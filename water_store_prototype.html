@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Optom Suv Do'koni CRM — Livewire Prototip</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- TOP NAVBAR -->
+  <header class="bg-slate-900/90 border-b border-slate-800 px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-xl shadow-lg shadow-cyan-500/20">
+        💧
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-black tracking-tight text-white">AquaOptom CRM</h1>
+          <span class="text-[10px] bg-cyan-950 border border-cyan-800 text-cyan-400 px-2 py-0.5 rounded-full font-bold uppercase">Suv & Ichimliklar</span>
+        </div>
+        <p class="text-xs text-slate-400">Optom savdo, Livewire interfeys va Telegram Bot integratsiyasi</p>
+      </div>
+    </div>
+
+    <!-- Livewire Navigation Tabs -->
+    <div class="flex items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-2xl border border-slate-700/60 text-xs font-semibold">
+      <button onclick="switchTab('inward')" id="tab-inward" class="tab-btn px-4 py-2 rounded-xl transition-all bg-blue-600 text-white shadow-md flex items-center gap-2">
+        📥 Tezkor Kirim
+      </button>
+      <button onclick="switchTab('pos')" id="tab-pos" class="tab-btn px-4 py-2 rounded-xl transition-all text-slate-300 hover:text-white flex items-center gap-2">
+        🛒 Optom Savdo (POS)
+      </button>
+      <button onclick="switchTab('calculator')" id="tab-calculator" class="tab-btn px-4 py-2 rounded-xl transition-all text-slate-300 hover:text-white flex items-center gap-2">
+        🧮 Ombor Kalkulyatori
+      </button>
+      <button onclick="switchTab('catalog')" id="tab-catalog" class="tab-btn px-4 py-2 rounded-xl transition-all text-slate-300 hover:text-white flex items-center gap-2">
+        🏷️ Mahsulotlar & Standart Narx
+      </button>
+      <button onclick="switchTab('telegram')" id="tab-telegram" class="tab-btn px-4 py-2 rounded-xl transition-all text-slate-300 hover:text-white flex items-center gap-2">
+        🤖 Telegram Bot
+      </button>
+    </div>
+
+    <!-- Quick Status -->
+    <div class="hidden sm:flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="text-slate-300 font-mono" id="top-cash-info">Kassa: 14 250 000 so'm</span>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 p-4 md:p-6 max-w-7xl mx-auto w-full">
+
+    <!-- ================= TAB 1: TEZKOR KIRIM (INWARD / SUPPLY) ================= -->
+    <section id="content-inward" class="space-y-6">
+      <div class="max-w-3xl mx-auto bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+        <div class="border-b border-slate-800 pb-4">
+          <span class="text-xs uppercase font-bold text-blue-400 bg-blue-950/80 px-2.5 py-1 rounded-full border border-blue-900">Yuk Kelishi</span>
+          <h2 class="text-xl font-bold text-white mt-2">Yangi Mahsulotlarni Omborga Kirim Qilish</h2>
+          <p class="text-xs text-slate-400">Nomini yozing (yo'q bo'lsa darhol yangi yaratiladi), litrini, sonini va kirim narxini kiriting</p>
+        </div>
+
+        <form id="inward-form" onsubmit="handleInwardSubmit(event)" class="space-y-5">
+          <!-- 1. Mahsulot nomi & Avtomatik qo'shish -->
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">
+              1. Mahsulot Nomi <span class="text-red-400">*</span>
+            </label>
+            <div class="relative">
+              <input type="text" id="inward-name-input" placeholder="Yozing: Fanta, Coca-Cola, Chortoq, Nestle..." required
+                oninput="handleNameInput(this.value)"
+                class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none">
+              
+              <!-- Quick Add Popover (Livewire autocomplete & quick create) -->
+              <div id="quick-add-box" class="hidden absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl p-2 z-20 space-y-1">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1">Agar mahsulot nomi bazada bo'lmasa, nomini yozib yangi qo'shishingiz mumkin (ID avtomatik beriladi).</p>
+          </div>
+
+          <!-- 2. Litr / Hajm Tanlash -->
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1.5">
+              2. Idish Hajmi (Litri) <span class="text-red-400">*</span>
+            </label>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="0.25" class="hidden" onchange="calcInwardTotal()">
+                0.25 L
+              </label>
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="0.5" checked class="hidden" onchange="calcInwardTotal()">
+                0.5 L
+              </label>
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="1.0" class="hidden" onchange="calcInwardTotal()">
+                1.0 L
+              </label>
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="1.5" class="hidden" onchange="calcInwardTotal()">
+                1.5 L
+              </label>
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="5.0" class="hidden" onchange="calcInwardTotal()">
+                5.0 L
+              </label>
+              <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-700 bg-slate-950 cursor-pointer hover:border-blue-500 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-400 font-bold text-xs transition-all">
+                <input type="radio" name="inward-litres" value="18.9" class="hidden" onchange="calcInwardTotal()">
+                18.9 L
+              </label>
+            </div>
+          </div>
+
+          <!-- 3. Soni va Kirim Narxi -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                3. Kelgan Miqdor (Dona soni) <span class="text-red-400">*</span>
+              </label>
+              <input type="number" id="inward-qty" value="150" min="1" required oninput="calcInwardTotal()"
+                class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl px-4 py-2.5 text-sm text-white font-mono font-bold focus:outline-none">
+              <span class="text-[11px] text-slate-500 mt-1 block">Masalan: 150 dona</span>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1.5">
+                4. Kirim Narxi (1 dona uchun) <span class="text-red-400">*</span>
+              </label>
+              <div class="relative">
+                <input type="number" id="inward-cost" value="5000" min="1" required oninput="calcInwardTotal()"
+                  class="w-full bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl pl-4 pr-12 py-2.5 text-sm text-white font-mono font-bold focus:outline-none">
+                <span class="absolute right-3 top-2.5 text-xs text-slate-500">so'm</span>
+              </div>
+              <span class="text-[11px] text-slate-500 mt-1 block">Masalan: 5 000 so'm</span>
+            </div>
+          </div>
+
+          <!-- Kalkulyatsiya qutisi -->
+          <div class="bg-blue-950/40 border border-blue-800/60 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <span class="text-xs text-blue-300 font-semibold">Ushbu kirim partiyasi jami summasi:</span>
+              <div id="inward-total-preview" class="text-2xl font-black text-white mt-0.5">750 000 so'm</div>
+            </div>
+            <div class="text-right">
+              <span class="text-[11px] text-slate-400">150 dona × 5 000 so'm</span>
+              <div class="text-xs text-emerald-400 font-bold mt-0.5">✓ Ombor qoldig'iga to'g'ridan-to'g'ri qo'shiladi</div>
+            </div>
+          </div>
+
+          <!-- Submit -->
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 active:scale-[0.98] text-white font-bold rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2">
+              📥 Kirim Qilish va Bazaga Yozish
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: OPTOM SAVDO (POS) ================= -->
+    <section id="content-pos" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Chap: Mahsulot tanlash va Xaridor -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+            <div>
+              <h2 class="text-lg font-bold text-white">Optom Savdo (Kassa)</h2>
+              <p class="text-xs text-slate-400">Xaridorga qarab erkin narx yoki tizim narxini qo'llash</p>
+            </div>
+            <!-- Xaridor ismi -->
+            <div class="w-full sm:w-auto">
+              <input type="text" id="pos-customer" placeholder="Xaridor / Do'kon nomi..." value="Farhod aka (Chorsu)"
+                class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Mahsulot qidirish -->
+          <div class="relative">
+            <input type="text" id="pos-search" oninput="renderPosGrid()" placeholder="Mahsulot nomi yoki litrini qidirish..."
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none">
+          </div>
+
+          <!-- Mahsulotlar paneli -->
+          <div id="pos-items-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[460px] overflow-y-auto pr-1">
+            <!-- JS orqali to'ldiriladi -->
+          </div>
+        </div>
+
+        <!-- O'ng: Savat & Narxni erkin/tizim tanlash -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-3xl p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+              <div>
+                <h3 class="text-sm font-bold text-white uppercase">🧾 Optom Savdo Cheki</h3>
+                <span class="text-[11px] text-slate-400" id="pos-customer-display">Farhod aka (Chorsu)</span>
+              </div>
+              <button onclick="clearPosCart()" class="text-xs text-red-400 hover:underline">Savatni tozalash</button>
+            </div>
+
+            <div id="pos-cart-container" class="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+              <!-- JS orqali to'ldiriladi -->
+            </div>
+          </div>
+
+          <!-- Jami va To'lov -->
+          <div class="border-t border-slate-800 pt-4 space-y-3">
+            <div class="flex justify-between text-xs text-slate-400">
+              <span>Jami tannarxi (kirim):</span>
+              <span id="pos-total-cost" class="font-mono text-slate-300">0 so'm</span>
+            </div>
+            <div class="flex justify-between text-xs text-emerald-400 font-bold">
+              <span>Ushbu savdodan SOF FOYDA:</span>
+              <span id="pos-total-profit" class="font-mono">+0 so'm</span>
+            </div>
+            <div class="flex justify-between text-lg font-black text-white">
+              <span>JAMI TO'LOV:</span>
+              <span id="pos-total-retail" class="text-cyan-400 font-mono">0 so'm</span>
+            </div>
+
+            <!-- To'lov turi -->
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <label class="p-2 rounded-xl border border-slate-700 bg-slate-950 text-center cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-950 text-slate-300 font-semibold">
+                <input type="radio" name="payment-method" value="cash" checked class="hidden"> Naqd
+              </label>
+              <label class="p-2 rounded-xl border border-slate-700 bg-slate-950 text-center cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-950 text-slate-300 font-semibold">
+                <input type="radio" name="payment-method" value="card" class="hidden"> Karta
+              </label>
+              <label class="p-2 rounded-xl border border-slate-700 bg-slate-950 text-center cursor-pointer has-[:checked]:border-cyan-500 has-[:checked]:bg-cyan-950 text-slate-300 font-semibold">
+                <input type="radio" name="payment-method" value="debt" class="hidden"> Nasiya
+              </label>
+            </div>
+
+            <button onclick="submitPosSale()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-[0.98] text-white text-sm font-bold rounded-2xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2">
+              💳 Savdoni Tasdiqlash & Chiqim Qilish
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: OMBOR KALKULYATORI (INTERACTIVE CHECKBOX FILTER) ================= -->
+    <section id="content-calculator" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs uppercase font-bold text-purple-400 bg-purple-950/80 px-2.5 py-1 rounded-full border border-purple-900">Interaktiv Tahlil</span>
+              <h2 class="text-xl font-bold text-white">Ombordagi Mahsulotlar Kalkulyatori</h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-1">
+              Barcha mahsulotlarni yoki alohida Fanta, Coca-Colani tanlang. Checkboxlar orqali faqat 0.5L, 1L yoki 1.5L larni belgilab, o'sha zahotiyoq umumiy summani hisoblang!
+            </p>
+          </div>
+
+          <div class="flex gap-2">
+            <button onclick="selectAllCalc(true)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl text-slate-300">Hammasini tanlash</button>
+            <button onclick="selectAllCalc(false)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl text-slate-400">Tozalash</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Calculation Result Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-950 p-5 rounded-2xl border border-slate-800/80">
+          <div>
+            <span class="text-xs text-slate-400">Tanlangan tovarlar kirim tannarxi:</span>
+            <div id="calc-res-cost" class="text-xl font-black text-white mt-1">0 so'm</div>
+            <span class="text-[10px] text-slate-500">Omborga tikilgan sarmoya</span>
+          </div>
+
+          <div>
+            <span class="text-xs text-slate-400">Kutilayotgan sotuv summasi:</span>
+            <div id="calc-res-retail" class="text-xl font-black text-cyan-400 mt-1">0 so'm</div>
+            <span class="text-[10px] text-slate-500">Standart tizim narxida</span>
+          </div>
+
+          <div>
+            <span class="text-xs text-slate-400">Kutilayotgan SOF FOYDA:</span>
+            <div id="calc-res-profit" class="text-xl font-black text-emerald-400 mt-1">+0 so'm</div>
+            <span id="calc-res-margin" class="text-[10px] text-emerald-500 font-bold">Marja: 0%</span>
+          </div>
+
+          <div>
+            <span class="text-xs text-slate-400">Jami tanlangan tovar soni:</span>
+            <div id="calc-res-qty" class="text-xl font-black text-purple-400 mt-1">0 dona</div>
+            <span id="calc-res-count" class="text-[10px] text-slate-500">0 xil pozitsiya</span>
+          </div>
+        </div>
+
+        <!-- Filtered Group List with Checkboxes -->
+        <div id="calc-groups-container" class="space-y-4">
+          <!-- Rendered via JS: Brendlar va ularning litrlari checkboxlar bilan -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 4: MAHSULOTLAR KATALOGI VA STANDART NARX ================= -->
+    <section id="content-catalog" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <div>
+            <h2 class="text-xl font-bold text-white">Mahsulotlar Katalogi & Standart Sotuv Narxlari</h2>
+            <p class="text-xs text-slate-400">Har bir mahsulot va litr uchun standart tizim narxini (default retail price) belgilab qo'yish</p>
+          </div>
+          <button onclick="switchTab('inward')" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold">
+            + Yangi Yuk Kirim Qilish
+          </button>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-800">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 font-bold uppercase border-b border-slate-800">
+              <tr>
+                <th class="p-3.5">ID</th>
+                <th class="p-3.5">Mahsulot Nomi</th>
+                <th class="p-3.5">Hajmi (Litr)</th>
+                <th class="p-3.5 text-right">Ombordagi Qoldiq</th>
+                <th class="p-3.5 text-right">Kirim Narxi (Tannarx)</th>
+                <th class="p-3.5 text-right">Standart Tizim Narxi</th>
+                <th class="p-3.5 text-right">1 dona foydasi</th>
+                <th class="p-3.5 text-center">Harakat</th>
+              </tr>
+            </thead>
+            <tbody id="catalog-table-body" class="divide-y divide-slate-800/60 bg-slate-900/60">
+              <!-- Rendered by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 5: TELEGRAM BOT INTEGRATSIYASI ================= -->
+    <section id="content-telegram" class="hidden space-y-6">
+      <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6">
+        <!-- Telegram Bot Chat Mockup -->
+        <div class="md:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-2xl flex flex-col justify-between h-[600px]">
+          <div>
+            <div class="flex items-center gap-3 border-b border-slate-800 pb-3 mb-4">
+              <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
+                ✈️
+              </div>
+              <div>
+                <h3 class="text-sm font-bold text-white">AquaOptom CRM Bot</h3>
+                <span class="text-[11px] text-emerald-400">bot online</span>
+              </div>
+            </div>
+
+            <!-- Messages list -->
+            <div id="tg-messages" class="space-y-3 overflow-y-auto max-h-[420px] pr-2 text-xs">
+              <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] space-y-1">
+                <p class="font-bold text-blue-400">Assalomu alaykum, Xo'jayin!</p>
+                <p>AquaOptom do'kon botiga xush kelibsiz. Quyidagi buyruqlardan foydalanishingiz mumkin:</p>
+                <p class="text-[10px] text-slate-400">/hisobot — Bugungi savdo va sof foyda<br>/qoldiq Fanta — Fanta qoldig'i<br>/kirim — Mobil orqali tezkor kirim</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Telegram Quick Buttons -->
+          <div class="border-t border-slate-800 pt-3 space-y-2">
+            <div class="grid grid-cols-3 gap-2">
+              <button onclick="sendTgCommand('/hisobot')" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl text-center">
+                📊 /hisobot
+              </button>
+              <button onclick="sendTgCommand('/qoldiq Fanta')" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl text-center">
+                📦 /qoldiq Fanta
+              </button>
+              <button onclick="sendTgCommand('/kassa')" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl text-center">
+                💰 /kassa
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="md:col-span-5 space-y-4">
+          <div class="bg-gradient-to-br from-blue-900/60 to-slate-900 border border-blue-800/40 rounded-3xl p-6">
+            <span class="text-xs uppercase font-bold text-cyan-400">Kassa Apparatisiz Ishlash</span>
+            <h3 class="text-lg font-bold text-white mt-1">Smartfon & Telegram Boshqaruvi</h3>
+            <p class="text-xs text-slate-300 mt-2 leading-relaxed">
+              Do'kon egasi yoki haydovchilar kompyuter yonida bo'lmaganida ham, smartfondagi Telegram orqali yuk kelganda kirim qila oladi, savdo hisobotini ko'radi va ombordan kerakli litrli suvlar qoldig'ini bir zumda bilib oladi.
+            </p>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3 text-xs">
+            <h4 class="font-bold text-white">Texnik Bog'lanish:</h4>
+            <div class="p-3 bg-slate-950 rounded-xl font-mono text-[11px] text-cyan-300">
+              Laravel API ⟷ Telegram Webhook<br>
+              Reaksiya tezligi: &lt; 0.2 soniya
+            </div>
+            <p class="text-slate-400">Har bir katta savdo bo'lganda (masalan 100 blokdan oshsa) do'kon egasiga push-xabar jo'natiladi.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white border border-slate-700 px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-semibold">
+    <span id="toast-icon">✓</span>
+    <span id="toast-msg">Muvaffaqiyatli bajarildi!</span>
+  </div>
+
+  <script>
+    // Initial Database (Products & Litre Variants)
+    let catalog = [
+      { id: 1, name: "Fanta", litres: 0.5, stock: 150, costPrice: 5000, retailPrice: 6500 },
+      { id: 2, name: "Fanta", litres: 1.0, stock: 80, costPrice: 7500, retailPrice: 9500 },
+      { id: 3, name: "Fanta", litres: 1.5, stock: 200, costPrice: 10000, retailPrice: 12500 },
+      { id: 4, name: "Coca-Cola", litres: 0.5, stock: 240, costPrice: 5200, retailPrice: 6500 },
+      { id: 5, name: "Coca-Cola", litres: 1.5, stock: 180, costPrice: 10500, retailPrice: 13000 },
+      { id: 6, name: "Chortoq", litres: 0.5, stock: 300, costPrice: 4000, retailPrice: 5500 },
+      { id: 7, name: "Chortoq", litres: 1.0, stock: 120, costPrice: 6000, retailPrice: 8000 },
+      { id: 8, name: "Nestle Pure Life", litres: 5.0, stock: 90, costPrice: 9000, retailPrice: 12000 },
+      { id: 9, name: "Nestle Pure Life (Kuller)", litres: 18.9, stock: 50, costPrice: 14000, retailPrice: 20000 }
+    ];
+
+    let posCart = [
+      { id: 1, name: "Fanta", litres: 0.5, qty: 50, costPrice: 5000, retailPrice: 6500, isSystemPrice: true, defaultRetail: 6500 }
+    ];
+
+    let dailyCash = 14250000;
+    let selectedCalcVariantIds = [1, 2, 3, 4, 5, 6, 7, 8, 9]; // Initially all checked
+
+    function formatMoney(num) {
+      return new Intl.NumberFormat('uz-UZ').format(Math.round(num)) + " so'm";
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      ['inward', 'pos', 'calculator', 'catalog', 'telegram'].forEach(t => {
+        document.getElementById(`content-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${t}`);
+        btn.classList.remove('bg-blue-600', 'text-white', 'shadow-md');
+        btn.classList.add('text-slate-300');
+      });
+
+      document.getElementById(`content-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow-md');
+      activeBtn.classList.remove('text-slate-300');
+
+      if (tabId === 'pos') renderPosGrid();
+      if (tabId === 'calculator') renderCalculator();
+      if (tabId === 'catalog') renderCatalogTable();
+    }
+
+    // ================= INWARD LOGIC =================
+    function handleNameInput(val) {
+      const q = val.trim().toLowerCase();
+      const popover = document.getElementById('quick-add-box');
+      if (!q) {
+        popover.classList.add('hidden');
+        return;
+      }
+
+      // Check existing unique names
+      const existingNames = [...new Set(catalog.map(c => c.name))];
+      const matches = existingNames.filter(n => n.toLowerCase().includes(q));
+
+      let html = '';
+      if (matches.length > 0) {
+        html += matches.map(m => `
+          <div onclick="selectExistingName('${m}')" class="p-2 hover:bg-slate-700 rounded-lg cursor-pointer flex items-center justify-between text-xs text-white">
+            <span>🥤 ${m}</span>
+            <span class="text-[10px] text-slate-400">Mavjud mahsulot</span>
+          </div>
+        `).join('');
+      }
+
+      // Always show quick-add option if exact match doesn't exist
+      const exact = existingNames.find(n => n.toLowerCase() === q);
+      if (!exact) {
+        html += `
+          <div onclick="selectNewName('${val.trim()}')" class="p-2.5 bg-blue-950/80 hover:bg-blue-900 border border-blue-800 rounded-lg cursor-pointer flex items-center justify-between text-xs text-cyan-300 font-bold">
+            <span>✨ + '${val.trim()}' nomli yangi mahsulot yaratish</span>
+            <span class="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded font-mono">Yangi ID</span>
+          </div>
+        `;
+      }
+
+      popover.innerHTML = html;
+      popover.classList.remove('hidden');
+    }
+
+    function selectExistingName(name) {
+      document.getElementById('inward-name-input').value = name;
+      document.getElementById('quick-add-box').classList.add('hidden');
+      calcInwardTotal();
+    }
+
+    function selectNewName(name) {
+      document.getElementById('inward-name-input').value = name;
+      document.getElementById('quick-add-box').classList.add('hidden');
+      showToast(`'${name}' yangi mahsulot sifatida tanlandi!`);
+      calcInwardTotal();
+    }
+
+    function calcInwardTotal() {
+      const qty = parseFloat(document.getElementById('inward-qty').value) || 0;
+      const cost = parseFloat(document.getElementById('inward-cost').value) || 0;
+      document.getElementById('inward-total-preview').textContent = formatMoney(qty * cost);
+    }
+
+    function handleInwardSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('inward-name-input').value.trim();
+      const litres = parseFloat(document.querySelector('input[name="inward-litres"]:checked').value);
+      const qty = parseInt(document.getElementById('inward-qty').value);
+      const costPrice = parseFloat(document.getElementById('inward-cost').value);
+
+      if (!name || isNaN(qty) || isNaN(costPrice)) return;
+
+      // Check if variant already exists
+      const existing = catalog.find(c => c.name.toLowerCase() === name.toLowerCase() && c.litres === litres);
+      if (existing) {
+        // Weighted average cost formula
+        const oldCostTotal = existing.stock * existing.costPrice;
+        const newCostTotal = qty * costPrice;
+        existing.costPrice = Math.round((oldCostTotal + newCostTotal) / (existing.stock + qty));
+        existing.stock += qty;
+      } else {
+        const nextId = catalog.length ? Math.max(...catalog.map(c => c.id)) + 1 : 1;
+        catalog.push({
+          id: nextId,
+          name: name,
+          litres: litres,
+          stock: qty,
+          costPrice: costPrice,
+          retailPrice: Math.round(costPrice * 1.25) // Standart +25% marja
+        });
+        selectedCalcVariantIds.push(nextId);
+      }
+
+      showToast(`Kirim qabul qilindi: ${name} ${litres}L (${qty} dona)`);
+      document.getElementById('inward-form').reset();
+      document.getElementById('inward-name-input').value = '';
+      calcInwardTotal();
+      switchTab('catalog');
+    }
+
+    // ================= POS LOGIC =================
+    function renderPosGrid() {
+      const q = (document.getElementById('pos-search').value || '').toLowerCase();
+      const grid = document.getElementById('pos-items-grid');
+
+      const filtered = catalog.filter(c => c.name.toLowerCase().includes(q) || c.litres.toString().includes(q));
+
+      grid.innerHTML = filtered.map(item => `
+        <div onclick="addPosItem(${item.id})" class="p-3 bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500 rounded-2xl cursor-pointer transition-all flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[11px] font-black text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-800">${item.litres} Litr</span>
+              <span class="text-[10px] text-slate-400">Qoldiq: ${item.stock}</span>
+            </div>
+            <h4 class="text-xs font-bold text-white group-hover:text-cyan-300 mt-1">${item.name}</h4>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-800 flex justify-between items-center text-xs">
+            <span class="font-bold text-white">${formatMoney(item.retailPrice)}</span>
+            <span class="text-[10px] text-emerald-400 font-bold">+ Tanlash</span>
+          </div>
+        </div>
+      `).join('');
+
+      renderPosCart();
+    }
+
+    function addPosItem(id) {
+      const item = catalog.find(c => c.id === id);
+      if (!item || item.stock <= 0) {
+        showToast("Omborda mahsulot qolmagan!", "⚠️");
+        return;
+      }
+
+      const inCart = posCart.find(p => p.id === id);
+      if (inCart) {
+        if (inCart.qty + 10 <= item.stock) {
+          inCart.qty += 10; // Optom bo'lgani uchun 10 donadan qo'shiladi
+        } else {
+          inCart.qty = item.stock;
+          showToast(`Maksimal qoldiq: ${item.stock} dona!`, "⚠️");
+        }
+      } else {
+        posCart.push({
+          id: item.id,
+          name: item.name,
+          litres: item.litres,
+          qty: 10,
+          costPrice: item.costPrice,
+          retailPrice: item.retailPrice,
+          isSystemPrice: true,
+          defaultRetail: item.retailPrice
+        });
+      }
+      renderPosCart();
+    }
+
+    function toggleSystemPrice(id, checked) {
+      const item = posCart.find(p => p.id === id);
+      if (!item) return;
+      item.isSystemPrice = checked;
+      if (checked) {
+        item.retailPrice = item.defaultRetail;
+      }
+      renderPosCart();
+    }
+
+    function updateCartRetailPrice(id, newPrice) {
+      const item = posCart.find(p => p.id === id);
+      if (!item) return;
+      const val = parseFloat(newPrice);
+      item.retailPrice = isNaN(val) ? 0 : val;
+      renderPosCartTotals();
+    }
+
+    function updateCartQty(id, newQty) {
+      const item = posCart.find(p => p.id === id);
+      const cat = catalog.find(c => c.id === id);
+      if (!item) return;
+
+      const val = parseInt(newQty);
+      if (val <= 0 || isNaN(val)) {
+        posCart = posCart.filter(p => p.id !== id);
+      } else if (cat && val > cat.stock) {
+        item.qty = cat.stock;
+        showToast(`Omborda faqat ${cat.stock} dona bor!`, "⚠️");
+      } else {
+        item.qty = val;
+      }
+      renderPosCart();
+    }
+
+    function renderPosCart() {
+      const container = document.getElementById('pos-cart-container');
+      if (posCart.length === 0) {
+        container.innerHTML = `<div class="text-center py-10 text-slate-500 text-xs">Savat bo'sh. Mahsulot tanlang.</div>`;
+        renderPosCartTotals();
+        return;
+      }
+
+      container.innerHTML = posCart.map(item => `
+        <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-bold text-white text-xs">${item.name} (${item.litres}L)</span>
+              <span class="text-[10px] text-slate-500 block">Kirim tannarxi: ${formatMoney(item.costPrice)}</span>
+            </div>
+            <button onclick="updateCartQty(${item.id}, 0)" class="text-slate-500 hover:text-red-400 text-xs px-1">✕</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <!-- Soni -->
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-0.5">Soni (dona):</label>
+              <input type="number" min="1" value="${item.qty}" onchange="updateCartQty(${item.id}, this.value)"
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white font-mono font-bold">
+            </div>
+
+            <!-- Sotuv Narxi -->
+            <div>
+              <label class="text-[10px] text-slate-400 block mb-0.5">1 dona sotuv narxi:</label>
+              <input type="number" value="${item.retailPrice}" ${item.isSystemPrice ? 'readonly' : ''}
+                oninput="updateCartRetailPrice(${item.id}, this.value)"
+                class="w-full bg-slate-900 border ${item.isSystemPrice ? 'border-slate-800 text-slate-400' : 'border-cyan-500 text-cyan-300 font-bold'} rounded-lg px-2.5 py-1 text-xs font-mono">
+            </div>
+          </div>
+
+          <!-- Tizim Narxi Checkboxi -->
+          <div class="flex items-center justify-between pt-1 border-t border-slate-900 text-xs">
+            <label class="flex items-center gap-2 cursor-pointer text-[11px] text-slate-400 hover:text-white">
+              <input type="checkbox" ${item.isSystemPrice ? 'checked' : ''} onchange="toggleSystemPrice(${item.id}, this.checked)"
+                class="rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-0">
+              <span>[x] Tizim narxi</span>
+            </label>
+            <span class="font-bold text-white font-mono text-xs">
+              Jami: ${formatMoney(item.qty * item.retailPrice)}
+            </span>
+          </div>
+        </div>
+      `).join('');
+
+      renderPosCartTotals();
+    }
+
+    function renderPosCartTotals() {
+      let totalCost = 0;
+      let totalRetail = 0;
+
+      posCart.forEach(item => {
+        totalCost += (item.qty * item.costPrice);
+        totalRetail += (item.qty * item.retailPrice);
+      });
+
+      const profit = totalRetail - totalCost;
+      document.getElementById('pos-total-cost').textContent = formatMoney(totalCost);
+      document.getElementById('pos-total-retail').textContent = formatMoney(totalRetail);
+      document.getElementById('pos-total-profit').textContent = `+${formatMoney(profit)}`;
+    }
+
+    function clearPosCart() {
+      posCart = [];
+      renderPosCart();
+    }
+
+    function submitPosSale() {
+      if (posCart.length === 0) {
+        showToast("Savat bo'sh!", "⚠️");
+        return;
+      }
+
+      let saleRetail = 0;
+      let saleProfit = 0;
+
+      // Ombor qoldig'ini kamaytirish
+      posCart.forEach(item => {
+        const prod = catalog.find(c => c.id === item.id);
+        if (prod) {
+          prod.stock = Math.max(0, prod.stock - item.qty);
+          saleRetail += (item.qty * item.retailPrice);
+          saleProfit += (item.qty * (item.retailPrice - item.costPrice));
+        }
+      });
+
+      dailyCash += saleRetail;
+      document.getElementById('top-cash-info').textContent = `Kassa: ${formatMoney(dailyCash)}`;
+
+      // Telegram xabarnoma simulyatsiyasi
+      addTgBotSaleNotification(saleRetail, saleProfit, posCart.length);
+
+      showToast(`Savdo amalga oshirildi! Foyda: +${formatMoney(saleProfit)}`);
+      clearPosCart();
+      renderPosGrid();
+    }
+
+    // ================= CALCULATOR (CHECKBOX FILTERS) =================
+    function selectAllCalc(state) {
+      if (state) {
+        selectedCalcVariantIds = catalog.map(c => c.id);
+      } else {
+        selectedCalcVariantIds = [];
+      }
+      renderCalculator();
+    }
+
+    function toggleCalcVariant(id) {
+      if (selectedCalcVariantIds.includes(id)) {
+        selectedCalcVariantIds = selectedCalcVariantIds.filter(i => i !== id);
+      } else {
+        selectedCalcVariantIds.push(id);
+      }
+      renderCalculator();
+    }
+
+    function toggleCalcProductAll(productName, checkAll) {
+      const items = catalog.filter(c => c.name === productName);
+      items.forEach(it => {
+        if (checkAll && !selectedCalcVariantIds.includes(it.id)) {
+          selectedCalcVariantIds.push(it.id);
+        } else if (!checkAll) {
+          selectedCalcVariantIds = selectedCalcVariantIds.filter(i => i !== it.id);
+        }
+      });
+      renderCalculator();
+    }
+
+    function renderCalculator() {
+      // Group by Product Name
+      const groups = {};
+      catalog.forEach(item => {
+        if (!groups[item.name]) groups[item.name] = [];
+        groups[item.name].push(item);
+      });
+
+      let totalCost = 0;
+      let totalRetail = 0;
+      let totalQty = 0;
+      let selectedCount = 0;
+
+      const container = document.getElementById('calc-groups-container');
+      container.innerHTML = Object.keys(groups).map(name => {
+        const variants = groups[name];
+        let groupCost = 0;
+        let groupRetail = 0;
+        let groupQty = 0;
+        let allGroupChecked = true;
+
+        const variantsHtml = variants.map(v => {
+          const isChecked = selectedCalcVariantIds.includes(v.id);
+          const vCost = v.stock * v.costPrice;
+          const vRetail = v.stock * v.retailPrice;
+
+          if (isChecked) {
+            totalCost += vCost;
+            totalRetail += vRetail;
+            totalQty += v.stock;
+            selectedCount++;
+            groupCost += vCost;
+            groupRetail += vRetail;
+            groupQty += v.stock;
+          } else {
+            allGroupChecked = false;
+          }
+
+          return `
+            <label class="flex items-center justify-between p-3 rounded-xl border ${isChecked ? 'border-cyan-500/80 bg-cyan-950/30' : 'border-slate-800 bg-slate-950/60'} cursor-pointer hover:border-cyan-500/50 transition-all">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleCalcVariant(${v.id})"
+                  class="rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-0">
+                <div>
+                  <span class="text-xs font-bold text-white">${v.litres} Litr</span>
+                  <span class="text-[11px] text-slate-400 block">Qoldiq: ${v.stock} dona</span>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-bold font-mono text-cyan-400">${formatMoney(vRetail)}</div>
+                <div class="text-[10px] text-slate-500 font-mono">Tannarx: ${formatMoney(vCost)}</div>
+              </div>
+            </label>
+          `;
+        }).join('');
+
+        return `
+          <div class="bg-slate-950 border border-slate-800/90 rounded-2xl p-4 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/70 pb-2">
+              <div class="flex items-center gap-3">
+                <input type="checkbox" ${allGroupChecked ? 'checked' : ''} onchange="toggleCalcProductAll('${name}', this.checked)"
+                  class="rounded border-slate-700 bg-slate-900 text-cyan-600 focus:ring-0">
+                <h3 class="text-sm font-black text-white flex items-center gap-2">
+                  🥤 ${name}
+                </h3>
+              </div>
+              <div class="text-xs font-semibold text-slate-400">
+                Guruh bo'yicha kutilayotgan sotuv: <span class="text-cyan-400 font-mono font-bold">${formatMoney(groupRetail)}</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              ${variantsHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Update banner metrics
+      const profit = totalRetail - totalCost;
+      const margin = totalRetail > 0 ? Math.round((profit / totalRetail) * 100) : 0;
+
+      document.getElementById('calc-res-cost').textContent = formatMoney(totalCost);
+      document.getElementById('calc-res-retail').textContent = formatMoney(totalRetail);
+      document.getElementById('calc-res-profit').textContent = `+${formatMoney(profit)}`;
+      document.getElementById('calc-res-margin').textContent = `Foydalilik marjasi: ~${margin}%`;
+      document.getElementById('calc-res-qty').textContent = `${totalQty} dona`;
+      document.getElementById('calc-res-count').textContent = `${selectedCount} ta litr pozitsiyasi tanlandi`;
+    }
+
+    // ================= CATALOG TABLE =================
+    function renderCatalogTable() {
+      const tbody = document.getElementById('catalog-table-body');
+      tbody.innerHTML = catalog.map((item, idx) => {
+        const profitPerUnit = item.retailPrice - item.costPrice;
+        return `
+          <tr class="hover:bg-slate-800/40 transition-colors">
+            <td class="p-3.5 text-slate-500 font-mono">${idx + 1}</td>
+            <td class="p-3.5 font-bold text-white">${item.name}</td>
+            <td class="p-3.5"><span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono font-bold">${item.litres} L</span></td>
+            <td class="p-3.5 text-right font-bold ${item.stock <= 50 ? 'text-amber-400' : 'text-slate-200'}">${item.stock} dona</td>
+            <td class="p-3.5 text-right font-mono text-slate-400">${formatMoney(item.costPrice)}</td>
+            <td class="p-3.5 text-right font-mono font-bold text-cyan-400">${formatMoney(item.retailPrice)}</td>
+            <td class="p-3.5 text-right font-mono font-semibold text-emerald-400">+${formatMoney(profitPerUnit)}</td>
+            <td class="p-3.5 text-center">
+              <button onclick="editCatalogPrice(${item.id})" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px]">
+                Narxni o'zgartirish ✏️
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function editCatalogPrice(id) {
+      const item = catalog.find(c => c.id === id);
+      if (!item) return;
+      const newP = prompt(`'${item.name} ${item.litres}L' uchun yangi standart sotuv narxini kiriting:`, item.retailPrice);
+      if (newP && !isNaN(parseFloat(newP))) {
+        item.retailPrice = parseFloat(newP);
+        showToast("Standart tizim narxi yangilandi!");
+        renderCatalogTable();
+      }
+    }
+
+    // ================= TELEGRAM BOT LOGIC =================
+    function sendTgCommand(cmd) {
+      const container = document.getElementById('tg-messages');
+      // User bubble
+      container.innerHTML += `
+        <div class="flex justify-end">
+          <div class="bg-blue-600 text-white p-2.5 rounded-2xl rounded-tr-none max-w-[80%] font-semibold">
+            ${cmd}
+          </div>
+        </div>
+      `;
+
+      setTimeout(() => {
+        let botReply = '';
+        if (cmd === '/hisobot') {
+          botReply = `
+            📊 <strong>KUNLIK SAVDO VA KASSA HISOBOTI:</strong><br>
+            • Jami kassa: <strong>${formatMoney(dailyCash)}</strong><br>
+            • Bugungi sof foyda: <strong>+3 840 000 so'm</strong><br>
+            • Sotilgan jami hajm: <strong>840 dona suv</strong>
+          `;
+        } else if (cmd.includes('/qoldiq')) {
+          const fantaItems = catalog.filter(c => c.name.toLowerCase() === 'fanta');
+          botReply = `
+            🥤 <strong>FANTA OMBOR QOLDIG'I:</strong><br>
+            ${fantaItems.map(f => `• ${f.litres}L idishda: <strong>${f.stock} dona</strong>`).join('<br>')}
+          `;
+        } else if (cmd === '/kassa') {
+          botReply = `💰 Hozirgi kassa balansi: <strong>${formatMoney(dailyCash)}</strong>`;
+        }
+
+        container.innerHTML += `
+          <div class="bg-slate-800 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[85%] space-y-1">
+            ${botReply}
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+      }, 300);
+    }
+
+    function addTgBotSaleNotification(retail, profit, itemsCount) {
+      const container = document.getElementById('tg-messages');
+      container.innerHTML += `
+        <div class="bg-slate-800/90 border border-emerald-800/60 text-slate-200 p-3 rounded-2xl rounded-tl-none max-w-[90%] space-y-1">
+          <p class="font-bold text-emerald-400">🔔 Yangi Optom Savdo!</p>
+          <p>Xaridor: <strong>Farhod aka (Chorsu)</strong></p>
+          <p>Jami to'lov: <strong>${formatMoney(retail)}</strong> (${itemsCount} xil suv)</p>
+          <p class="text-emerald-400 font-bold">Sof Foyda: +${formatMoney(profit)}</p>
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // Helper Toast
+    function showToast(msg, icon = "✓") {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = msg;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Init
+    calcInwardTotal();
+  </script>
+</body>
+</html>

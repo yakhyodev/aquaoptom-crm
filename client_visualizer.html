@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartStore CRM - Client Vizualizatsiyasi va Ishlash Mexanizmi</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+    .step-active { animation: pulse-ring 2s infinite; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header & Interactive Stepper -->
+    <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-6 shadow-xl backdrop-blur-md">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700/60 pb-5 mb-5">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-blue-400 bg-blue-950/80 px-2.5 py-1 rounded-full border border-blue-800/60">Client Tomon Interfeysi</span>
+          <h1 class="text-2xl font-black text-white mt-2">Do'konda Tizim Qanday Ko'rinadi va Ishlaydi?</h1>
+          <p class="text-sm text-slate-400">Pastdagi 4 ta asosiy ekranni tanlab, har bir bosqichning ishlashini jonli ko'ring:</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="startAutoTour()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition-all flex items-center gap-1.5">
+            ▶️ Avtomatik Sayohat (Tour)
+          </button>
+        </div>
+      </div>
+
+      <!-- Step Navigation -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <button onclick="setScreen(1)" id="btn-step-1" class="step-btn p-3.5 rounded-xl border border-blue-500 bg-blue-950/60 text-left transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-blue-400 mb-1">
+            <span>1-EKRAN</span>
+            <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          </div>
+          <div class="font-bold text-sm text-white">🚚 Yuk Qabul Qilish</div>
+          <div class="text-[11px] text-slate-400 mt-1">Kategoriya, kg/dona/l, tannarx</div>
+        </button>
+
+        <button onclick="setScreen(2)" id="btn-step-2" class="step-btn p-3.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-left transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+            <span>2-EKRAN</span>
+          </div>
+          <div class="font-bold text-sm text-white">🏷️ Ombor & Qoldiqlar</div>
+          <div class="text-[11px] text-slate-400 mt-1">Kirim, sotuv narxi va jami kapital</div>
+        </button>
+
+        <button onclick="setScreen(3)" id="btn-step-3" class="step-btn p-3.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-left transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+            <span>3-EKRAN</span>
+          </div>
+          <div class="font-bold text-sm text-white">🛒 Kassa & Tarozi (POS)</div>
+          <div class="text-[11px] text-slate-400 mt-1">Kasrli sotuv, tezkor qidiruv, chek</div>
+        </button>
+
+        <button onclick="setScreen(4)" id="btn-step-4" class="step-btn p-3.5 rounded-xl border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-left transition-all">
+          <div class="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+            <span>4-EKRAN</span>
+          </div>
+          <div class="font-bold text-sm text-white">📱 Xaridor Ekrani & Foyda</div>
+          <div class="text-[11px] text-slate-400 mt-1">Chek, QR to'lov va bir zumda foyda</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- MAIN DISPLAY CANVAS (Client Screen Mockup) -->
+    <div class="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+
+      <!-- ================= SCREEN 1: YUK KELISHI ================= -->
+      <div id="screen-1" class="screen-content space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-xl font-bold">1</div>
+              <div>
+                <h3 class="text-base font-bold text-white">Mijoz / Do'kondor Qanday Yuk Qabul Qiladi?</h3>
+                <p class="text-xs text-slate-400">Yuk mashinasi kelganda operator yoki do'kondor planshet yoki kompyuterda bu oynani ochadi</p>
+              </div>
+            </div>
+            <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full font-mono">Real-time Kalkulyator</span>
+          </div>
+
+          <!-- Interactive Input Mockup -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 bg-slate-950/80 p-5 rounded-xl border border-slate-800/80">
+            <!-- Chap tomon: Kiritish formalari -->
+            <div class="lg:col-span-7 space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">1. Kategoriyani tanlaydi:</label>
+                <div class="flex gap-2">
+                  <span class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-bold">🥦 Sabzavot va Mevalar</span>
+                  <span class="px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-xs">🥤 Ichimliklar</span>
+                  <span class="px-3 py-1.5 bg-slate-800 text-slate-400 rounded-lg text-xs">🥛 Sut mollari</span>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">2. Mahsulot nomi:</label>
+                <input type="text" value="Qizil Olma (Golden)" readonly class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-sm text-white font-medium">
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 mb-1">3. O'lchov birligi:</label>
+                  <div class="grid grid-cols-3 gap-1">
+                    <button class="py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs">kg</button>
+                    <button class="py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">dona</button>
+                    <button class="py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">litr</button>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 mb-1">4. Miqdor (kg):</label>
+                  <input type="number" id="s1-qty" value="150" oninput="recalcScreen1()" class="w-full bg-slate-900 border border-blue-500 rounded-lg px-3 py-1.5 text-sm font-bold text-white">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 mb-1">5. Kirim narxi (1 kg uchun):</label>
+                  <input type="number" id="s1-cost" value="8000" oninput="recalcScreen1()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200">
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-400 mb-1">6. Sotuv narxi (1 kg uchun):</label>
+                  <input type="number" id="s1-retail" value="12500" oninput="recalcScreen1()" class="w-full bg-slate-900 border border-emerald-500 rounded-lg px-3 py-2 text-sm font-bold text-emerald-400">
+                </div>
+              </div>
+            </div>
+
+            <!-- O'ng tomon: Tizimning orqa fondagi aqlli hisoboti -->
+            <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+              <div>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">⚡ Tizim avtomatik nimalarni hisoblaydi:</span>
+                <div class="mt-3 space-y-2.5">
+                  <div class="flex justify-between text-xs py-1 border-b border-slate-800">
+                    <span class="text-slate-400">Ushbu yuk jami xarajati:</span>
+                    <span id="s1-out-total-cost" class="font-bold text-white">1 200 000 so'm</span>
+                  </div>
+                  <div class="flex justify-between text-xs py-1 border-b border-slate-800">
+                    <span class="text-slate-400">Sotilgandagi jami tushum:</span>
+                    <span id="s1-out-total-retail" class="font-bold text-emerald-400">1 875 000 so'm</span>
+                  </div>
+                  <div class="flex justify-between text-xs py-1 border-b border-slate-800">
+                    <span class="text-slate-400">1 kg dan kutilayotgan foyda:</span>
+                    <span id="s1-out-unit-profit" class="font-bold text-blue-400">+4 500 so'm</span>
+                  </div>
+                  <div class="flex justify-between text-xs py-1">
+                    <span class="text-slate-400">Do'kon ustamasi (Markup):</span>
+                    <span id="s1-out-markup" class="font-black text-purple-400">+56.2%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="p-3 bg-blue-950/40 border border-blue-800/60 rounded-lg text-[11px] text-blue-300 leading-relaxed">
+                💡 <strong>Afzalligi:</strong> Do'kondor hisob-kitobda adashmaydi. "Saqlash" bosilishi bilan ushbu tovar avtomatik ravishda omborga va kassa peshtaxtasiga tushadi.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCREEN 2: OMBOR VA QOLDIQLAR ================= -->
+      <div id="screen-2" class="screen-content hidden space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xl font-bold">2</div>
+              <div>
+                <h3 class="text-base font-bold text-white">Ombor (Barcha Mahsulotlar) Ekranining Ko'rinishi</h3>
+                <p class="text-xs text-slate-400">Do'kondor bir qarashda butun do'kondagi boylik va qoldiqlarni ko'radi</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table Mockup -->
+          <div class="overflow-x-auto rounded-xl border border-slate-800">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950 text-slate-400 font-bold uppercase border-b border-slate-800">
+                <tr>
+                  <th class="p-3">Mahsulot</th>
+                  <th class="p-3">Birlik</th>
+                  <th class="p-3 text-right">Qoldiq</th>
+                  <th class="p-3 text-right">Kirim narxi</th>
+                  <th class="p-3 text-right">Sotuv narxi</th>
+                  <th class="p-3 text-right">1 birlik foydasi</th>
+                  <th class="p-3 text-right">Ombordagi Qiymati</th>
+                  <th class="p-3 text-center">Holat</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 bg-slate-900/50">
+                <tr class="hover:bg-slate-800/40">
+                  <td class="p-3 font-bold text-white flex items-center gap-2">
+                    🍎 Qizil Olma (Golden)
+                  </td>
+                  <td class="p-3"><span class="px-2 py-0.5 bg-amber-950 text-amber-400 rounded border border-amber-800 font-mono">kg</span></td>
+                  <td class="p-3 text-right font-bold text-white">150.0 kg</td>
+                  <td class="p-3 text-right text-slate-400">8 000 so'm</td>
+                  <td class="p-3 text-right font-semibold text-emerald-400">12 500 so'm</td>
+                  <td class="p-3 text-right font-bold text-blue-400">+4 500 so'm</td>
+                  <td class="p-3 text-right font-mono">1 200 000 so'm</td>
+                  <td class="p-3 text-center"><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 rounded text-[10px]">Yetarli</span></td>
+                </tr>
+
+                <tr class="hover:bg-slate-800/40">
+                  <td class="p-3 font-bold text-white flex items-center gap-2">
+                    🥤 Coca-Cola 1.5L
+                  </td>
+                  <td class="p-3"><span class="px-2 py-0.5 bg-blue-950 text-blue-400 rounded border border-blue-800 font-mono">dona</span></td>
+                  <td class="p-3 text-right font-bold text-white">96 dona</td>
+                  <td class="p-3 text-right text-slate-400">11 200 so'm</td>
+                  <td class="p-3 text-right font-semibold text-emerald-400">14 500 so'm</td>
+                  <td class="p-3 text-right font-bold text-blue-400">+3 300 so'm</td>
+                  <td class="p-3 text-right font-mono">1 075 200 so'm</td>
+                  <td class="p-3 text-center"><span class="px-2 py-0.5 bg-emerald-950 text-emerald-400 rounded text-[10px]">Yetarli</span></td>
+                </tr>
+
+                <tr class="hover:bg-slate-800/40">
+                  <td class="p-3 font-bold text-white flex items-center gap-2">
+                    🥛 Nestle Sut 3.2%
+                  </td>
+                  <td class="p-3"><span class="px-2 py-0.5 bg-cyan-950 text-cyan-400 rounded border border-cyan-800 font-mono">litr</span></td>
+                  <td class="p-3 text-right font-bold text-amber-400">8.0 litr</td>
+                  <td class="p-3 text-right text-slate-400">10 500 so'm</td>
+                  <td class="p-3 text-right font-semibold text-emerald-400">13 000 so'm</td>
+                  <td class="p-3 text-right font-bold text-blue-400">+2 500 so'm</td>
+                  <td class="p-3 text-right font-mono">84 000 so'm</td>
+                  <td class="p-3 text-center"><span class="px-2 py-0.5 bg-amber-950 text-amber-400 rounded text-[10px]">Kam qoldi!</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Barcha tovarlarning jami tannarxi (Ombordagi muzlatilgan sarmoya):</span>
+            <span class="text-sm font-bold text-white">2 359 200 so'm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCREEN 3: KASSA VA TAROZI (POS) ================= -->
+      <div id="screen-3" class="screen-content hidden space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl font-bold">3</div>
+              <div>
+                <h3 class="text-base font-bold text-white">Kassa (POS) va Elektron Tarozi Bilan Ishlash</h3>
+                <p class="text-xs text-slate-400">Kassir qanday sotadi: donabay tovar skanerlanadi, tarozidagi tovar og'irligi bilan olinadi</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+              <span class="text-xs text-emerald-400 font-mono">Tarozi ulangan (COM1)</span>
+            </div>
+          </div>
+
+          <!-- Interactive Cashier Simulator -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            <!-- Chap tomon: Tarozi va tovar tanlash -->
+            <div class="lg:col-span-7 space-y-4">
+              <!-- Tarozi simulatsiyasi -->
+              <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slate-400 uppercase font-bold">Elektron Tarozi Ko'rsatkichi:</span>
+                  <div class="text-2xl font-mono font-black text-emerald-400 mt-1">
+                    <span id="scale-display">1.450</span> kg
+                  </div>
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="setScale(0.850)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg">0.85 kg</button>
+                  <button onclick="setScale(1.450)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg">1.45 kg</button>
+                  <button onclick="setScale(2.720)" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-lg">2.72 kg</button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div onclick="addScaleItemToCart('Qizil Olma (Golden)', 12500, 8000)" class="p-3 bg-slate-800/80 hover:bg-blue-900/40 border border-slate-700 hover:border-blue-500 rounded-xl cursor-pointer transition-all">
+                  <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-white">🍎 Qizil Olma</span>
+                    <span class="text-[10px] bg-amber-950 text-amber-400 px-1.5 py-0.5 rounded">kg</span>
+                  </div>
+                  <div class="text-xs text-emerald-400 font-bold mt-2">12 500 so'm/kg</div>
+                  <div class="text-[10px] text-blue-400 mt-1">Tarozidagi og'irlik bilan qo'shish +</div>
+                </div>
+
+                <div onclick="addPieceItemToCart('Coca-Cola 1.5L', 14500, 11200)" class="p-3 bg-slate-800/80 hover:bg-blue-900/40 border border-slate-700 hover:border-blue-500 rounded-xl cursor-pointer transition-all">
+                  <div class="flex justify-between items-start">
+                    <span class="text-xs font-bold text-white">🥤 Coca-Cola 1.5L</span>
+                    <span class="text-[10px] bg-blue-950 text-blue-400 px-1.5 py-0.5 rounded">dona</span>
+                  </div>
+                  <div class="text-xs text-emerald-400 font-bold mt-2">14 500 so'm</div>
+                  <div class="text-[10px] text-blue-400 mt-1">Skaner orqali qo'shish (1 dona) +</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- O'ng tomon: Kassa Cheki -->
+            <div class="lg:col-span-5 bg-slate-950 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+              <div>
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+                  <span class="text-xs font-bold text-white uppercase">🧾 Joriy Xaridor Cheki</span>
+                  <button onclick="resetClientCart()" class="text-[11px] text-red-400 hover:underline">Tozalash</button>
+                </div>
+
+                <div id="client-cart-list" class="space-y-2 max-h-[160px] overflow-y-auto text-xs">
+                  <!-- JS orqali to'ldiriladi -->
+                </div>
+              </div>
+
+              <div class="border-t border-slate-800 pt-3 space-y-1.5">
+                <div class="flex justify-between text-xs text-slate-400">
+                  <span>Jami to'lov:</span>
+                  <span id="client-total-sum" class="text-base font-black text-white">0 so'm</span>
+                </div>
+                <div class="flex justify-between text-xs text-emerald-400 font-semibold">
+                  <span>Bu chekdan do'kon sof foydasi:</span>
+                  <span id="client-profit-sum">+0 so'm</span>
+                </div>
+                <button onclick="simulateClientCheckout()" class="w-full mt-2 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-lg transition-all">
+                  To'lovni Tasdiqlash & Chek Chiqarish 🖨️
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= SCREEN 4: XARIDOR EKRANI VA HISOBOT ================= -->
+      <div id="screen-4" class="screen-content hidden space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Xaridor Ko'radigan Ikkinchi Monitor (Customer Facing Display) -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-3">
+                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                <h4 class="text-sm font-bold text-white">Xaridor Ko'radigan Tashqi Monitor</h4>
+              </div>
+              <p class="text-xs text-slate-400 mb-4">Kassir tovar urgan zahoti mijoz o'zining ekranida nima olinganini va narxini ko'rib turadi:</p>
+
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 font-mono">
+                <div class="text-center pb-2 border-b border-slate-800">
+                  <div class="font-bold text-white text-base">SMART SUPERMARKET</div>
+                  <div class="text-[10px] text-slate-400">Xaridingiz uchun rahmat!</div>
+                </div>
+
+                <div class="text-xs space-y-1.5 text-slate-300">
+                  <div class="flex justify-between">
+                    <span>Qizil Olma (1.450 kg x 12 500)</span>
+                    <span class="text-white font-bold">18 125 so'm</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span>Coca-Cola 1.5L (1 dona x 14 500)</span>
+                    <span class="text-white font-bold">14 500 so'm</span>
+                  </div>
+                </div>
+
+                <div class="border-t border-dashed border-slate-700 pt-2 flex justify-between items-baseline">
+                  <span class="text-xs text-slate-400 font-sans">JAMI:</span>
+                  <span class="text-xl font-black text-emerald-400">32 625 so'm</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+              <span>💳 To'lov: Naqd / Humo / Uzcard / Click</span>
+              <span class="text-emerald-400">✓ Chek chop etildi</span>
+            </div>
+          </div>
+
+          <!-- Do'kondor Telefoni (Owner Dashboard & Real-Time Alert) -->
+          <div class="bg-gradient-to-br from-slate-900 to-indigo-950 border border-indigo-900/50 rounded-2xl p-5 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center gap-2 mb-3">
+                <span class="w-3 h-3 rounded-full bg-purple-500"></span>
+                <h4 class="text-sm font-bold text-white">Do'kon Egasining Telefoni (Telegram / Mobil Ilova)</h4>
+              </div>
+              <p class="text-xs text-slate-400 mb-4">Do'kon egasi uydan turib ham har bir sotuv va sof foydani real vaqtda ko'radi:</p>
+
+              <div class="bg-slate-950/90 p-4 rounded-xl border border-indigo-800/40 space-y-3">
+                <div class="flex items-center gap-2 text-xs text-indigo-400 font-bold">
+                  <span>🔔 Yangi Savdo Bildirishnomasi:</span>
+                </div>
+                <div class="text-xs space-y-1 text-slate-300">
+                  <p>🧾 Chek № 1042 — <strong>32 625 so'm</strong></p>
+                  <p>📦 Mahsulotlar: 1.45 kg Olma, 1 dona Cola</p>
+                  <p class="text-emerald-400 font-bold">💰 Sof Foyda: +9 825 so'm</p>
+                  <p class="text-slate-500 text-[10px]">Bugungi jami sof foyda: <strong>1 450 000 so'm</strong></p>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-indigo-900/40 text-xs text-indigo-200">
+              Tizim omborda tovar kam qolganda do'kon egasiga avtomatik: <em>"Sut 8 litr qoldi, yangi yuk buyurtma qiling!"</em> deb xabar beradi.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    let currentScale = 1.450;
+    let clientCart = [
+      { name: "Qizil Olma (Golden)", unit: "kg", qty: 1.450, price: 12500, cost: 8000 }
+    ];
+
+    function setScreen(step) {
+      document.querySelectorAll('.screen-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.step-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'bg-blue-950/60');
+        btn.classList.add('border-slate-700', 'bg-slate-800/60');
+      });
+
+      document.getElementById(`screen-${step}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`btn-step-${step}`);
+      activeBtn.classList.remove('border-slate-700', 'bg-slate-800/60');
+      activeBtn.classList.add('border-blue-500', 'bg-blue-950/60');
+    }
+
+    // Screen 1 recalc
+    function recalcScreen1() {
+      const qty = parseFloat(document.getElementById('s1-qty').value) || 0;
+      const cost = parseFloat(document.getElementById('s1-cost').value) || 0;
+      const retail = parseFloat(document.getElementById('s1-retail').value) || 0;
+
+      const totalCost = qty * cost;
+      const totalRetail = qty * retail;
+      const unitProfit = retail - cost;
+      const markup = cost > 0 ? Math.round(((retail - cost) / cost) * 100) : 0;
+
+      document.getElementById('s1-out-total-cost').textContent = new Intl.NumberFormat('uz-UZ').format(totalCost) + " so'm";
+      document.getElementById('s1-out-total-retail').textContent = new Intl.NumberFormat('uz-UZ').format(totalRetail) + " so'm";
+      document.getElementById('s1-out-unit-profit').textContent = "+" + new Intl.NumberFormat('uz-UZ').format(unitProfit) + " so'm";
+      document.getElementById('s1-out-markup').textContent = "+" + markup + "%";
+    }
+
+    // Screen 3 Scale & Cart
+    function setScale(val) {
+      currentScale = val;
+      document.getElementById('scale-display').textContent = val.toFixed(3);
+    }
+
+    function addScaleItemToCart(name, price, cost) {
+      clientCart.push({ name, unit: 'kg', qty: currentScale, price, cost });
+      renderClientCart();
+    }
+
+    function addPieceItemToCart(name, price, cost) {
+      clientCart.push({ name, unit: 'dona', qty: 1, price, cost });
+      renderClientCart();
+    }
+
+    function resetClientCart() {
+      clientCart = [];
+      renderClientCart();
+    }
+
+    function renderClientCart() {
+      const list = document.getElementById('client-cart-list');
+      if (clientCart.length === 0) {
+        list.innerHTML = '<div class="text-slate-500 text-center py-4">Savat bo\'sh</div>';
+        document.getElementById('client-total-sum').textContent = "0 so'm";
+        document.getElementById('client-profit-sum').textContent = "+0 so'm";
+        return;
+      }
+
+      let total = 0;
+      let totalCost = 0;
+
+      list.innerHTML = clientCart.map((item, idx) => {
+        const itemTotal = item.qty * item.price;
+        total += itemTotal;
+        totalCost += (item.qty * item.cost);
+
+        return `
+          <div class="flex justify-between items-center py-1 border-b border-slate-800">
+            <div>
+              <span class="text-white font-medium">${item.name}</span>
+              <span class="text-slate-500 text-[10px]">(${item.qty} ${item.unit} x ${new Intl.NumberFormat('uz-UZ').format(item.price)})</span>
+            </div>
+            <span class="font-bold text-emerald-400 font-mono">${new Intl.NumberFormat('uz-UZ').format(Math.round(itemTotal))} so'm</span>
+          </div>
+        `;
+      }).join('');
+
+      const profit = total - totalCost;
+      document.getElementById('client-total-sum').textContent = new Intl.NumberFormat('uz-UZ').format(Math.round(total)) + " so'm";
+      document.getElementById('client-profit-sum').textContent = "+" + new Intl.NumberFormat('uz-UZ').format(Math.round(profit)) + " so'm";
+    }
+
+    function simulateClientCheckout() {
+      alert("✅ Chek chop etildi!\nOmbor qoldig'i kamaytirildi.\nSof foyda tizimga kiritildi.");
+      resetClientCart();
+    }
+
+    // Auto Tour
+    let tourIndex = 1;
+    let tourTimer = null;
+    function startAutoTour() {
+      if (tourTimer) clearInterval(tourTimer);
+      tourIndex = 1;
+      setScreen(tourIndex);
+      tourTimer = setInterval(() => {
+        tourIndex++;
+        if (tourIndex > 4) {
+          clearInterval(tourTimer);
+          tourTimer = null;
+          return;
+        }
+        setScreen(tourIndex);
+      }, 4000);
+    }
+
+    // Init
+    renderClientCart();
+  </script>
+</body>
+</html>

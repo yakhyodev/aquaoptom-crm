@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartStore CRM - Do'kon Boshqaruv Tizimi</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(150, 150, 150, 0.3); border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- Header -->
+  <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-4 sticky top-0 z-30 shadow-sm flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-blue-500/20">
+        🏪
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">SmartStore CRM</h1>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Do'kon, Ombor va Yuk Kirimi Boshqaruvi</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-sm font-medium">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-2 rounded-lg transition-all bg-white dark:bg-slate-900 shadow-sm text-blue-600 dark:text-blue-400 font-semibold flex items-center gap-2">
+        📊 Boshqaruv paneli
+      </button>
+      <button onclick="switchTab('supply')" id="tab-supply" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-2">
+        📦 Yangi Yuk Kirimi
+      </button>
+      <button onclick="switchTab('inventory')" id="tab-inventory" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-2">
+        🏷️ Barcha Mahsulotlar
+      </button>
+      <button onclick="switchTab('pos')" id="tab-pos" class="tab-btn px-4 py-2 rounded-lg transition-all text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white flex items-center gap-2">
+        💳 Kassa (POS)
+      </button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span class="text-xs px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full font-medium border border-emerald-200 dark:border-emerald-800">
+        ● Jonli rejim (Faol)
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full">
+
+    <!-- ================= TAB 1: DASHBOARD ================= -->
+    <section id="content-dashboard" class="space-y-6">
+      <!-- Metric Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Card 1 -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-blue-400 transition-all">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm mb-2">
+            <span>Ombordagi jami sarmoya</span>
+            <span class="p-2 bg-blue-50 dark:bg-blue-950 text-blue-600 rounded-lg text-lg">💰</span>
+          </div>
+          <div id="stat-total-cost" class="text-2xl font-bold text-slate-900 dark:text-white">0 so'm</div>
+          <p class="text-xs text-slate-500 mt-1">Barcha tovarlarning kirim tannarxi</p>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-emerald-400 transition-all">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm mb-2">
+            <span>Kutilayotgan tushum</span>
+            <span class="p-2 bg-emerald-50 dark:bg-emerald-950 text-emerald-600 rounded-lg text-lg">📈</span>
+          </div>
+          <div id="stat-total-retail" class="text-2xl font-bold text-slate-900 dark:text-white">0 so'm</div>
+          <p class="text-xs text-slate-500 mt-1">Sotuv narxidagi jami qiymat</p>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-purple-400 transition-all">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm mb-2">
+            <span>Kutilayotgan sof foyda</span>
+            <span class="p-2 bg-purple-50 dark:bg-purple-950 text-purple-600 rounded-lg text-lg">✨</span>
+          </div>
+          <div id="stat-expected-profit" class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">0 so'm</div>
+          <p id="stat-profit-margin" class="text-xs text-purple-600 dark:text-purple-400 font-medium mt-1">Marja: 0%</p>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-amber-400 transition-all">
+          <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-sm mb-2">
+            <span>Mahsulot turlari soni</span>
+            <span class="p-2 bg-amber-50 dark:bg-amber-950 text-amber-600 rounded-lg text-lg">📦</span>
+          </div>
+          <div id="stat-total-items" class="text-2xl font-bold text-slate-900 dark:text-white">0 xil</div>
+          <p id="stat-low-stock" class="text-xs text-amber-600 font-medium mt-1">Kam qolganlar: 0 ta</p>
+        </div>
+      </div>
+
+      <!-- Quick Action & Architecture Info -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              ⚡ Oxirgi Kirim va Harakatlar
+            </h3>
+            <button onclick="switchTab('supply')" class="text-xs font-semibold text-blue-600 hover:underline">+ Yangi yuk qabul qilish</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs uppercase font-medium">
+                <tr>
+                  <th class="py-3 px-4 rounded-l-lg">Sana</th>
+                  <th class="py-3 px-4">Mahsulot</th>
+                  <th class="py-3 px-4">Birlik</th>
+                  <th class="py-3 px-4">Miqdor</th>
+                  <th class="py-3 px-4">Kirim narxi</th>
+                  <th class="py-3 px-4 rounded-r-lg">Jami summa</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-recent-supplies" class="divide-y divide-slate-100 dark:divide-slate-800">
+                <!-- Injected via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="bg-gradient-to-br from-indigo-500 to-blue-700 text-white rounded-2xl p-6 shadow-md flex flex-col justify-between">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold px-2 py-1 bg-white/20 rounded-md">Smart CRM Mexanizmi</span>
+            <h3 class="text-lg font-bold mt-3">Kirimdan Kassagacha to'liq sikl</h3>
+            <p class="text-sm text-indigo-100 mt-2 leading-relaxed">
+              Dunyodagi eng sodda va samarali tizimlar (Square, Loyverse) kabi: yuk kelganda uning o'lchov birligi (kg, dona, litr) va narxi kiritiladi, kassa sotgan zahoti foyda real vaqtda aniqlanadi.
+            </p>
+          </div>
+          <div class="mt-6 pt-4 border-t border-indigo-400/30 text-xs text-indigo-100 space-y-1">
+            <p>✓ <strong>kg:</strong> Tarozi bilan ishlovchi tovarlar (1.25 kg)</p>
+            <p>✓ <strong>dona:</strong> Qadoqli mahsulotlar (donabay)</p>
+            <p>✓ <strong>litr:</strong> Suyuqliklar va ichimliklar (0.5 l, 1 l)</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: YUK KELISHI (SUPPLY / INWARD) ================= -->
+    <section id="content-supply" class="hidden space-y-6">
+      <div class="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm max-w-4xl mx-auto">
+        <div class="border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
+          <div class="flex items-center gap-3">
+            <span class="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950 text-blue-600 flex items-center justify-center text-xl">🚚</span>
+            <div>
+              <h2 class="text-lg font-bold text-slate-900 dark:text-white">Yangi Yuk Kelishi (Kirim Hujjati)</h2>
+              <p class="text-xs text-slate-500">Omborga yangi tovarlarni qabul qilish va tannarxni hisoblash</p>
+            </div>
+          </div>
+        </div>
+
+        <form id="supply-form" onsubmit="handleSupplySubmit(event)" class="space-y-5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Kategoriya -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Kategoriya <span class="text-red-500">*</span>
+              </label>
+              <div class="flex gap-2">
+                <select id="supply-category" required class="flex-1 px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                  <option value="Oziq-ovqat">🥦 Oziq-ovqat & Sabzavotlar</option>
+                  <option value="Ichimliklar">🥤 Ichimliklar & Suvlar</option>
+                  <option value="Sut mahsulotlari">🧀 Sut & Qatiq mahsulotlari</option>
+                  <option value="Non & Qandolat">🍞 Non & Shirinliklar</option>
+                  <option value="Xo'jalik mollari">🧼 Xo'jalik & Kimyo</option>
+                  <option value="Boshqa">📦 Boshqa toifalar</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Mahsulot Nomi -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Mahsulot Nomi <span class="text-red-500">*</span>
+              </label>
+              <input type="text" id="supply-name" placeholder="Masalan: Qizil Olma yoki Coca-Cola 1.5L" required
+                class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- O'lchov Birligi -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                O'lchov Birligi <span class="text-red-500">*</span>
+              </label>
+              <div class="grid grid-cols-3 gap-2">
+                <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-600 transition-all">
+                  <input type="radio" name="unit" value="kg" checked class="hidden" onchange="updateUnitLabels()">
+                  <span class="text-sm font-semibold">⚖️ kg</span>
+                </label>
+                <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-600 transition-all">
+                  <input type="radio" name="unit" value="dona" class="hidden" onchange="updateUnitLabels()">
+                  <span class="text-sm font-semibold">📦 dona</span>
+                </label>
+                <label class="flex items-center justify-center p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/60 has-[:checked]:text-blue-600 transition-all">
+                  <input type="radio" name="unit" value="litr" class="hidden" onchange="updateUnitLabels()">
+                  <span class="text-sm font-semibold">🥛 litr</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Miqdor -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Keltirilgan Miqdor (<span id="unit-label-qty">kg</span>) <span class="text-red-500">*</span>
+              </label>
+              <input type="number" id="supply-qty" step="any" min="0.001" placeholder="Masalan: 50 yoki 12.5" required oninput="calcSupplyTotal()"
+                class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+
+            <!-- Yetkazib beruvchi (Ta'minotchi) -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Yetkazib Beruvchi (Firma / Shaxs)
+              </label>
+              <input type="text" id="supply-vendor" placeholder="Masalan: 'Agro Savdo MCHJ'"
+                class="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Narxlar -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+            <!-- Kirim narxi -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Kirim Narxi (1 <span class="unit-label">kg</span> uchun) <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input type="number" id="supply-cost" min="1" placeholder="10000" required oninput="calcSupplyTotal()"
+                  class="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">so'm</span>
+              </div>
+            </div>
+
+            <!-- Sotuv narxi -->
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">
+                Sotuv Narxi (1 <span class="unit-label">kg</span> uchun) <span class="text-red-500">*</span>
+              </label>
+              <div class="relative">
+                <input type="number" id="supply-retail" min="1" placeholder="14000" required oninput="calcSupplyTotal()"
+                  class="w-full pl-3.5 pr-12 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <span class="absolute right-3 top-2.5 text-xs text-slate-400 font-medium">so'm</span>
+              </div>
+            </div>
+
+            <!-- Jami Partiya Summasi -->
+            <div class="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl p-3 flex flex-col justify-center">
+              <span class="text-xs text-blue-600 dark:text-blue-400 font-medium">Ushbu yuk jami summasi:</span>
+              <span id="supply-total-sum" class="text-lg font-bold text-blue-700 dark:text-blue-300">0 so'm</span>
+              <span id="supply-markup-info" class="text-[11px] text-slate-500 mt-0.5">Ustama: 0%</span>
+            </div>
+          </div>
+
+          <!-- Submit Buttons -->
+          <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+            <button type="reset" class="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+              Tozalash
+            </button>
+            <button type="submit" class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl text-sm font-semibold shadow-md shadow-blue-500/20 transition-all flex items-center gap-2">
+              ✓ Yukni Omborga Kiritish
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: BARCHA MAHSULOTLAR (INVENTORY) ================= -->
+    <section id="content-inventory" class="hidden space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center gap-3 flex-1 min-w-[240px]">
+          <span class="text-slate-400">🔍</span>
+          <input type="text" id="inventory-search" oninput="renderInventoryTable()" placeholder="Nomi yoki kategoriya bo'yicha qidirish..."
+            class="w-full bg-transparent text-sm focus:outline-none">
+        </div>
+        <div class="flex items-center gap-2">
+          <select id="inventory-filter-cat" onchange="renderInventoryTable()" class="px-3 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-medium">
+            <option value="all">Barcha kategoriyalar</option>
+            <option value="Oziq-ovqat">Oziq-ovqat</option>
+            <option value="Ichimliklar">Ichimliklar</option>
+            <option value="Sut mahsulotlari">Sut mahsulotlari</option>
+            <option value="Non & Qandolat">Non & Qandolat</option>
+            <option value="Xo'jalik mollari">Xo'jalik mollari</option>
+          </select>
+          <button onclick="switchTab('supply')" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm">
+            + Yuk qabul qilish
+          </button>
+        </div>
+      </div>
+
+      <!-- Inventory Table -->
+      <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 text-xs uppercase font-medium border-b border-slate-200 dark:border-slate-800">
+              <tr>
+                <th class="py-3.5 px-4">#</th>
+                <th class="py-3.5 px-4">Mahsulot nomi</th>
+                <th class="py-3.5 px-4">Kategoriya</th>
+                <th class="py-3.5 px-4">Birlik</th>
+                <th class="py-3.5 px-4 text-right">Qoldiq Miqdor</th>
+                <th class="py-3.5 px-4 text-right">Kirim narxi</th>
+                <th class="py-3.5 px-4 text-right">Sotuv narxi</th>
+                <th class="py-3.5 px-4 text-right">Foyda / Dona(kg/l)</th>
+                <th class="py-3.5 px-4 text-right">Ombordagi Qiymati</th>
+                <th class="py-3.5 px-4 text-center">Harakat</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body" class="divide-y divide-slate-100 dark:divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 4: KASSA (POS) ================= -->
+    <section id="content-pos" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Mahsulotlar tanlash paneli -->
+        <div class="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center justify-between gap-3">
+            <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              🛒 Sotuv uchun tanlang
+            </h3>
+            <span class="text-xs text-slate-400">Mahsulot ustiga bosing</span>
+          </div>
+
+          <div id="pos-product-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[550px] overflow-y-auto p-1">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Chek / Savat paneli -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-3">
+              <h3 class="font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                🧾 Joriy Chek
+              </h3>
+              <button onclick="clearCart()" class="text-xs text-red-500 hover:underline">Tozalash</button>
+            </div>
+
+            <div id="pos-cart-items" class="space-y-3 max-h-[340px] overflow-y-auto pr-1">
+              <div class="text-center py-10 text-slate-400 text-sm">Savat bo'sh. Mahsulot tanlang.</div>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-100 dark:border-slate-800 pt-4 mt-4 space-y-3">
+            <div class="flex justify-between text-sm text-slate-500">
+              <span>Oraliq summa:</span>
+              <span id="pos-subtotal" class="font-semibold text-slate-800 dark:text-slate-200">0 so'm</span>
+            </div>
+            <div class="flex justify-between text-sm text-emerald-600 font-medium">
+              <span>Ushbu chekdan foyda:</span>
+              <span id="pos-profit">0 so'm</span>
+            </div>
+            <div class="flex justify-between text-lg font-bold text-slate-900 dark:text-white">
+              <span>Jami To'lov:</span>
+              <span id="pos-total" class="text-blue-600 dark:text-blue-400">0 so'm</span>
+            </div>
+
+            <button onclick="checkoutSale()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md shadow-emerald-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+              💳 To'lovni Qabul Qilish (Sotish)
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-medium">
+    <span id="toast-icon">✓</span>
+    <span id="toast-msg">Muvaffaqiyatli bajarildi!</span>
+  </div>
+
+  <script>
+    // Initial Mock Products (Yuk kirimi bilan allaqachon to'ldirilgan namunalar)
+    let products = [
+      { id: 1, name: "Qizil Olma (Navbahor)", category: "Oziq-ovqat", unit: "kg", stock: 85.5, costPrice: 9000, retailPrice: 14000, vendor: "Samarqand Bog'lari" },
+      { id: 2, name: "Kartoshka (Qizil)", category: "Oziq-ovqat", unit: "kg", stock: 240.0, costPrice: 4200, retailPrice: 6000, vendor: "Agro Ta'minot" },
+      { id: 3, name: "Coca-Cola 1.5L", category: "Ichimliklar", unit: "dona", stock: 120, costPrice: 11200, retailPrice: 14500, vendor: "CCI Bottlers" },
+      { id: 4, name: "Nestle Sut 3.2%", category: "Sut mahsulotlari", unit: "litr", stock: 45.0, costPrice: 10500, retailPrice: 13000, vendor: "Lactalis MCHJ" },
+      { id: 5, name: "Qolipli Non (Buxanka)", category: "Non & Qandolat", unit: "dona", stock: 30, costPrice: 2800, retailPrice: 3500, vendor: "1-Non Zavodi" },
+      { id: 6, name: "O'simlik Moyi (Oltin Kalit)", category: "Oziq-ovqat", unit: "litr", stock: 60.0, costPrice: 14000, retailPrice: 17500, vendor: "Moy Invest" }
+    ];
+
+    let supplyHistory = [
+      { date: "Bugun 10:20", name: "Qizil Olma (Navbahor)", unit: "kg", qty: 100, costPrice: 9000, totalCost: 900000 },
+      { date: "Bugun 09:15", name: "Coca-Cola 1.5L", unit: "dona", qty: 120, costPrice: 11200, totalCost: 1344000 },
+      { date: "Kecha 16:40", name: "Nestle Sut 3.2%", unit: "litr", qty: 50, costPrice: 10500, totalCost: 525000 }
+    ];
+
+    let cart = [];
+
+    // Format currency
+    function formatMoney(num) {
+      return new Intl.NumberFormat('uz-UZ').format(Math.round(num)) + " so'm";
+    }
+
+    // Switch Tabs
+    function switchTab(tabId) {
+      const tabs = ['dashboard', 'supply', 'inventory', 'pos'];
+      tabs.forEach(t => {
+        document.getElementById(`content-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`tab-${t}`);
+        btn.classList.remove('bg-white', 'dark:bg-slate-900', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400', 'font-semibold');
+        btn.classList.add('text-slate-600', 'dark:text-slate-300');
+      });
+
+      document.getElementById(`content-${tabId}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabId}`);
+      activeBtn.classList.add('bg-white', 'dark:bg-slate-900', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400', 'font-semibold');
+      activeBtn.classList.remove('text-slate-600', 'dark:text-slate-300');
+
+      if (tabId === 'dashboard') updateDashboard();
+      if (tabId === 'inventory') renderInventoryTable();
+      if (tabId === 'pos') renderPOS();
+    }
+
+    // Update Unit labels in Supply Form
+    function updateUnitLabels() {
+      const selectedUnit = document.querySelector('input[name="unit"]:checked').value;
+      document.getElementById('unit-label-qty').textContent = selectedUnit;
+      document.querySelectorAll('.unit-label').forEach(el => el.textContent = selectedUnit);
+      calcSupplyTotal();
+    }
+
+    function calcSupplyTotal() {
+      const qty = parseFloat(document.getElementById('supply-qty').value) || 0;
+      const cost = parseFloat(document.getElementById('supply-cost').value) || 0;
+      const retail = parseFloat(document.getElementById('supply-retail').value) || 0;
+
+      const totalSum = qty * cost;
+      document.getElementById('supply-total-sum').textContent = formatMoney(totalSum);
+
+      if (cost > 0 && retail > 0) {
+        const markup = Math.round(((retail - cost) / cost) * 100);
+        document.getElementById('supply-markup-info').textContent = `Ustama: +${markup}% (Sof foyda: ${formatMoney(retail - cost)} / birlik)`;
+      } else {
+        document.getElementById('supply-markup-info').textContent = "Ustama: 0%";
+      }
+    }
+
+    // Handle Supply Form Submit
+    function handleSupplySubmit(e) {
+      e.preventDefault();
+      const category = document.getElementById('supply-category').value;
+      const name = document.getElementById('supply-name').value.trim();
+      const unit = document.querySelector('input[name="unit"]:checked').value;
+      const qty = parseFloat(document.getElementById('supply-qty').value);
+      const costPrice = parseFloat(document.getElementById('supply-cost').value);
+      const retailPrice = parseFloat(document.getElementById('supply-retail').value);
+      const vendor = document.getElementById('supply-vendor').value.trim() || "Noma'lum ta'minotchi";
+
+      // Mavjud mahsulot bormi tekshirish
+      const existing = products.find(p => p.name.toLowerCase() === name.toLowerCase() && p.unit === unit);
+      if (existing) {
+        // Weighted Average Cost (O'rtacha kirim narxi formulasi)
+        const oldTotalCost = existing.stock * existing.costPrice;
+        const newTotalCost = qty * costPrice;
+        const totalStock = existing.stock + qty;
+        
+        existing.costPrice = Math.round((oldTotalCost + newTotalCost) / totalStock);
+        existing.stock = totalStock;
+        existing.retailPrice = retailPrice; // Yangi sotuv narxi
+        existing.vendor = vendor;
+      } else {
+        const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
+        products.push({
+          id: newId,
+          name,
+          category,
+          unit,
+          stock: qty,
+          costPrice,
+          retailPrice,
+          vendor
+        });
+      }
+
+      // Add to history
+      supplyHistory.unshift({
+        date: "Hozirgina",
+        name,
+        unit,
+        qty,
+        costPrice,
+        totalCost: qty * costPrice
+      });
+
+      showToast(`Yuk qabul qilindi: ${name} (${qty} ${unit})`);
+      document.getElementById('supply-form').reset();
+      updateUnitLabels();
+      updateDashboard();
+      switchTab('inventory');
+    }
+
+    // Render Dashboard
+    function updateDashboard() {
+      let totalCost = 0;
+      let totalRetail = 0;
+      let lowStockCount = 0;
+
+      products.forEach(p => {
+        totalCost += (p.stock * p.costPrice);
+        totalRetail += (p.stock * p.retailPrice);
+        if (p.stock <= 10) lowStockCount++;
+      });
+
+      const expectedProfit = totalRetail - totalCost;
+      const margin = totalRetail > 0 ? Math.round((expectedProfit / totalRetail) * 100) : 0;
+
+      document.getElementById('stat-total-cost').textContent = formatMoney(totalCost);
+      document.getElementById('stat-total-retail').textContent = formatMoney(totalRetail);
+      document.getElementById('stat-expected-profit').textContent = formatMoney(expectedProfit);
+      document.getElementById('stat-profit-margin').textContent = `Foydalilik marjasi: ~${margin}%`;
+      document.getElementById('stat-total-items').textContent = `${products.length} xil`;
+      document.getElementById('stat-low-stock').textContent = `Kam qolganlar: ${lowStockCount} ta`;
+
+      // Recent supplies table
+      const tbody = document.getElementById('dashboard-recent-supplies');
+      tbody.innerHTML = supplyHistory.slice(0, 5).map(s => `
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <td class="py-3 px-4 text-slate-400">${s.date}</td>
+          <td class="py-3 px-4 font-medium text-slate-900 dark:text-white">${s.name}</td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-800 font-semibold">${s.unit}</span></td>
+          <td class="py-3 px-4 font-semibold text-blue-600">${s.qty} ${s.unit}</td>
+          <td class="py-3 px-4">${formatMoney(s.costPrice)}</td>
+          <td class="py-3 px-4 font-semibold">${formatMoney(s.totalCost)}</td>
+        </tr>
+      `).join('');
+    }
+
+    // Render Inventory Table
+    function renderInventoryTable() {
+      const search = (document.getElementById('inventory-search').value || '').toLowerCase();
+      const filterCat = document.getElementById('inventory-filter-cat').value;
+
+      const filtered = products.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(search) || p.category.toLowerCase().includes(search);
+        const matchesCat = filterCat === 'all' || p.category === filterCat;
+        return matchesSearch && matchesCat;
+      });
+
+      const tbody = document.getElementById('inventory-table-body');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400">Hech qanday mahsulot topilmadi</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((p, index) => {
+        const profitPerUnit = p.retailPrice - p.costPrice;
+        const totalValue = p.stock * p.costPrice;
+        const isLow = p.stock <= 10;
+
+        return `
+          <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+            <td class="py-3.5 px-4 text-slate-400 font-mono text-xs">${index + 1}</td>
+            <td class="py-3.5 px-4 font-bold text-slate-900 dark:text-white">
+              ${p.name}
+              ${isLow ? '<span class="ml-1.5 px-1.5 py-0.5 bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 rounded text-[10px] font-semibold">Kam qoldi</span>' : ''}
+            </td>
+            <td class="py-3.5 px-4 text-slate-500 text-xs">${p.category}</td>
+            <td class="py-3.5 px-4">
+              <span class="px-2 py-0.5 rounded text-xs font-semibold ${p.unit === 'kg' ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : p.unit === 'litr' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'}">
+                ${p.unit}
+              </span>
+            </td>
+            <td class="py-3.5 px-4 text-right font-bold ${isLow ? 'text-amber-600' : 'text-slate-800 dark:text-slate-100'}">
+              ${p.stock} ${p.unit}
+            </td>
+            <td class="py-3.5 px-4 text-right text-slate-500 font-mono text-xs">${formatMoney(p.costPrice)}</td>
+            <td class="py-3.5 px-4 text-right font-semibold text-blue-600 font-mono text-xs">${formatMoney(p.retailPrice)}</td>
+            <td class="py-3.5 px-4 text-right font-medium text-emerald-600 font-mono text-xs">+${formatMoney(profitPerUnit)}</td>
+            <td class="py-3.5 px-4 text-right font-semibold text-slate-700 dark:text-slate-300 font-mono text-xs">${formatMoney(totalValue)}</td>
+            <td class="py-3.5 px-4 text-center">
+              <button onclick="quickSell(${p.id})" class="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 dark:bg-slate-800 dark:hover:bg-blue-950 hover:text-blue-600 rounded-lg text-xs font-medium transition-all">
+                Sotish 🛒
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // POS Methods
+    function renderPOS() {
+      const grid = document.getElementById('pos-product-grid');
+      grid.innerHTML = products.map(p => `
+        <div onclick="addToCart(${p.id})" class="p-3.5 bg-slate-50 dark:bg-slate-800/70 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700 hover:border-blue-400 rounded-xl cursor-pointer transition-all flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">${p.category}</span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">${p.unit}</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 line-clamp-2">${p.name}</h4>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <span class="text-xs font-bold text-blue-600 dark:text-blue-400">${formatMoney(p.retailPrice)}</span>
+            <span class="text-[11px] text-slate-400">Qoldiq: ${p.stock}</span>
+          </div>
+        </div>
+      `).join('');
+
+      renderCart();
+    }
+
+    function addToCart(productId) {
+      const p = products.find(i => i.id === productId);
+      if (!p || p.stock <= 0) {
+        showToast("Omborda mahsulot qolmagan!", "⚠️");
+        return;
+      }
+
+      const existing = cart.find(item => item.id === productId);
+      const step = p.unit === 'dona' ? 1 : 0.5; // kg yoki litr bo'lsa yarim yarim qilib qo'shish qulay
+
+      if (existing) {
+        if (existing.qty + step <= p.stock) {
+          existing.qty += step;
+        } else {
+          showToast(`Maksimal qoldiq: ${p.stock} ${p.unit}`, "⚠️");
+        }
+      } else {
+        cart.push({
+          id: p.id,
+          name: p.name,
+          unit: p.unit,
+          costPrice: p.costPrice,
+          retailPrice: p.retailPrice,
+          qty: step,
+          maxStock: p.stock
+        });
+      }
+      renderCart();
+    }
+
+    function quickSell(productId) {
+      switchTab('pos');
+      addToCart(productId);
+    }
+
+    function updateCartQty(productId, newQty) {
+      const item = cart.find(i => i.id === productId);
+      if (!item) return;
+
+      const qty = parseFloat(newQty);
+      if (qty <= 0 || isNaN(qty)) {
+        cart = cart.filter(i => i.id !== productId);
+      } else if (qty > item.maxStock) {
+        item.qty = item.maxStock;
+        showToast(`Omborda faqat ${item.maxStock} ${item.unit} bor!`, "⚠️");
+      } else {
+        item.qty = qty;
+      }
+      renderCart();
+    }
+
+    function renderCart() {
+      const cartContainer = document.getElementById('pos-cart-items');
+      if (cart.length === 0) {
+        cartContainer.innerHTML = '<div class="text-center py-10 text-slate-400 text-sm">Savat bo\'sh. Mahsulot tanlang.</div>';
+        document.getElementById('pos-subtotal').textContent = "0 so'm";
+        document.getElementById('pos-profit').textContent = "0 so'm";
+        document.getElementById('pos-total').textContent = "0 so'm";
+        return;
+      }
+
+      let subtotal = 0;
+      let totalCost = 0;
+
+      cartContainer.innerHTML = cart.map(item => {
+        const itemTotal = item.qty * item.retailPrice;
+        const itemCost = item.qty * item.costPrice;
+        subtotal += itemTotal;
+        totalCost += itemCost;
+
+        return `
+          <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-3">
+            <div class="flex-1 min-w-0">
+              <h5 class="text-xs font-bold text-slate-900 dark:text-white truncate">${item.name}</h5>
+              <div class="text-[11px] text-slate-500 mt-0.5">
+                ${formatMoney(item.retailPrice)} / ${item.unit}
+              </div>
+            </div>
+
+            <!-- Qty input -->
+            <div class="flex items-center gap-1.5">
+              <input type="number" step="${item.unit === 'dona' ? '1' : '0.1'}" min="0.1" max="${item.maxStock}" value="${item.qty}"
+                onchange="updateCartQty(${item.id}, this.value)"
+                class="w-16 px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-xs font-bold text-center">
+              <span class="text-xs text-slate-500 font-semibold">${item.unit}</span>
+            </div>
+
+            <div class="text-right min-w-[70px]">
+              <span class="text-xs font-bold text-blue-600 dark:text-blue-400">${formatMoney(itemTotal)}</span>
+            </div>
+
+            <button onclick="updateCartQty(${item.id}, 0)" class="text-slate-400 hover:text-red-500 text-xs px-1">✕</button>
+          </div>
+        `;
+      }).join('');
+
+      const profit = subtotal - totalCost;
+      document.getElementById('pos-subtotal').textContent = formatMoney(subtotal);
+      document.getElementById('pos-profit').textContent = `+${formatMoney(profit)}`;
+      document.getElementById('pos-total').textContent = formatMoney(subtotal);
+    }
+
+    function clearCart() {
+      cart = [];
+      renderCart();
+    }
+
+    function checkoutSale() {
+      if (cart.length === 0) {
+        showToast("Savat bo'sh!", "⚠️");
+        return;
+      }
+
+      // Ombor qoldiqlarini ayirish
+      cart.forEach(item => {
+        const prod = products.find(p => p.id === item.id);
+        if (prod) {
+          prod.stock = Math.round((prod.stock - item.qty) * 1000) / 1000;
+        }
+      });
+
+      const soldItemsCount = cart.length;
+      showToast(`${soldItemsCount} xil tovar sotildi. Chek chiqarildi!`, "💳");
+      clearCart();
+      updateDashboard();
+      renderPOS();
+    }
+
+    // Toast helper
+    function showToast(msg, icon = "✓") {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').textContent = msg;
+      document.getElementById('toast-icon').textContent = icon;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    // Init
+    updateDashboard();
+  </script>
+</body>
+</html>

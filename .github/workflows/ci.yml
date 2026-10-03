@@ -1,0 +1,170 @@
+name: AquaOptom CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-quality-and-tests:
+    name: Backend Lint, Migrations & PostgreSQL Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: aquaoptom_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, pgsql, bcmath, redis
+          coverage: none
+
+      - name: Validate composer.json and composer.lock
+        run: composer validate --strict
+
+      - name: Cache Composer packages
+        id: composer-cache
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor
+          key: ${{ runner.os }}-php-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run code styling / lint check (Laravel Pint)
+        run: ./vendor/bin/pint --test
+        continue-on-error: true
+
+      - name: Create CI environment file
+        run: |
+          cat << 'EOF' > .env.testing
+          APP_NAME="AquaOptom Wholesale CRM"
+          APP_ENV=testing
+          APP_KEY=base64:heXBNSJDegcPTQUWRj2hj3BTN/4rg/Ee4Dq5XGFGijg=
+          APP_DEBUG=true
+          APP_URL=http://localhost:8000
+
+          DB_CONNECTION=pgsql
+          DB_HOST=127.0.0.1
+          DB_PORT=5432
+          DB_DATABASE=aquaoptom_test
+          DB_USERNAME=postgres
+          DB_PASSWORD=postgrespassword
+          DB_SSLMODE=prefer
+
+          REDIS_CLIENT=predis
+          REDIS_HOST=127.0.0.1
+          REDIS_PORT=6379
+          CACHE_STORE=redis
+          QUEUE_CONNECTION=redis
+          SESSION_DRIVER=redis
+
+          TELEGRAM_BOT_TOKEN=fake-ci-bot-token
+          TELEGRAM_CHANNEL_ID=-1001234567890
+          PAYMENT_MOCK_ENABLED=true
+          EOF
+
+      - name: Test PostgreSQL migrations
+        run: php artisan migrate --env=testing --force
+
+      - name: Test PostgreSQL migration rollback and re-migrate
+        run: |
+          php artisan migrate:rollback --env=testing --force
+          php artisan migrate --env=testing --force
+          php artisan db:seed --class=RoleAndPermissionSeeder --env=testing --force
+
+      - name: Execute backend tests against PostgreSQL
+        run: php artisan test --env=testing
+
+  frontend-build:
+    name: Frontend Build & Asset Compilation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build frontend assets (Vite / Tailwind)
+        run: npm run build
+
+  mobile-checks:
+    name: Flutter Mobile Quality Checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Get Flutter dependencies
+        run: flutter pub get
+
+      - name: Analyze Flutter codebase
+        run: flutter analyze --no-fatal-infos
