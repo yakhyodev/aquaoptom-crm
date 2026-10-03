@@ -4,9 +4,12 @@ namespace App\Services\Ledger;
 
 use App\Models\CashAccount;
 use App\Models\CashMovement;
+use App\Models\CashSession;
 use App\Services\Ledger\Exceptions\InsufficientCashException;
+use App\Services\Operations\Exceptions\OperationValidationException;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class CashAccountService
@@ -22,10 +25,28 @@ class CashAccountService
         ?string $referenceType = null,
         ?int $referenceId = null,
         ?string $description = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $cashSessionId = null
     ): CashMovement {
         if ($amount <= 0) {
             throw new InvalidArgumentException('Kirim summasi 0 dan katta butun son bo\'lishi shart.');
+        }
+
+        if ($cashSessionId !== null) {
+            $session = CashSession::find($cashSessionId);
+            if ($session && $session->status === 'CLOSED' && ! in_array($type, ['DIFFERENCE_SURPLUS', 'DIFFERENCE_SHORTAGE'], true)) {
+                throw new OperationValidationException(
+                    $operationId ?? (string) Str::uuid(),
+                    "Yopilgan smenaga yangi operatsiya yozib bo'lmaydi!",
+                    ['session_id' => $cashSessionId],
+                    'CLOSED_SESSION_CANNOT_ACCEPT_OPERATIONS'
+                );
+            }
+        } else {
+            $activeSession = CashSession::where('cash_account_id', $cashAccountId)->where('status', 'OPEN')->first();
+            if ($activeSession) {
+                $cashSessionId = $activeSession->id;
+            }
         }
 
         $account = CashAccount::where('id', $cashAccountId)->lockForUpdate()->firstOrFail();
@@ -39,6 +60,7 @@ class CashAccountService
         return CashMovement::create([
             'operation_id' => $operationId,
             'cash_account_id' => $cashAccountId,
+            'cash_session_id' => $cashSessionId,
             'type' => $type,
             'direction' => 'IN',
             'debit' => $amount,
@@ -67,10 +89,28 @@ class CashAccountService
         ?int $referenceId = null,
         ?string $description = null,
         ?int $userId = null,
-        bool $allowNegative = false
+        bool $allowNegative = false,
+        ?int $cashSessionId = null
     ): CashMovement {
         if ($amount <= 0) {
             throw new InvalidArgumentException('Chiqim summasi 0 dan katta butun son bo\'lishi shart.');
+        }
+
+        if ($cashSessionId !== null) {
+            $session = CashSession::find($cashSessionId);
+            if ($session && $session->status === 'CLOSED' && ! in_array($type, ['DIFFERENCE_SURPLUS', 'DIFFERENCE_SHORTAGE'], true)) {
+                throw new OperationValidationException(
+                    $operationId ?? (string) Str::uuid(),
+                    "Yopilgan smenaga yangi operatsiya yozib bo'lmaydi!",
+                    ['session_id' => $cashSessionId],
+                    'CLOSED_SESSION_CANNOT_ACCEPT_OPERATIONS'
+                );
+            }
+        } else {
+            $activeSession = CashSession::where('cash_account_id', $cashAccountId)->where('status', 'OPEN')->first();
+            if ($activeSession) {
+                $cashSessionId = $activeSession->id;
+            }
         }
 
         $account = CashAccount::where('id', $cashAccountId)->lockForUpdate()->firstOrFail();
@@ -89,6 +129,7 @@ class CashAccountService
         return CashMovement::create([
             'operation_id' => $operationId,
             'cash_account_id' => $cashAccountId,
+            'cash_session_id' => $cashSessionId,
             'type' => $type,
             'direction' => 'OUT',
             'debit' => 0,

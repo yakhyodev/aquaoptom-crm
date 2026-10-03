@@ -52,6 +52,22 @@ class DocumentNumberGenerator
     }
 
     /**
+     * Smena raqami: SESS-YYYY-000001
+     */
+    public static function nextSessionNumber(): string
+    {
+        return static::next('SESS', 'cash_session_seq');
+    }
+
+    /**
+     * Xarajat hujjati raqami: EXP-YYYY-000001
+     */
+    public static function nextExpenseNumber(): string
+    {
+        return static::next('EXP', 'expense_seq');
+    }
+
+    /**
      * Umumiy ketma-ketlik raqamini xavfsiz generatsiya qilish (max(id)+1 ishlatilmaydi)
      */
     public static function next(string $prefix, string $sequenceName): string

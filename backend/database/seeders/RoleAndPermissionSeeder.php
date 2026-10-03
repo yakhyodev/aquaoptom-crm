@@ -92,6 +92,18 @@ class RoleAndPermissionSeeder extends Seeder
                 'category' => 'finance',
                 'description' => 'Operatsion xarajatlar, inkassatsiya va ta\'minotchi to\'lovlarini tasdiqlash',
             ],
+            [
+                'name' => 'manage_cash_sessions',
+                'display_name' => 'Kassa smenalarini boshqarish',
+                'category' => 'finance',
+                'description' => 'Smena ochish, kutilgan va sanalgan naqdni kiritish, smenani yopish',
+            ],
+            [
+                'name' => 'approve_cash_discrepancy',
+                'display_name' => 'Kassa farqini tasdiqlash',
+                'category' => 'finance',
+                'description' => 'Kassa smenasi yopilgandagi farqni (ortiqcha/kamomad) tasdiqlash va qonuniy tuzatish',
+            ],
 
             // Reporting & Admin
             [
@@ -156,6 +168,8 @@ class RoleAndPermissionSeeder extends Seeder
                     'view_cash',
                     'view_debts',
                     'manage_settings',
+                    'manage_cash_sessions',
+                    'approve_cash_discrepancy',
                 ],
             ],
             'SALES_MANAGER' => [
@@ -181,6 +195,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'permissions' => [
                     'view_cash',
                     'manage_cash_outflow',
+                    'manage_cash_sessions',
                     'view_debts',
                     'process_refund',
                     'view_reports',

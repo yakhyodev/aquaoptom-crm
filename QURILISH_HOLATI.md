@@ -82,7 +82,7 @@
 | **07** | **Kirim bo‘limi — backenddan oynagacha** | Kundalik ish | **DONE** | DRAFT->POSTED kirim; migration 000006 (`operation_id`, `supplier_invoice_number`, `paid_amount`, `debt_amount`, `notes`); `ReceivePurchaseService` orqali atomik WAC qoldiq, supplier_ledger credit, ixtiyoriy cash_movements + supplier debit, Payment modeli; kassa huquqi bo'lmagan omborchining to'lov qilishi taqiqlangan (jim qolish naqd to'lov deb olinmaydi); xatolikda to'liq rollback; idempotent retry eski natijani berishi; Livewire `QuickInward` (katalog va ta'minotchi inline modallari bilan qoralama saqlanadi, to'lov paneli, kassa tanlovi); 68/68 testlar (541 assertions) 100% o'tdi. | 08-bosqichni boshlash |
 | **08** | **Sotuv bo‘limi — tezkor, mijozli va nasiya** | Kundalik ish | **DONE** | `CreateSaleService` xizmati; migration 000007 (`operation_id`, `paid_amount`, `debt_amount`, `cash_account_id`, `payment_method`, `notes`, `receipt_data`); guest tezkor savdoda faqat to'liq to'lov (mijozsiz DEBT taqiqlangan); mijozli savdoda to'liq/qisman/nasiya; savatda takroriy variant qatorlari bo'lsa barcha dona jamlanib lock tekshirilishi (100 qoldiqdan 60+60 o'tmaydi); kasr dona va manfiy/nol narx taqiqlanishi; tizim narxi vs erkin narx va eski narx versiyasida qayta tasdiq; 60×6500 jami 390 000 / cost 300 000 / paid 140 000 / debt 250 000 / gross 90 000 qabul mezoni to'liq o'tgan; 20 bosish/parallel so'rov bitta chek; mijoz avansi ikkinchi cash emasligi; Livewire OptomPos xatolikda savat saqlanishi va elektron kvitansiya; SaleExecutionAdapterInterface arxitekturasi; 78/78 testlar (581 assertions) 100% o'tdi. | 09-bosqichni boshlash |
 | **09** | **Qarzdorliklar va taraflar to‘lovlari** | Kundalik ish | **DONE** | Alohida "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" tablari; signed balans (musbat=qarz, manfiy=avans), avans boshqa taraf qarzini yashirmaydi; kartochkalar va ko'chirma (`boshlang'ich + harakatlar = yakuniy ko'chirma` 100%); Asia/Tashkent sekund aniqligida event_time, server_time, actor va tovar olib ketilgan vaqt (`goods_picked_up_at`); atomik `CustomerPaymentService` va `SupplierPaymentService` (kassa bilan bitta tranzaksiya); qarzdan ortiq summa faqat tasdiq bilan avansga o'tishi; keyingi to'lov chek/tovarlarga majburiy bog'lanmasligi va oldingi sotuv foyda/tannarxini o'zgartirmasligi; ta'minotchi to'lovi omborga tegmasligi; kredit limit va to'lov muddati ogohlantirishlari; 88/88 backend testlar (630 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 10-bosqichni boshlash |
-| 10 | Kassa, xarajat, o‘tkazma va smena | Kundalik ish | TODO | - | Pul hisoblari, xarajat kategoriyalari, smena ochish/yopish |
+| **10** | **Kassa, xarajat, o‘tkazma va smena** | Kundalik ish | **DONE** | Naqd/karta/bank hisoblari; umumiy atomik cash kontrakti; operatsion xarajatlar (`ExpenseService`), egasi mablag'i (`OwnerFundsService`, draw operatsion xarajat emas va foydani kamaytirmaydi); hisoblararo o'tkazma (`CashTransferService`, savdo/foyda emas); kassa yetarliligi `lockForUpdate` ichida; bitta naqd hisob uchun bitta OPEN smena (`CashSession`), kutilgan naqd balansi, sanalgan naqd, farq sababi; offline qurilmalar kutilganda PROVISIONAL yopilish; closed session guard (yopilgan smenaga savdo/harakat yozilmaydi); farqni yashirin balance overwrite bilan emas, balki ruxsatli farq hujjati bilan rasman tuzatish; 14.3 misoli (500k boshlang'ich naqd, supplier -300k, sale +140k, debt +100k, supplier -50k = 390k naqd, ombor/qarzlar aralashmasligi); Livewire `CashManager` interfeysi; 99/99 testlar (692 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 11-bosqichni boshlash |
 | 11 | Offline qurilmalar, qoldiq va kredit ajratmalari | Offline poydevori | TODO | - | Device registration, stock/credit allocation |
 | 12 | Server sync API va konfliktlar protokoli | Offline poydevori | TODO | - | Batch push, cursor pull, NEEDS_REVIEW |
 | 13 | PWA lokal baza va internetsiz sotuv | Offline PWA | TODO | - | Service Worker, IndexedDB, offline POS |
@@ -431,7 +431,53 @@
 
 ---
 
-## 15. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 15. 10-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Naqd, Karta va Bank Hisoblari & Umumiy Pul Kontrakti:**
+   - `cash_accounts` jadvali: Naqd pul (`CASH`), Karta/Terminal (`CARD`), Bank hisob-raqami (`BANK`).
+   - Umumiy cash kontrakti operatsion xarajatlar, hisoblararo o'tkazma, egasi mablag'i, savdo/qarz tushumlari va qaytarishlarga moslashtirildi.
+   - Pul chiqimlarida qoldiq yetarliligi `lockForUpdate()` tranzaksiyasi ichida tekshiriladi (`InsufficientCashException`).
+2. **Operatsion Xarajatlar (`ExpenseService`):**
+   - Ruxsat etilgan toifalar: `RENT`, `SALARY`, `TRANSPORT`, `UTILITIES`, `UNLOADING`, `OTHER`.
+   - `operation_id` orqali to'liq idempotentsiya: takroriy so'rov eski natijani qaytaradi, kassa puli ikki marta yechilmaydi, boshqa ma'lumot bilan 409 Conflict.
+   - `expenses` va `payments` jadvallari, `AuditLog` va `OutboxEvent` atomik shakllanadi.
+3. **Hisoblararo O'tkazma (`CashTransferService`):**
+   - Transfer faqat hisoblararo pul harakati bo'lib, yangi savdo, tushum yoki operatsion xarajat EMAS.
+   - Chiqim hisobidan yechilib, kirim hisobiga qo'shiladi; deadlockdan himoyalanish uchun hisoblar ID lari saralangan tartibda qulflanadi.
+   - Idempotentsiya tekshirildi (takroriy so'rovda ikki marta yechilmaydi).
+4. **Egasi Mablag'i (`OwnerFundsService`) va Foydadan Ajratish:**
+   - Egasi mablag' kiritishi (`OWNER_DEPOSIT` / capital injection) savdo tushumi emas.
+   - Egasi mablag' chiqarishi (`OWNER_DRAW` / draw) operatsion xarajat emas va sotuv yalpi foydasini kamaytirmaydi (`Expense` modeli yaratilmaydi).
+5. **14.3 Misoli — Aniq Ketma-ketlik va Hisoblarning To'liq Ajratilishi:**
+   - Boshlang'ich naqd: 500 000 so'm.
+   - Ta'minotchiga to'lov: −300 000 so'm -> kassa: 200 000 so'm, ta'minotchi qarzi: 450 000 so'm.
+   - Mijozga savdo (60 dona × 6 500 = 390 000 so'm, tannarx 300 000 so'm, yalpi foyda 90 000 so'm), to'langan: +140 000 so'm -> kassa: 340 000 so'm, mijoz qarzi: 250 000 so'm, ombor qoldig'i: 90 dona / 450 000 so'm.
+   - Mijoz qarz to'lovi: +100 000 so'm -> kassa: 440 000 so'm, mijoz qarzi: 150 000 so'm.
+   - Ta'minotchiga to'lov: −50 000 so'm -> kassa: **390 000 so'm**, ta'minotchi qarzi: 400 000 so'm.
+   - Yakuniy naqd kassa: aniq **390 000 so'm**! Mijoz qarzi (150 000), ta'minotchi qarzi (400 000) va ombor qiymati (450 000) naqdga mutlaqo aralashmaydi.
+6. **Kassa Smenasi (`CashSession`) Intizomi:**
+   - **Bitta naqd hisob uchun bitta OPEN smena:** Bir vaqtda ikkinchi smena ochish dastur va PostgreSQL darajasida (`unique_open_cash_session_per_account`) taqiqlandi (`ANOTHER_SESSION_ALREADY_OPEN`).
+   - **Closed Session Guard:** Yopilgan smenaga yangi savdo yoki pul operatsiyasi yozish qat'iy bloklandi (`CLOSED_SESSION_CANNOT_ACCEPT_OPERATIONS`).
+   - **Provisional yopilish:** Offline qurilmalar sinxronizatsiyasi kutilayotganda smena `PROVISIONAL` holatida yopiladi va ma'lumotlar kelguncha kutadi.
+7. **Kassa Farqi va Ruxsatli Farq Hujjati:**
+   - Kassa sanalganda farq aniqlansa, sababsiz yopish rad etiladi (`DIFFERENCE_REASON_REQUIRED`).
+   - Smena yopilganda kassa balansi yashirincha overwrite qilinmaydi (`balance_after` o'zgarmasdan turadi).
+   - Farq faqat vakolatli xodim (egasi/admin) tomonidan tasdiqlangandan keyin qonuniy `DIFFERENCE_SURPLUS` yoki `DIFFERENCE_SHORTAGE` pul daftari harakati bilan to'g'rilanadi.
+8. **Livewire `CashManager` Interfeysi:**
+   - Hisoblar kartalari (Naqd, Karta, Bank) va jami pul mablag'i.
+   - Ochiq smena holati, ochilgan vaqti, kutilgan naqd summasi va smenani yopish oynasi.
+   - Tezkor amallar: Xarajat qilish, Hisoblararo o'tkazma, Egasi mablag'i (kiritish/chiqarish), Smena ochish/yopish.
+   - Pul harakatlari daftari (filtrlar, `Asia/Tashkent` sekund aniqligi, kirim/chiqim/qoldiq) va Smenalar tarixi jadvallari.
+9. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - `php artisan test --filter=CashSessionAndMovementsTest`: **11 passed (62 assertions, duration 2.8s)**.
+   - `php artisan test`: **99 passed out of 99 tests (692 assertions, duration 21.0s)**.
+   - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - `npm run build`: **0 errors (built in 550ms)**.
+   - `flutter analyze`: **No issues found! (ran in 2.1s)**.
+
+---
+
+## 16. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
@@ -440,7 +486,7 @@
 3. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*09-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 10.*
+*10-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 11.*
 
 
 

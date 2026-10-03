@@ -23,4 +23,19 @@ class CashAccount extends Model
     {
         return $this->hasMany(CashMovement::class);
     }
+
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(CashSession::class);
+    }
+
+    public function activeSession()
+    {
+        return $this->hasOne(CashSession::class)->where('status', 'OPEN');
+    }
+
+    public function hasOpenSession(): bool
+    {
+        return $this->sessions()->where('status', 'OPEN')->exists();
+    }
 }

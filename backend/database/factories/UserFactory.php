@@ -69,6 +69,13 @@ class UserFactory extends Factory
         return $this->warehouse();
     }
 
+    public function salesManager(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'SALES_MANAGER',
+        ]);
+    }
+
     public function blocked(): static
     {
         return $this->state(fn () => [

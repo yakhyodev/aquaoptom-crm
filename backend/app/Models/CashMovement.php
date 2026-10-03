@@ -14,6 +14,7 @@ class CashMovement extends Model
     protected $fillable = [
         'operation_id',
         'cash_account_id',
+        'cash_session_id',
         'type', // SALE_PAYMENT, CUSTOMER_PAYMENT, SUPPLIER_PAYMENT, EXPENSE, TRANSFER_IN, TRANSFER_OUT, OWNER_DEPOSIT, OWNER_WITHDRAWAL, REFUND, ADJUSTMENT, OPENING_BALANCE
         'direction', // IN, OUT
         'debit',
@@ -38,5 +39,15 @@ class CashMovement extends Model
     public function account(): BelongsTo
     {
         return $this->belongsTo(CashAccount::class, 'cash_account_id');
+    }
+
+    public function session(): BelongsTo
+    {
+        return $this->belongsTo(CashSession::class, 'cash_session_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

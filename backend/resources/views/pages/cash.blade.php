@@ -3,6 +3,6 @@
     <x-slot name="header">Kassa va xarajatlar — Pul harakati va kun yakuni</x-slot>
 
     <div class="space-y-6">
-        @livewire('finance-dashboard')
+        <livewire:cash.cash-manager />
     </div>
 </x-layouts.app>
