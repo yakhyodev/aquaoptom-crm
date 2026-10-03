@@ -58,7 +58,8 @@ class CreateSaleService
         ?int $warehouseId = null,
         ?int $userId = null,
         string $source = 'web',
-        bool $useSystemPrice = true
+        bool $useSystemPrice = true,
+        $goodsPickedUpAt = null
     ): Sale {
         $operationId = $operationId ?: (string) Str::uuid();
 
@@ -257,7 +258,8 @@ class CreateSaleService
                 $notes,
                 $warehouseId,
                 $userId,
-                $source
+                $source,
+                $goodsPickedUpAt
             ) {
                 $actualWarehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
 
@@ -308,6 +310,7 @@ class CreateSaleService
                     'notes' => $notes,
                     'created_by' => $userId,
                     'completed_at' => Carbon::now(),
+                    'goods_picked_up_at' => $goodsPickedUpAt ? Carbon::parse($goodsPickedUpAt, 'Asia/Tashkent')->utc() : null,
                 ]);
 
                 // 5.4. Tovarlar qatorlari va Ombor chiqimi (WAC tannarx snapshot bilan)

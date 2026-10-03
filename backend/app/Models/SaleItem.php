@@ -44,6 +44,11 @@ class SaleItem extends Model
         return $this->belongsTo(ProductVariant::class, 'product_variant_id');
     }
 
+    public function productVariant(): BelongsTo
+    {
+        return $this->variant();
+    }
+
     public function package(): BelongsTo
     {
         return $this->belongsTo(ProductPackage::class, 'package_id');

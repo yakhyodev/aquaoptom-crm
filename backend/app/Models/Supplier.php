@@ -17,6 +17,8 @@ class Supplier extends Model
         'phone',
         'address',
         'balance',
+        'credit_limit',
+        'payment_due_date',
         'status',
         'notes',
         'created_by',
@@ -24,6 +26,8 @@ class Supplier extends Model
 
     protected $casts = [
         'balance' => 'integer',
+        'credit_limit' => 'integer',
+        'payment_due_date' => 'date',
     ];
 
     public function purchases(): HasMany

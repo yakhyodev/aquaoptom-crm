@@ -28,6 +28,7 @@ class Sale extends Model
         'receipt_data',
         'created_by',
         'completed_at',
+        'goods_picked_up_at',
     ];
 
     protected $casts = [
@@ -38,6 +39,7 @@ class Sale extends Model
         'gross_profit' => 'integer',
         'receipt_data' => 'array',
         'completed_at' => 'datetime',
+        'goods_picked_up_at' => 'datetime',
     ];
 
     public function customer(): BelongsTo

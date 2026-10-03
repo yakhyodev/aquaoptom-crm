@@ -20,6 +20,7 @@ auth.json
 *.sql
 *.sql.gz
 *.bak
+*.rdb
 
 # Backend Dependencies & Generated
 /backend/vendor/

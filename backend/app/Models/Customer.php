@@ -17,6 +17,7 @@ class Customer extends Model
         'store_name',
         'address',
         'debt_limit',
+        'payment_due_date',
         'current_debt',
         'status',
         'notes',
@@ -26,6 +27,7 @@ class Customer extends Model
     protected $casts = [
         'debt_limit' => 'integer',
         'current_debt' => 'integer',
+        'payment_due_date' => 'date',
     ];
 
     public function sales(): HasMany

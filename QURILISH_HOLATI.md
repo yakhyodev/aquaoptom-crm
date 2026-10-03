@@ -60,8 +60,8 @@
 ## 3. Baseline Test Xatolari va Mavjud Kod Holati
 
 - **Backend (Laravel):**
-  - **78 ta test o‘tgan (581 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
-  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim va sotuv (POS / CreateSale) to‘liq qamrab olindi.
+  - **88 ta test o‘tgan (630 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
+  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim, sotuv (POS / CreateSale) hamda qarzdorliklar va to'lovlar (Prompt 09) to‘liq qamrab olindi.
   - Laravel Pint linteridan to‘liq o‘tkazildi (`{"tool":"pint","result":"passed"}`).
 - **Mobile (Flutter):**
   - `flutter analyze`: **0 issues found** (toza tahlil natijasi).
@@ -81,8 +81,7 @@
 | **06** | **Hisob daftarlari, tannarx va boshlang‘ich qoldiqlar** | Hisob poydevori | **DONE** | Ombor daftari (`inventory_movements`, `inventory_balances` jami qiymat `total_value` bilan); WAC formulasi (100×5000 + 100×6000 = 200 dona / 1 100 000 qiymat / WAC 5500); oxirgi dona sotilganda qoldiq qiymat ham qat'iy 0 bo'lishi; signed mijoz daftari (`customer_ledger` musbat qarz, manfiy avans, `max(0)` taqiqlangan); signed ta’minotchi daftari (`supplier_ledger` musbat qarzimiz, manfiy avansimiz); kassa hisoblari va harakatlari (`cash_accounts`, `cash_movements`, transfer); to'lovlar (`payments`); idempotent boshlang'ich qoldiq hujjati va xizmati (`OpeningBalanceService` retry bitta yozuv, conflict himoyasi); do'kon egasi uchun Livewire boshlang'ich qoldiqlar oynasi (`OpeningBalancesManager`); 62/62 testlar (489 assertions) 100% o'tdi. | 07-bosqichni boshlash |
 | **07** | **Kirim bo‘limi — backenddan oynagacha** | Kundalik ish | **DONE** | DRAFT->POSTED kirim; migration 000006 (`operation_id`, `supplier_invoice_number`, `paid_amount`, `debt_amount`, `notes`); `ReceivePurchaseService` orqali atomik WAC qoldiq, supplier_ledger credit, ixtiyoriy cash_movements + supplier debit, Payment modeli; kassa huquqi bo'lmagan omborchining to'lov qilishi taqiqlangan (jim qolish naqd to'lov deb olinmaydi); xatolikda to'liq rollback; idempotent retry eski natijani berishi; Livewire `QuickInward` (katalog va ta'minotchi inline modallari bilan qoralama saqlanadi, to'lov paneli, kassa tanlovi); 68/68 testlar (541 assertions) 100% o'tdi. | 08-bosqichni boshlash |
 | **08** | **Sotuv bo‘limi — tezkor, mijozli va nasiya** | Kundalik ish | **DONE** | `CreateSaleService` xizmati; migration 000007 (`operation_id`, `paid_amount`, `debt_amount`, `cash_account_id`, `payment_method`, `notes`, `receipt_data`); guest tezkor savdoda faqat to'liq to'lov (mijozsiz DEBT taqiqlangan); mijozli savdoda to'liq/qisman/nasiya; savatda takroriy variant qatorlari bo'lsa barcha dona jamlanib lock tekshirilishi (100 qoldiqdan 60+60 o'tmaydi); kasr dona va manfiy/nol narx taqiqlanishi; tizim narxi vs erkin narx va eski narx versiyasida qayta tasdiq; 60×6500 jami 390 000 / cost 300 000 / paid 140 000 / debt 250 000 / gross 90 000 qabul mezoni to'liq o'tgan; 20 bosish/parallel so'rov bitta chek; mijoz avansi ikkinchi cash emasligi; Livewire OptomPos xatolikda savat saqlanishi va elektron kvitansiya; SaleExecutionAdapterInterface arxitekturasi; 78/78 testlar (581 assertions) 100% o'tdi. | 09-bosqichni boshlash |
-| 09 | Qarzdorliklar va taraflar to‘lovlari | Kundalik ish | TODO | - | Mijoz/ta’minotchi ko‘chirmasi, qarz to‘lovi, avans |
-| 09 | Qarzdorliklar va taraflar to‘lovlari | Kundalik ish | TODO | - | Mijoz/ta’minotchi ko‘chirmasi, qarz to‘lovi, avans |
+| **09** | **Qarzdorliklar va taraflar to‘lovlari** | Kundalik ish | **DONE** | Alohida "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" tablari; signed balans (musbat=qarz, manfiy=avans), avans boshqa taraf qarzini yashirmaydi; kartochkalar va ko'chirma (`boshlang'ich + harakatlar = yakuniy ko'chirma` 100%); Asia/Tashkent sekund aniqligida event_time, server_time, actor va tovar olib ketilgan vaqt (`goods_picked_up_at`); atomik `CustomerPaymentService` va `SupplierPaymentService` (kassa bilan bitta tranzaksiya); qarzdan ortiq summa faqat tasdiq bilan avansga o'tishi; keyingi to'lov chek/tovarlarga majburiy bog'lanmasligi va oldingi sotuv foyda/tannarxini o'zgartirmasligi; ta'minotchi to'lovi omborga tegmasligi; kredit limit va to'lov muddati ogohlantirishlari; 88/88 backend testlar (630 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 10-bosqichni boshlash |
 | 10 | Kassa, xarajat, o‘tkazma va smena | Kundalik ish | TODO | - | Pul hisoblari, xarajat kategoriyalari, smena ochish/yopish |
 | 11 | Offline qurilmalar, qoldiq va kredit ajratmalari | Offline poydevori | TODO | - | Device registration, stock/credit allocation |
 | 12 | Server sync API va konfliktlar protokoli | Offline poydevori | TODO | - | Batch push, cursor pull, NEEDS_REVIEW |
@@ -392,7 +391,47 @@
 
 ---
 
-## 14. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 14. 09-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Alohida Tablar va Signed Balans Qoidalari:**
+   - "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" alohida tablar qilib ajratildi.
+   - Signed balans qat'iy saqlandi: musbat balans — qarz (`DEBT`), manfiy balans — avans (`ADVANCE`).
+   - Bir mijozning avansi boshqa mijozning qarzini agregatlarda hech qachon yashirmaydi (`max(0)` taqiqlangan).
+2. **Hisob Ko‘chirmasi (Statement) Formulaning 100% Mosligi:**
+   - `StatementService` mijoz va ta'minotchi uchun hisob ko'chirmasini to'liq shakllantiradi: `boshlang'ich qoldiq + jami debit - jami credit = yakuniy qoldiq`.
+   - Har bir harakat o'zgarishi running balance bilan hisoblanadi.
+3. **Asia/Tashkent Vaqt Aniqligi va Audit:**
+   - Hujjatlar va ko'chirmadagi barcha vaqtlar `Asia/Tashkent` vaqt mintaqasida sekund aniqligida (`Y-m-d H:i:s`) ko'rsatiladi.
+   - `event_time` (hodisa vaqti), `server_time` (yozilgan vaqt), `actor` (kim bajargan) va ixtiyoriy `goods_picked_up_at` (tovar olib ketilgan vaqt) to'liq audit qilinadi.
+   - Soxta CCTV integratsiyasi yo'q — faqat aniq vaqt ma'lumotlari.
+4. **Umumiy Atomik To‘lov Xizmatlari:**
+   - `CustomerPaymentService`: Mijoz qarz to'lovi kassa kirimi (`cash_movements` IN) va mijoz krediti (`customer_ledger` CREDIT) bilan bitta `TransactionalOperationService` tranzaksiyasida atomik bajariladi.
+   - `SupplierPaymentService`: Ta'minotchi qarzi to'lovi kassa chiqimi (`cash_movements` OUT) va ta'minotchi debiti (`supplier_ledger` DEBIT) bilan atomik bajariladi. Kassa mablag'i yetarli bo'lmasa to'liq rollback bo'ladi (`INSUFFICIENT_CASH`).
+   - Ta'minotchi to'lovi ombor qoldig'i yoki tovar harakatlariga MUTLAQO tegmaydi.
+5. **Ortiqcha To‘lov va Avans Tasdig‘i:**
+   - Agar to'lov summasi joriy qarzdan oshsa, xatolik beriladi (`EXCESS_PAYMENT_REQUIRES_ADVANCE_CONFIRMATION`).
+   - Foydalanuvchi `confirm_excess_advance = true` deb aniq tasdiqlagan taqdirdagina to'lov qabul qilinadi va mijoz/ta'minotchi balansida toza manfiy avans yoziladi.
+6. **Keyingi To‘lovning Yalpi Foydaga Ta'sir Qilmasligi:**
+   - 250 000 so‘m qarz bo'yicha keyinchalik kiritilgan 100 000 so‘m to'lov faqat mijoz balansini kamaytiradi (qarz 150 000 so‘mga tushadi).
+   - Oldingi savdoning yalpi foydasi (`gross_profit` 90 000 so‘m) va tannarxi (`total_cost` 300 000 so‘m) mutlaqo o'zgarmaydi. To'lov tovarlarga/cheklarga majburiy bog'lanmaydi.
+7. **Kredit Limit va Kelishilgan To‘lov Muddati:**
+   - Mijoz va ta'minotchi kartalariga `credit_limit` va `payment_due_date` qo'shildi. Muddati o'tgan qarzlar uchun qizil indikatorlar va filtrlash imkoniyati yaratildi.
+8. **Livewire DebtsManager Oynasi:**
+   - Responsive interfeys: Mijozlar va ta'minotchilar ro'yxati, qidiruv, holat filtrlari (qarz/avans/muddati o'tgan).
+   - Tezkor to'lov modal oynasi (to'liq to'lash, 50%, 25% tugmalari bilan).
+   - Ortiqcha summa kiritilganda ogohlantirish va avansga o'tkazish checkboxi.
+   - Hisob ko'chirmasi (Statement drawer) va davr filtrlari.
+   - Kredit limit va muddatlarni tahrirlash modali.
+9. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - `php artisan test --filter=DebtsAndPartyPaymentsTest`: **10 passed (49 assertions, duration 3.2s)**.
+   - `php artisan test`: **88 passed out of 88 tests (630 assertions, duration 31.3s)**.
+   - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - `npm run build`: **0 errors (built in 4.73s)**.
+   - `flutter analyze`: **No issues found! (ran in 57.5s)**.
+
+---
+
+## 15. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
@@ -401,7 +440,7 @@
 3. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*08-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 09.*
+*09-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 10.*
 
 
 

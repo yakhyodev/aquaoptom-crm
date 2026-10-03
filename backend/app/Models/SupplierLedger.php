@@ -37,4 +37,9 @@ class SupplierLedger extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }
