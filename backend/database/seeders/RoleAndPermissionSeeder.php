@@ -124,6 +124,24 @@ class RoleAndPermissionSeeder extends Seeder
                 'category' => 'admin',
                 'description' => 'Do\'kon rekvizitlari, audit, backup va tizim parametrlarini boshqarish',
             ],
+            [
+                'name' => 'manage_devices',
+                'display_name' => 'Qurilmalarni boshqarish',
+                'category' => 'admin',
+                'description' => 'Qurilmalarni ro\'yxatdan o\'tkazish, ruxsat guvohnomalarini (lease) berish va bekor qilish',
+            ],
+            [
+                'name' => 'manage_allocations',
+                'display_name' => 'Qurilma ajratmalarini boshqarish',
+                'category' => 'inventory',
+                'description' => 'Qurilmalarga tovar qoldig\'i va kredit limitlarini ajratish, qaytarish',
+            ],
+            [
+                'name' => 'reconcile_devices',
+                'display_name' => 'Yo\'qolgan qurilmalarni muvofiqlashtirish',
+                'category' => 'admin',
+                'description' => 'Yo\'qolgan yoki kesh tozalangan qurilmalar ajratmasini omborga qaytarish va hisobni to\'g\'rilash',
+            ],
         ];
 
         $now = now();
@@ -170,6 +188,9 @@ class RoleAndPermissionSeeder extends Seeder
                     'manage_settings',
                     'manage_cash_sessions',
                     'approve_cash_discrepancy',
+                    'manage_devices',
+                    'manage_allocations',
+                    'reconcile_devices',
                 ],
             ],
             'SALES_MANAGER' => [

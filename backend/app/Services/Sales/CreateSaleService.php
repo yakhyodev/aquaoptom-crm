@@ -3,7 +3,10 @@
 namespace App\Services\Sales;
 
 use App\Models\CashAccount;
+use App\Models\CreditAllocation;
 use App\Models\Customer;
+use App\Models\Device;
+use App\Models\InventoryAllocation;
 use App\Models\InventoryBalance;
 use App\Models\Payment;
 use App\Models\ProductVariant;
@@ -11,13 +14,18 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Warehouse;
 use App\Services\Ledger\CashAccountService;
+use App\Services\Ledger\CreditAllocationService;
 use App\Services\Ledger\CustomerLedgerService;
+use App\Services\Ledger\Exceptions\InsufficientAllocationException;
+use App\Services\Ledger\Exceptions\InsufficientFreeStockException;
+use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Operations\TransactionalOperationService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CreateSaleService
@@ -27,7 +35,9 @@ class CreateSaleService
         protected CustomerLedgerService $customerLedgerService,
         protected CashAccountService $cashAccountService,
         protected TransactionalOperationService $transactionalOperationService,
-        protected TelegramService $telegram
+        protected TelegramService $telegram,
+        protected InventoryAllocationService $inventoryAllocationService,
+        protected CreditAllocationService $creditAllocationService
     ) {}
 
     /**
@@ -59,7 +69,8 @@ class CreateSaleService
         ?int $userId = null,
         string $source = 'web',
         bool $useSystemPrice = true,
-        $goodsPickedUpAt = null
+        $goodsPickedUpAt = null,
+        ?int $deviceId = null
     ): Sale {
         $operationId = $operationId ?: (string) Str::uuid();
 
@@ -235,6 +246,7 @@ class CreateSaleService
             'cash_account_id' => $cashAccountId,
             'payment_method' => strtoupper($paymentMethod),
             'warehouse_id' => $warehouseId,
+            'device_id' => $deviceId,
             'source' => $source,
         ];
 
@@ -259,32 +271,115 @@ class CreateSaleService
                 $warehouseId,
                 $userId,
                 $source,
-                $goodsPickedUpAt
+                $goodsPickedUpAt,
+                $deviceId
             ) {
                 $actualWarehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
 
-                // 5.1. Concurrency stock lock: Barcha kerakli variantlar bo'yicha lockForUpdate tekshirish
-                // "100 qoldiqdan 60+60 o'tmaydi"
+                // 5.1. Concurrency stock lock va Rezerv tekshiruvi:
+                // "Fizik qoldiq va sotish huquqi rezervi alohida: 100 dona PC60/phone30/free10."
+                // "Online savdo o‘z rezervi yoki erkin qoldiqni sarflasin."
                 foreach ($aggregateQtyByVariant as $vid => $totalNeeded) {
                     $balance = InventoryBalance::where('product_variant_id', $vid)
                         ->where('warehouse_id', $actualWarehouseId)
                         ->lockForUpdate()
                         ->first();
 
-                    $available = $balance ? (int) $balance->quantity : 0;
-                    if ($available < $totalNeeded) {
+                    $physicalOnHand = $balance ? (int) $balance->quantity : 0;
+
+                    $deviceAlloc = null;
+                    if ($deviceId) {
+                        $device = Device::find($deviceId);
+                        $deviceAlloc = InventoryAllocation::where('device_id', $deviceId)
+                            ->where('product_variant_id', $vid)
+                            ->where('warehouse_id', $actualWarehouseId)
+                            ->where('status', 'ACTIVE')
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($deviceAlloc) {
+                            $availInReservation = $deviceAlloc->available_quantity;
+                            if ($availInReservation < $totalNeeded) {
+                                $v = ProductVariant::with(['product', 'volume'])->find($vid);
+                                $vName = $v ? "{$v->product->name} ({$v->volume->name})" : "#{$vid}";
+                                throw new InsufficientAllocationException(
+                                    message: "Qurilmada (#{$device->device_code}) '{$vName}' uchun yetarli tovar ajratmasi (rezervi) mavjud emas! Ajratmada mavjud: {$availInReservation} dona, so'ralgan: {$totalNeeded} dona.",
+                                    operationId: $operationId,
+                                    details: [
+                                        'device_id' => $deviceId,
+                                        'variant_id' => $vid,
+                                        'available_reservation' => $availInReservation,
+                                        'requested' => $totalNeeded,
+                                    ]
+                                );
+                            }
+                        }
+                    }
+
+                    // 2. Jismoniy ombor qoldig'i tekshiruvi:
+                    if ($physicalOnHand < $totalNeeded) {
                         $v = ProductVariant::with(['product', 'volume'])->find($vid);
                         $vName = $v ? "{$v->product->name} ({$v->volume->name})" : "#{$vid}";
                         throw new OperationValidationException(
                             operationId: $operationId,
-                            message: "Omborda yetarli mahsulot mavjud emas! '{$vName}' uchun mavjud: {$available} dona, so'ralgan jami: {$totalNeeded} dona.",
+                            message: "Omborda yetarli mahsulot mavjud emas! '{$vName}' uchun mavjud: {$physicalOnHand} dona, so'ralgan jami: {$totalNeeded} dona.",
                             errorCode: 'INSUFFICIENT_STOCK',
                             details: [
                                 'variant_id' => $vid,
-                                'available' => $available,
+                                'available' => $physicalOnHand,
                                 'requested' => $totalNeeded,
                             ]
                         );
+                    }
+
+                    // 3. Agar qurilma maxsus rezervidan emas, umumiy erkin qoldiqdan sarflanayotgan bo'lsa:
+                    if (! $deviceId || ! $deviceAlloc) {
+                        $sumReserved = (int) InventoryAllocation::where('product_variant_id', $vid)
+                            ->where('warehouse_id', $actualWarehouseId)
+                            ->where('status', 'ACTIVE')
+                            ->sum(DB::raw('allocated_quantity - consumed_quantity - returned_quantity'));
+                        $freeStock = max(0, $physicalOnHand - $sumReserved);
+                        if ($freeStock < $totalNeeded) {
+                            $v = ProductVariant::with(['product', 'volume'])->find($vid);
+                            $vName = $v ? "{$v->product->name} ({$v->volume->name})" : "#{$vid}";
+                            throw new InsufficientFreeStockException(
+                                message: "Omborda yetarli erkin tovar qoldig'i mavjud emas! '{$vName}' uchun jami omborda {$physicalOnHand} dona bor, ammo {$sumReserved} donasi boshqa qurilmalarga rezerv qilingan. Faqat {$freeStock} dona erkin sotish mumkin, so'ralgan: {$totalNeeded} dona.",
+                                operationId: $operationId,
+                                details: [
+                                    'variant_id' => $vid,
+                                    'total_on_hand' => $physicalOnHand,
+                                    'total_reserved' => $sumReserved,
+                                    'free_stock' => $freeStock,
+                                    'requested' => $totalNeeded,
+                                ]
+                            );
+                        }
+                    }
+                }
+
+                // 5.1.b. Qat'iy mijoz kredit limiti tekshiruvi:
+                // "Credit limit online/offline rezervni hisobga oladi"
+                if ($customerId && $debtAmount > 0 && $customer) {
+                    $debtLimit = (int) $customer->debt_limit;
+                    $isStrict = (bool) $customer->is_strict_credit_limit;
+
+                    if ($debtLimit > 0 && $isStrict) {
+                        $callingDevice = $deviceId ? Device::find($deviceId) : null;
+                        $availableCredit = $this->creditAllocationService->getAvailableCreditLimit($customer, $callingDevice);
+
+                        if ($debtAmount > $availableCredit) {
+                            throw new OperationValidationException(
+                                operationId: $operationId,
+                                message: "Mijoz '{$customer->name}' kredit limitidan oshib ketdi! Limit: {$debtLimit} so'm, qurilma rezervlari va joriy qarz hisobga olinganda faqat {$availableCredit} so'm nasiya berish mumkin. So'ralgan nasiya: {$debtAmount} so'm.",
+                                errorCode: 'CREDIT_LIMIT_EXCEEDED',
+                                details: [
+                                    'customer_id' => $customerId,
+                                    'debt_limit' => $debtLimit,
+                                    'available_credit' => $availableCredit,
+                                    'requested_debt' => $debtAmount,
+                                ]
+                            );
+                        }
                     }
                 }
 
@@ -297,6 +392,7 @@ class CreateSaleService
                     'invoice_number' => $invoiceNumber,
                     'customer_id' => $customerId,
                     'warehouse_id' => $actualWarehouseId,
+                    'device_id' => $deviceId,
                     'status' => 'COMPLETED',
                     'total_amount' => $totalAmount,
                     'paid_amount' => $paidAmount,
@@ -356,6 +452,27 @@ class CreateSaleService
                         'price_version' => $item['price_version'],
                     ]);
 
+                    // Agar qurilmada ushbu tovar varianti bo'yicha ajratma bo'lsa, uni sarflash
+                    if ($deviceId) {
+                        $devModel = Device::find($deviceId);
+                        $hasDevAlloc = InventoryAllocation::where('device_id', $deviceId)
+                            ->where('product_variant_id', $variantId)
+                            ->where('warehouse_id', $actualWarehouseId)
+                            ->where('status', 'ACTIVE')
+                            ->exists();
+
+                        if ($hasDevAlloc && $devModel) {
+                            $this->inventoryAllocationService->consumeAllocation(
+                                device: $devModel,
+                                variantId: $variantId,
+                                quantity: $qty,
+                                warehouseId: $actualWarehouseId,
+                                operationId: (string) Str::uuid(),
+                                userId: $userId
+                            );
+                        }
+                    }
+
                     $itemsRecorded[] = [
                         'variant_id' => $variantId,
                         'product_name' => $item['variant']->product->name,
@@ -404,6 +521,26 @@ class CreateSaleService
                     }
 
                     $customerBalanceAfter = (int) $customer->fresh()->current_debt;
+
+                    // Agar qurilmada ushbu mijoz bo'yicha kredit limiti ajratmasi bo'lsa, uni sarflash
+                    if ($debtAmount > 0 && $deviceId) {
+                        $devModel = Device::find($deviceId);
+                        $hasCreditAlloc = CreditAllocation::where('device_id', $deviceId)
+                            ->where('customer_id', $customerId)
+                            ->where('status', 'ACTIVE')
+                            ->exists();
+
+                        if ($hasCreditAlloc && $devModel && $customer) {
+                            $this->creditAllocationService->consumeCreditAllocation(
+                                device: $devModel,
+                                customer: $customer,
+                                amount: $debtAmount,
+                                operationId: (string) Str::uuid(),
+                                isNewCustomerBudget: false,
+                                userId: $userId
+                            );
+                        }
+                    }
                 }
 
                 // 5.6. Kassa Harakati (Cash Inflow)

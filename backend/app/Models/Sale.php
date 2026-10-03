@@ -14,6 +14,7 @@ class Sale extends Model
         'invoice_number',
         'customer_id',
         'warehouse_id',
+        'device_id',
         'status', // COMPLETED, CANCELLED, VOID
         'total_amount',
         'paid_amount',
@@ -50,6 +51,11 @@ class Sale extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(Device::class);
     }
 
     public function cashAccount(): BelongsTo

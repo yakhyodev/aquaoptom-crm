@@ -25,7 +25,10 @@ class OnlineSaleAdapter implements SaleExecutionAdapterInterface
             notes: $saleData['notes'] ?? null,
             warehouseId: isset($saleData['warehouse_id']) ? (int) $saleData['warehouse_id'] : null,
             userId: isset($saleData['user_id']) ? (int) $saleData['user_id'] : null,
-            source: $saleData['source'] ?? 'web'
+            source: $saleData['source'] ?? 'web',
+            useSystemPrice: $saleData['use_system_price'] ?? true,
+            goodsPickedUpAt: $saleData['goods_picked_up_at'] ?? null,
+            deviceId: isset($saleData['device_id']) ? (int) $saleData['device_id'] : null
         );
 
         return new Fluent([

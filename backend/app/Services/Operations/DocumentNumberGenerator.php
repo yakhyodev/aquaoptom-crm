@@ -68,6 +68,20 @@ class DocumentNumberGenerator
     }
 
     /**
+     * Qurilma kodi: DEV-000001
+     */
+    public static function nextDeviceCode(): string
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            $seq = DB::select("SELECT nextval('device_seq') as seq")[0]->seq;
+
+            return sprintf('DEV-%04d', $seq);
+        }
+
+        return sprintf('DEV-%04d', mt_rand(1, 9999));
+    }
+
+    /**
      * Umumiy ketma-ketlik raqamini xavfsiz generatsiya qilish (max(id)+1 ishlatilmaydi)
      */
     public static function next(string $prefix, string $sequenceName): string

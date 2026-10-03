@@ -166,4 +166,14 @@ class User extends Authenticatable
         return $this->belongsToMany(Permission::class, 'user_permissions')
             ->withPivot('is_granted');
     }
+
+    public function assignedDevices(): HasMany
+    {
+        return $this->hasMany(Device::class, 'assigned_user_id');
+    }
+
+    public function deviceAuthorizations(): HasMany
+    {
+        return $this->hasMany(OfflineAuthorization::class);
+    }
 }

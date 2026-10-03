@@ -17,6 +17,7 @@ class Customer extends Model
         'store_name',
         'address',
         'debt_limit',
+        'is_strict_credit_limit',
         'payment_due_date',
         'current_debt',
         'status',
@@ -26,6 +27,7 @@ class Customer extends Model
 
     protected $casts = [
         'debt_limit' => 'integer',
+        'is_strict_credit_limit' => 'boolean',
         'current_debt' => 'integer',
         'payment_due_date' => 'date',
     ];
@@ -38,6 +40,11 @@ class Customer extends Model
     public function ledger(): HasMany
     {
         return $this->hasMany(CustomerLedger::class);
+    }
+
+    public function creditAllocations(): HasMany
+    {
+        return $this->hasMany(CreditAllocation::class);
     }
 
     /**

@@ -57,11 +57,11 @@
 
 ---
 
-## 3. Baseline Test Xatolari va Mavjud Kod Holati
+### 3. Baseline Test Xatolari va Mavjud Kod Holati
 
 - **Backend (Laravel):**
-  - **88 ta test o‘tgan (630 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
-  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim, sotuv (POS / CreateSale) hamda qarzdorliklar va to'lovlar (Prompt 09) to‘liq qamrab olindi.
+  - **110 ta test o‘tgan (735 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
+  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim, sotuv (POS / CreateSale), qarzdorliklar, kassa va smena hamda offline qurilmalar va qoldiq ajratmalari (Prompt 11) to‘liq qamrab olindi.
   - Laravel Pint linteridan to‘liq o‘tkazildi (`{"tool":"pint","result":"passed"}`).
 - **Mobile (Flutter):**
   - `flutter analyze`: **0 issues found** (toza tahlil natijasi).
@@ -72,7 +72,7 @@
 ## 4. 25 Bosqichli Qurilish Reyestri (25-Step Pipeline Registry)
 
 | № | Bosqich nomi | Guruh | Status | Dalillar va Natijalar | Keyingi qoldiq ish |
-| :---: | :--- | :--- | :--- :---: | :--- | :--- |
+| :---: | :--- | :--- | :---: | :--- | :--- |
 | **01** | **Loyihani tayyorlash va arxitektura qarorlarini qayd qilish** | Poydevor | **DONE** | Inventarizatsiya qilindi. `backend/AGENTS.md` Boost bilan yangilandi. Ildiz `.gitignore` va lokal Git repo yaratildi. Baseline xatolari qayd etildi. | 02-bosqichni kutish |
 | **02** | **Takror ko‘tariladigan lokal muhit va CI** | Poydevor | **DONE** | PostgreSQL 16 va Redis 5 Windows muhitida ko‘tarildi; `aquaoptom_dev` va `aquaoptom_test` yaratildi; toza test DBda migrate/rollback/re-migrate sinovi o‘tdi; `AppServiceProvider` xavfsizlik qo‘riqchilari qo‘shildi; `.env.example` namunaviy qiymatlar bilan tozalandi; GitHub Actions CI workflow yozildi; 14 ta backend testi real PostgreSQL+Redis ustida muvaffaqiyatli o‘tdi (79 assertions); Vite frontend build va Flutter analyze tekshirildi. | 03-bosqichni boshlash |
 | **03** | **Kirish, ruxsatlar va responsive dastur karkasi** | Poydevor | **DONE** | Web & API Sanctum auth; 5 ta asosiy rol (`OWNER`, `ADMIN`, `SALES_MANAGER`, `WAREHOUSE_MANAGER`, `CASHIER`) va 15 ta aniq granular ruxsatlar; xavfsiz `app:bootstrap-owner` buyrug'i; bloklangan foydalanuvchini darhol cheklash; server policy/API'da tannarx yashirish (`cost_price: null`); mahalliy Vite assetli responsive layout, 360px viewport va 8 ta rasmiy menyu (soxta raqamlarsiz); 25 ta backend testi (184 assertions) va Pint linter 100% o'tdi. | 04-bosqichni boshlash |
@@ -83,7 +83,7 @@
 | **08** | **Sotuv bo‘limi — tezkor, mijozli va nasiya** | Kundalik ish | **DONE** | `CreateSaleService` xizmati; migration 000007 (`operation_id`, `paid_amount`, `debt_amount`, `cash_account_id`, `payment_method`, `notes`, `receipt_data`); guest tezkor savdoda faqat to'liq to'lov (mijozsiz DEBT taqiqlangan); mijozli savdoda to'liq/qisman/nasiya; savatda takroriy variant qatorlari bo'lsa barcha dona jamlanib lock tekshirilishi (100 qoldiqdan 60+60 o'tmaydi); kasr dona va manfiy/nol narx taqiqlanishi; tizim narxi vs erkin narx va eski narx versiyasida qayta tasdiq; 60×6500 jami 390 000 / cost 300 000 / paid 140 000 / debt 250 000 / gross 90 000 qabul mezoni to'liq o'tgan; 20 bosish/parallel so'rov bitta chek; mijoz avansi ikkinchi cash emasligi; Livewire OptomPos xatolikda savat saqlanishi va elektron kvitansiya; SaleExecutionAdapterInterface arxitekturasi; 78/78 testlar (581 assertions) 100% o'tdi. | 09-bosqichni boshlash |
 | **09** | **Qarzdorliklar va taraflar to‘lovlari** | Kundalik ish | **DONE** | Alohida "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" tablari; signed balans (musbat=qarz, manfiy=avans), avans boshqa taraf qarzini yashirmaydi; kartochkalar va ko'chirma (`boshlang'ich + harakatlar = yakuniy ko'chirma` 100%); Asia/Tashkent sekund aniqligida event_time, server_time, actor va tovar olib ketilgan vaqt (`goods_picked_up_at`); atomik `CustomerPaymentService` va `SupplierPaymentService` (kassa bilan bitta tranzaksiya); qarzdan ortiq summa faqat tasdiq bilan avansga o'tishi; keyingi to'lov chek/tovarlarga majburiy bog'lanmasligi va oldingi sotuv foyda/tannarxini o'zgartirmasligi; ta'minotchi to'lovi omborga tegmasligi; kredit limit va to'lov muddati ogohlantirishlari; 88/88 backend testlar (630 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 10-bosqichni boshlash |
 | **10** | **Kassa, xarajat, o‘tkazma va smena** | Kundalik ish | **DONE** | Naqd/karta/bank hisoblari; umumiy atomik cash kontrakti; operatsion xarajatlar (`ExpenseService`), egasi mablag'i (`OwnerFundsService`, draw operatsion xarajat emas va foydani kamaytirmaydi); hisoblararo o'tkazma (`CashTransferService`, savdo/foyda emas); kassa yetarliligi `lockForUpdate` ichida; bitta naqd hisob uchun bitta OPEN smena (`CashSession`), kutilgan naqd balansi, sanalgan naqd, farq sababi; offline qurilmalar kutilganda PROVISIONAL yopilish; closed session guard (yopilgan smenaga savdo/harakat yozilmaydi); farqni yashirin balance overwrite bilan emas, balki ruxsatli farq hujjati bilan rasman tuzatish; 14.3 misoli (500k boshlang'ich naqd, supplier -300k, sale +140k, debt +100k, supplier -50k = 390k naqd, ombor/qarzlar aralashmasligi); Livewire `CashManager` interfeysi; 99/99 testlar (692 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 11-bosqichni boshlash |
-| 11 | Offline qurilmalar, qoldiq va kredit ajratmalari | Offline poydevori | TODO | - | Device registration, stock/credit allocation |
+| **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
 | 12 | Server sync API va konfliktlar protokoli | Offline poydevori | TODO | - | Batch push, cursor pull, NEEDS_REVIEW |
 | 13 | PWA lokal baza va internetsiz sotuv | Offline PWA | TODO | - | Service Worker, IndexedDB, offline POS |
 | 14 | PWA avtomatik sync va uzilish sinovlari | Offline PWA | TODO | - | Reconnect sync, retry, ACK, storage failure recovery |
@@ -477,16 +477,72 @@
 
 ---
 
-## 16. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 16. 11-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Qurilmalar Ro‘yxatga Olinishi (`DeviceService` & `devices` jadvali):**
+   - **Migratsiya:** `2026_10_03_000010_create_devices_and_allocations_tables.php` yaratildi. `device_seq` PostgreSQL sequence orqali parallel so‘rovlarda xavfsiz `DEV-0001` formatidagi inson o‘qiy oladigan kodlar shakllanadi.
+   - Har bir qurilma uchun unikal `device_uuid`, `device_type` (`PC`, `MOBILE`, `TABLET`, `POS_TERMINAL`), `status` (`ACTIVE`, `REVOKED`, `LOST`), tayinlangan foydalanuvchi (`assigned_user_id`), oxirgi IP va heartbeat vaqtlari qayd etildi.
+   - Bloklangan yoki yo'qolgan qurilmalar yangi operatsiyalarni bajara olmaydi (`DeviceRevokedException`).
+
+2. **Imzolangan Muddatli Ruxsat Guvohnomasi (`OfflineLeaseService`):**
+   - HMAC-SHA256 imzosi server maxfiy kaliti (`config('app.key')`) orqali kanonik JSON ma'lumotlari asosida shakllantiriladi.
+   - Muddat (`valid_from`, `expires_at`), ruxsatlar to'plami (`permissions`), token (`lease_token`) va qurilma epoxasi (`current_lease_epoch`) to'liq imzo bilan muhrlanadi.
+   - Imzo soxtalashtirilganda `verifyLease` darhol `SIGNATURE_MISMATCH` qaytaradi.
+   - Epoxa oshirilganda yoki lease revoke qilinganda eski ruxsatlar bekor bo'ladi.
+   - **Muhim arxitektura qoidasi:** Revoke yoki Expiry yangi savdoni to'xtatadi, ammo ushbu vaqtdan oldin qurilmada lokal yaratilgan pending savdoni rad etmaydi (`validateOperationPermitted`).
+
+3. **100 Dona = PC 60 / Phone 30 / Free 10 Stsenariysi (`InventoryAllocationService`):**
+   - **Fizik qoldiq va sotish huquqi ajratmasi (rezerv) qat'iy ajratildi:** Omborda 100 dona tovar bo'lsa, PC ga 60 dona va Phone ga 30 dona ajratilganda jismoniy qoldiq 100, jami rezerv 90 va erkin sotish mumkin bo'lgan erkin qoldiq aniq 10 donani tashkil qiladi.
+   - **Erkin qoldiq himoyasi:** Online savdo o'z rezervi bo'lmasa, faqat erkin qoldiqdan sarflaydi. 10 dona erkin qoldiq bo'lganda 15 dona sotish so'rovi `InsufficientFreeStockException` bilan bloklanadi.
+   - **Qurilma o'z rezervidan sotishi:** PC 60 dona sotganda o'z ajratmasidan sarflaydi (`consumed_quantity = 60`), fizik qoldiq 90 bo'ladi.
+   - **Qurilma rezervidan ortiq sota olmasligi:** 30 dona ajratmasi bor telefon 35 dona sotishga uringanda `InsufficientAllocationException` bilan bloklanadi.
+   - **Parallel grantlar jismoniy qoldiqdan osha olmaydi:** Omborda mavjud bo'lganidan ortiq tovar qurilmalarga rezerv qilib tarqatilmaydi (`InsufficientStockForAllocationException`).
+
+4. **Idempotent Iste'mol va Baza Butunligi:**
+   - Bir xil `operation_id` bilan bir nechta marta sarflash chaqirilganda rezerv takroriy kamaytirilmaydi; harakatlar daftari (`inventory_allocation_movements`) bitta yozuvni saqlaydi.
+
+5. **Avtomatik Tiklanmaslik Qoidasi (Lease Expiry / Offline / Reinstall):**
+   - Qurilmaning internetdan uzilishi, muddati tugashi yoki dasturni qayta o'rnatishi unga berilgan tovar rezervini avtomatik ravishda bekor qilib boshqa qurilmaga bermaydi (chunki fizik tovar yo'lda yoki mashinada sotilgan bo'lishi mumkin).
+   - Rezervlar tovar do'konga qaytarilgandagina rasman qaytariladi (`returnAllocation`).
+
+6. **Yo'qolgan Qurilmani Qo'lda Rekonsilyatsiya Qilish (`manualReconcileLostDevice`):**
+   - Agar qurilma yo'qolsa, do'kon egasi ruxsati bilan majburiy sabab kiritilib, qoldiqlar audit logi bilan rekonsilyatsiya qilinadi.
+
+7. **Ombor Harakatlarining Faol Rezervlardan Himoyalanishi:**
+   - Ombordagi brakka chiqarish yoki ta'minotchiga qaytarish kabi qoldiqni kamaytiruvchi amallar faol rezervlar chegarasini buzolmaydi (`validateStockReductionAllowed` -> `ReservedStockProtectionException`).
+
+8. **Mijoz Kredit Limiti va Yangi Mijozlar Qarz Byudjeti (`CreditAllocationService`):**
+   - `is_strict_credit_limit = true` bo'lgan mijozlar uchun qurilmalarga berilgan kredit limit ajratmalari va online nasiyalar umumiy limitdan oshmasligi tekshiriladi (`InsufficientCreditAllocationException`).
+   - Qurilmalarga yangi ro'yxatdan o'tmagan offline mijozlarga sotish uchun alohida umumiy nasiya byudjeti (`new_customer_debt_budget`) ajratiladi.
+
+9. **Livewire `DeviceManager` Interfeysi:**
+   - Qurilmalar ro'yxati (kodi, nomi, turi, egasi, oxirgi IP va faollik vaqti).
+   - Qurilmani ro'yxatga olish, bloklash (revoke), yo'qolgan deb belgilash (lost).
+   - Muddatli Lease berish modali (ruxsatlar tanlovi, muddat soatlarda).
+   - Tovar rezervi ajratish (Variant, Ombor, Miqdor) va qaytarish modallari.
+   - Kredit limiti ajratish modali.
+   - Yo'qolgan qurilmani rasmiy audit sababi bilan rekonsilyatsiya qilish oynasi.
+   - Admin sahifasiga (`resources/views/pages/admin.blade.php`) to'liq ulandi.
+
+10. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+    - `php artisan test --filter=OfflineDevicesAndAllocationsTest`: **11 passed (43 assertions, duration 4.3s)**.
+    - `php artisan test`: **110 passed out of 110 tests (735 assertions, duration 26.8s)**.
+    - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+    - `npm run build`: **0 errors (built in 1.01s)**.
+    - `flutter analyze`: **No issues found! (ran in 2.7s)**.
+
+---
+
+## 17. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
    - Flutter `test/widget_test.dart` dagi default counter testi Prompt 20 da haqiqiy CRM kirish va savdo ekranlari widget testlariga almashtiriladi.
-2. **Offline qoldiq ajratish miqdori (Siyosat):** Qurilmalarga qoldiq rezervini avtomatik foizda (masalan, 30%) yoki do‘kon egasi tomonidan qo‘lda belgilash tartibi 11-bosqichda tasdiqlanishi kerak.
+2. **Offline qoldiq va kredit ajratish siyosati:** Prompt 11 doirasida to'liq amalga oshirildi. Do'kon egasi Livewire interfeysi yoki API orqali har bir qurilmaga aniq tovar donasi va mijoz kredit byudjetini mustaqil boshqarishi mumkin.
 3. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*10-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 11.*
+*11-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 12.*
 
 
 

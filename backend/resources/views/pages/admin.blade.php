@@ -14,6 +14,9 @@
             </a>
         </div>
 
+        <!-- Offline Devices and Allocations Management -->
+        <livewire:devices.device-manager />
+
         <!-- Users Management Card -->
         <x-card title="Xodimlar va Rollar Boshqaruvi" subtitle="Tizimga kirish huquqiga ega barcha foydalanuvchilar">
             <x-slot name="actions">
