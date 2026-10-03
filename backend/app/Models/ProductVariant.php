@@ -62,6 +62,11 @@ class ProductVariant extends Model
         return $this->hasOne(InventoryBalance::class, 'product_variant_id');
     }
 
+    public function inventoryBalances(): HasMany
+    {
+        return $this->hasMany(InventoryBalance::class, 'product_variant_id');
+    }
+
     public function movements(): HasMany
     {
         return $this->hasMany(InventoryMovement::class, 'product_variant_id');

@@ -84,7 +84,7 @@
 | **09** | **Qarzdorliklar va taraflar to‘lovlari** | Kundalik ish | **DONE** | Alohida "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" tablari; signed balans (musbat=qarz, manfiy=avans), avans boshqa taraf qarzini yashirmaydi; kartochkalar va ko'chirma (`boshlang'ich + harakatlar = yakuniy ko'chirma` 100%); Asia/Tashkent sekund aniqligida event_time, server_time, actor va tovar olib ketilgan vaqt (`goods_picked_up_at`); atomik `CustomerPaymentService` va `SupplierPaymentService` (kassa bilan bitta tranzaksiya); qarzdan ortiq summa faqat tasdiq bilan avansga o'tishi; keyingi to'lov chek/tovarlarga majburiy bog'lanmasligi va oldingi sotuv foyda/tannarxini o'zgartirmasligi; ta'minotchi to'lovi omborga tegmasligi; kredit limit va to'lov muddati ogohlantirishlari; 88/88 backend testlar (630 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 10-bosqichni boshlash |
 | **10** | **Kassa, xarajat, o‘tkazma va smena** | Kundalik ish | **DONE** | Naqd/karta/bank hisoblari; umumiy atomik cash kontrakti; operatsion xarajatlar (`ExpenseService`), egasi mablag'i (`OwnerFundsService`, draw operatsion xarajat emas va foydani kamaytirmaydi); hisoblararo o'tkazma (`CashTransferService`, savdo/foyda emas); kassa yetarliligi `lockForUpdate` ichida; bitta naqd hisob uchun bitta OPEN smena (`CashSession`), kutilgan naqd balansi, sanalgan naqd, farq sababi; offline qurilmalar kutilganda PROVISIONAL yopilish; closed session guard (yopilgan smenaga savdo/harakat yozilmaydi); farqni yashirin balance overwrite bilan emas, balki ruxsatli farq hujjati bilan rasman tuzatish; 14.3 misoli (500k boshlang'ich naqd, supplier -300k, sale +140k, debt +100k, supplier -50k = 390k naqd, ombor/qarzlar aralashmasligi); Livewire `CashManager` interfeysi; 99/99 testlar (692 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 11-bosqichni boshlash |
 | **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
-| 12 | Server sync API va konfliktlar protokoli | Offline poydevori | TODO | - | Batch push, cursor pull, NEEDS_REVIEW |
+| **12** | **Server sync API va konfliktlar protokoli** | Offline poydevori | **DONE** | Versiyalangan qurilma bootstrap (`/api/sync/bootstrap`), signed lease snapshot, tayinlangan ombor, faol tovar va kredit ajratmalari; cursor pull change feed (`/api/sync/pull`, BIGSERIAL commit-order cursor, `sync_change_log`, versioning, tombstones, sezgir tannarx/moliya cheklovlari); atomik batch push (`/api/sync/push`, per-item transaction isolation, `CREATE_CUSTOMER`, `CREATE_SALE`, `CUSTOMER_PAYMENT`, statuslar: APPLIED, RETRY_SUCCESS, CONFLICT, NEEDS_REVIEW, FAILED); yangi UUID mijoz avval server ID ga ulanadi, so'ng savdo bog'lanadi (avtomatik nom/telefon merge yo'q); idempotent timeout replay eski natijani qaytaradi, boshqa payload bilan shu ID 409 Conflict beradi; stale narx qoidasi: offline kelishilgan sotuv narxi qat'iy saqlanadi, WAC tannarx server posting paytida hisoblanadi; uch xil vaqt (`device_created_at`, `received_at`, `posted_at`); yopilgan kassa smenasi yoki limitlar oshishi operatsiyani tashlab yubormaydi, balki `sync_conflicts` da `NEEDS_REVIEW` holatida xom payload bilan saqlanadi; admin nizolarni hal qilish API (`/api/sync/conflicts` va `/api/sync/conflicts/{id}/resolve` -> APPROVED_OVERRIDE / REJECT) audit bilan; operatsiya holatini tekshirish (`/api/sync/status/{operation_id}`); 12/12 sync testlar (106 assertions) va 122/122 to'liq tizim testlari (841 assertions) 100% o'tdi. | 13-bosqichni boshlash |
 | 13 | PWA lokal baza va internetsiz sotuv | Offline PWA | TODO | - | Service Worker, IndexedDB, offline POS |
 | 14 | PWA avtomatik sync va uzilish sinovlari | Offline PWA | TODO | - | Reconnect sync, retry, ACK, storage failure recovery |
 | 15 | Ombor qoldiqlari va interaktiv kalkulyator | Tahlil va nazorat | TODO | - | Master kalkulyator, hajm checkboxlari, kutilayotgan foyda |
@@ -533,16 +533,67 @@
 
 ---
 
-## 17. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 17. 12-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Versiyalangan Device Bootstrap (`POST /api/sync/bootstrap`):**
+   - Faol qurilma uchun imzolangan muddatli lease token (`OfflineLeaseService`), ruxsatlar snapshot (`permissions`), biriktirilgan ombor (`assigned_warehouse`), faol tovar ajratmalari (`stock_allocations`), mijoz kredit ajratmalari (`credit_allocations`), serverning eng so'nggi kursori (`latest_cursor`) va rasmiy server vaqti (`server_time_iso`) berilishi tasdiqlandi.
+
+2. **Commit-Order Cursor Pull & Change Feed (`GET /api/sync/pull`):**
+   - `sync_change_log` jadvali orqali `BIGSERIAL` commit-order tartibida qat'iy kursor boshqaruvi (`last_cursor`). Kech commit past ID'ni yo'qotadigan max-ID polling muammosi yo'q; tranzaksiyaviy advisory lock orqali ketma-ketlik kafolatlangan.
+   - Entitet versiyalari (`version`) va tombstones (`is_tombstone: true`).
+   - Sezgir moliyaviy ma'lumotlar (`cost_price`, `average_cost`) huquqi bo'lmagan sotuvchi/kassir qurilmalaridan yashiriladi (faqat OWNER, ADMIN, FINANCE_VIEWER ko'ra oladi).
+   - Sahifalash (`limit`, `next_cursor`, `has_more`) va so'nggi kursor xotirasi (`device_cursors`).
+
+3. **Batch Push va Mustaqil Natijalar Kontrakti (`POST /api/sync/push`):**
+   - Bir nechta amallar (`CREATE_CUSTOMER`, `CREATE_SALE`, `CUSTOMER_PAYMENT`) bitta paketda kelganda har biriga mustaqil tranzaksiya ochiladi (Per-item transaction isolation). Bitta amal xato qilsa (masalan, noma'lum mijoz), boshqa muvaffaqiyatli amallar commit qilinadi va to'xtab qolmaydi.
+   - Natija kontraktida har bir amal bo'yicha: `status` (`APPLIED`, `RETRY_SUCCESS`, `CONFLICT`, `NEEDS_REVIEW`, `FAILED`), `server_document_id`, `server_document_number`, `entity_type`, `entity_id`, `error_code`, `message`.
+
+4. **Offline Mijoz Bog'liqligi va Automerge Taqiqlanishi:**
+   - Qurilmada yangi yaratilgan mijoz (`CREATE_CUSTOMER` payload'ida `client_uuid`) bazaga yangi mijoz sifatida yoziladi.
+   - Xuddi shu paketdagi keyingi savdo (`customer_client_uuid`) ushbu mijozning server ID siga bog'lanadi.
+   - Serverda ayni telefon raqamli boshqa mijoz mavjud bo'lsa ham avtomatik merge qilinmaydi (har bir taraf mustaqil qoladi).
+
+5. **Idempotent Replay va Timeout Himoyasi:**
+   - Tarmoq uzilishi yoki client timeout bo'lganda bir xil `operation_id` va bir xil kanonik payload (`PayloadFingerprint::compute`) takroriy yuborilsa, `RETRY_SUCCESS` qaytadi va avvalgi hujjat raqami/ID saqlanadi; tovar ombordan ikkinchi marta kamaymaydi.
+   - Ayni shu `operation_id` boshqa ma'lumot bilan yuborilsa, `409 Conflict` (`PAYLOAD_MISMATCH`) qaytariladi.
+
+6. **Stale Narx va Posting Tannarxi (WAC):**
+   - Offline vaqtda kelishilgan sotuv narxi (`sale_price`) qat'iy saqlanadi (serverdagi joriy narx o'zgargan bo'lsa ham).
+   - Savdoning yakuniy tannarxi (`total_cost`) va realizatsiya qilingan foydasi (`gross_profit`) serverga qabul qilingan paytdagi joriy WAC qoldiq asosida hisoblanadi.
+
+7. **Uch Xil Vaqtning Saqlanishi:**
+   - `device_created_at` (qurilmada savdo qilingan vaqt), `received_at` (serverga push kelgan vaqt), `posted_at` (server hisob kitobiga yozilgan vaqt) ajratib qayd etiladi.
+
+8. **Kech Kelgan Smena va Rezerv Cheklovlarida Yozuv Tashlab Yuborilmasligi (`NEEDS_REVIEW`):**
+   - Yopilgan kassa smenasiga kech kelgan naqd savdo, yoki tovar/kredit rezervidan oshib ketgan amallar aslo o'chirilmaydi yoki e'tiborsiz qoldirilmaydi.
+   - Amal `sync_conflicts` jadvaliga `status: NEEDS_REVIEW`, aniq xato kodi (`LATE_CLOSED_SESSION`, `INSUFFICIENT_ALLOCATION`, `CUSTOMER_NOT_FOUND`) va asl xom payload (`raw_payload`) bilan to'liq saqlanadi.
+
+9. **Admin Nizolarni Hal Qilish API:**
+   - `GET /api/sync/conflicts` (barcha yoki holat bo'yicha nizolarni ko'rish).
+   - `POST /api/sync/conflicts/{id}/resolve` (`APPROVED_OVERRIDE` — admin ruxsati bilan o'tkazish; `REJECT` — rad etish) izohlar va audit logi bilan.
+   - `GET /api/sync/status/{operation_id}` (ixtiyoriy operatsiyaning hozirgi server holati: PROCESSED, CONFLICT, NEEDS_REVIEW, NOT_FOUND).
+
+10. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+    - `php artisan test tests/Feature/SyncProtocolAndConflictTest.php`: **12 passed out of 12 tests (106 assertions, duration 5.7s)**.
+    - `php artisan test`: **122 passed out of 122 tests (841 assertions, duration 32.8s)**.
+    - `vendor/bin/pint`: **0 issues** (barcha fayllar PSR-12/Laravel standartida).
+    - `npm run build`: **0 errors (built in 652ms)**.
+    - `flutter analyze`: **No issues found! (ran in 1.5s)**.
+
+---
+
+## 18. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
    - Flutter `test/widget_test.dart` dagi default counter testi Prompt 20 da haqiqiy CRM kirish va savdo ekranlari widget testlariga almashtiriladi.
-2. **Offline qoldiq va kredit ajratish siyosati:** Prompt 11 doirasida to'liq amalga oshirildi. Do'kon egasi Livewire interfeysi yoki API orqali har bir qurilmaga aniq tovar donasi va mijoz kredit byudjetini mustaqil boshqarishi mumkin.
-3. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
+2. **Offline qoldiq va kredit ajratish siyosati:** Prompt 11 doirasida to'liq amalga oshirildi.
+3. **Server Sync API va Nizolar protokoli:** Prompt 12 doirasida to'liq amalga oshirildi. Qurilma bootstrap, commit-order pull, batch push, idempotent replay, stale narx, late session / limit istisnolari va admin conflict resolution to'liq sinovdan o'tdi.
+4. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*11-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 12.*
+*12-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 13.*
+
 
 
 

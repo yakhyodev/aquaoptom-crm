@@ -43,7 +43,8 @@ class CustomerPaymentService
         ?int $userId = null,
         ?string $notes = null,
         bool $confirmExcessAsAdvance = false,
-        mixed $happenedAt = null
+        mixed $happenedAt = null,
+        ?array $rawPayload = null
     ): array {
         $operationId = $operationId ?: (string) Str::uuid();
 
@@ -79,7 +80,7 @@ class CustomerPaymentService
         return $this->operationService->execute(
             operationId: $operationId,
             operationType: 'CUSTOMER_PAYMENT',
-            payload: $canonicalPayload,
+            payload: $rawPayload ?? $canonicalPayload,
             businessCallback: function () use (
                 $customerId,
                 $amount,

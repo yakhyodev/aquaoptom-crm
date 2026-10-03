@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\OperationApiController;
+use App\Http\Controllers\Api\SyncApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -36,4 +37,14 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Generic Idempotent Operation Runner
     Route::post('/operations/execute', [OperationApiController::class, 'execute']);
+
+    // Sync Protocol Endpoints (Prompt 12)
+    Route::post('/sync/bootstrap', [SyncApiController::class, 'bootstrap']);
+    Route::get('/sync/pull', [SyncApiController::class, 'pull']);
+    Route::post('/sync/push', [SyncApiController::class, 'push']);
+    Route::get('/sync/status/{operation_id}', [SyncApiController::class, 'status']);
+    Route::get('/sync/conflicts', [SyncApiController::class, 'conflicts'])
+        ->middleware('permission:manage_devices');
+    Route::post('/sync/conflicts/{id}/resolve', [SyncApiController::class, 'resolveConflict'])
+        ->middleware('permission:manage_devices');
 });

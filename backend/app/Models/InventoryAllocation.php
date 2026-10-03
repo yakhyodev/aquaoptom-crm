@@ -37,6 +37,11 @@ class InventoryAllocation extends Model
         return $this->belongsTo(ProductVariant::class);
     }
 
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+    }
+
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);

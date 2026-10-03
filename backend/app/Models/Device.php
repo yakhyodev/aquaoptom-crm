@@ -92,6 +92,16 @@ class Device extends Model
         return $this->hasMany(Sale::class);
     }
 
+    public function cursor(): HasOne
+    {
+        return $this->hasOne(DeviceCursor::class);
+    }
+
+    public function conflicts(): HasMany
+    {
+        return $this->hasMany(SyncConflict::class);
+    }
+
     public function isActive(): bool
     {
         return $this->is_active && $this->status === 'ACTIVE';

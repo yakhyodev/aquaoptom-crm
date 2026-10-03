@@ -70,7 +70,8 @@ class CreateSaleService
         string $source = 'web',
         bool $useSystemPrice = true,
         $goodsPickedUpAt = null,
-        ?int $deviceId = null
+        ?int $deviceId = null,
+        ?array $rawPayload = null
     ): Sale {
         $operationId = $operationId ?: (string) Str::uuid();
 
@@ -172,7 +173,7 @@ class CreateSaleService
 
         // 3. Xaridor va To'lov qoidalari
         // Agar paidAmount berilmagan bo'lsa (0) va to'lov turi naqd/karta/bank/full bo'lsa, to'liq to'langan deb olinadi
-        if ($paidAmount === 0 && in_array(strtoupper($paymentType), ['CASH', 'CARD', 'BANK', 'FULL'])) {
+        if ($paidAmount === 0 && in_array(strtoupper($paymentType), ['CASH', 'CARD', 'BANK', 'FULL']) && strtoupper($paymentMethod) !== 'DEBT' && strtoupper($paymentType) !== 'DEBT') {
             $paidAmount = $totalAmount;
         }
 
@@ -231,7 +232,7 @@ class CreateSaleService
         }
 
         // Kanonik payload (Idempotency tekshiruvi uchun)
-        $payload = [
+        $operationPayload = $rawPayload ?? [
             'type' => 'SALE',
             'customer_id' => $customerId,
             'items' => array_map(fn ($it) => [
@@ -254,7 +255,7 @@ class CreateSaleService
         $resultData = $this->transactionalOperationService->execute(
             operationId: $operationId,
             operationType: 'CREATE_SALE',
-            payload: $payload,
+            payload: $operationPayload,
             businessCallback: function () use (
                 $operationId,
                 $customerId,

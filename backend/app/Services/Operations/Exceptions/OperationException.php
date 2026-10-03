@@ -18,6 +18,11 @@ class OperationException extends Exception
         parent::__construct($message, $statusCode, $previous);
     }
 
+    public function getErrorCode(): string
+    {
+        return $this->errorCode;
+    }
+
     public function toResponseArray(): array
     {
         return [
