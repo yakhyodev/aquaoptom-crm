@@ -11,6 +11,7 @@ use App\Services\Operations\Exceptions\OperationValidationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Throwable;
@@ -171,6 +172,7 @@ class TransactionalOperationService
             }
 
             // Raw SQL xatoliklarini yashiramiz, sir chiqib ketmasligi uchun
+            Log::error('TransactionalOperationService QueryException: '.$e->getMessage());
             throw new OperationValidationException(
                 operationId: $operationId,
                 message: 'Ma\'lumotlar bazasi cheklovi buzildi. Kiritilgan qiymatlarni tekshiring.',

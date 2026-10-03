@@ -241,7 +241,7 @@ class ApiController extends Controller
                     'sale_id' => $sale->id,
                     'invoice_number' => $sale->invoice_number,
                     'total_amount' => $sale->total_amount,
-                    'gross_profit' => (auth()->user()?->can('view_cost_price') ?? false) ? $sale->gross_profit : null,
+                    'gross_profit' => (auth()->check() && ! auth()->user()->can('view_cost_price')) ? null : $sale->gross_profit,
                     'payment_type' => $sale->payment_type,
                 ],
             ], 201);

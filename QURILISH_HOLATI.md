@@ -60,8 +60,8 @@
 ## 3. Baseline Test Xatolari va Mavjud Kod Holati
 
 - **Backend (Laravel):**
-  - **68 ta test o‘tgan (541 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
-  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar va kirim (purchase receiving) to‘liq qamrab olindi.
+  - **78 ta test o‘tgan (581 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
+  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim va sotuv (POS / CreateSale) to‘liq qamrab olindi.
   - Laravel Pint linteridan to‘liq o‘tkazildi (`{"tool":"pint","result":"passed"}`).
 - **Mobile (Flutter):**
   - `flutter analyze`: **0 issues found** (toza tahlil natijasi).
@@ -80,7 +80,8 @@
 | **05** | **Operatsiya ID, tranzaksiya, audit va hodisa navbati** | Hisob poydevori | **DONE** | Barcha yozuvchi amallar uchun umumiy `operation_id` (UUID), canonical payload fingerprint (SHA-256), PostgreSQL advisory lock (`pg_advisory_xact_lock`), 20 ta parallel bir xil `operation_id` sinovi 100% bitta operatsiya va eski natijani qaytardi, boshqa payload 409 Conflict berdi; tranzaksiyaviy `outbox_events` jadvali va background `app:process-outbox` command/job qurildi (rollbackdan keyin event yo'q, xato bergan savdo yarim qolib ketmaydi); `DocumentNumberGenerator` sequence orqali `max(id)+1`siz invoice/payment raqamlari beradi; xatolar toifalandi (`OperationConflictException`, `OperationValidationException`, `OperationPermissionException`, `OperationRetryableException`, `OperationNeedsReviewException`); 52/52 testlar (386 assertions) to'liq o'tdi. | 06-bosqichni boshlash |
 | **06** | **Hisob daftarlari, tannarx va boshlang‘ich qoldiqlar** | Hisob poydevori | **DONE** | Ombor daftari (`inventory_movements`, `inventory_balances` jami qiymat `total_value` bilan); WAC formulasi (100×5000 + 100×6000 = 200 dona / 1 100 000 qiymat / WAC 5500); oxirgi dona sotilganda qoldiq qiymat ham qat'iy 0 bo'lishi; signed mijoz daftari (`customer_ledger` musbat qarz, manfiy avans, `max(0)` taqiqlangan); signed ta’minotchi daftari (`supplier_ledger` musbat qarzimiz, manfiy avansimiz); kassa hisoblari va harakatlari (`cash_accounts`, `cash_movements`, transfer); to'lovlar (`payments`); idempotent boshlang'ich qoldiq hujjati va xizmati (`OpeningBalanceService` retry bitta yozuv, conflict himoyasi); do'kon egasi uchun Livewire boshlang'ich qoldiqlar oynasi (`OpeningBalancesManager`); 62/62 testlar (489 assertions) 100% o'tdi. | 07-bosqichni boshlash |
 | **07** | **Kirim bo‘limi — backenddan oynagacha** | Kundalik ish | **DONE** | DRAFT->POSTED kirim; migration 000006 (`operation_id`, `supplier_invoice_number`, `paid_amount`, `debt_amount`, `notes`); `ReceivePurchaseService` orqali atomik WAC qoldiq, supplier_ledger credit, ixtiyoriy cash_movements + supplier debit, Payment modeli; kassa huquqi bo'lmagan omborchining to'lov qilishi taqiqlangan (jim qolish naqd to'lov deb olinmaydi); xatolikda to'liq rollback; idempotent retry eski natijani berishi; Livewire `QuickInward` (katalog va ta'minotchi inline modallari bilan qoralama saqlanadi, to'lov paneli, kassa tanlovi); 68/68 testlar (541 assertions) 100% o'tdi. | 08-bosqichni boshlash |
-| 08 | Sotuv bo‘limi — tezkor, mijozli va nasiya | Kundalik ish | TODO | - | CreateSale, tizim narxi, nasiya, kassa snapshot |
+| **08** | **Sotuv bo‘limi — tezkor, mijozli va nasiya** | Kundalik ish | **DONE** | `CreateSaleService` xizmati; migration 000007 (`operation_id`, `paid_amount`, `debt_amount`, `cash_account_id`, `payment_method`, `notes`, `receipt_data`); guest tezkor savdoda faqat to'liq to'lov (mijozsiz DEBT taqiqlangan); mijozli savdoda to'liq/qisman/nasiya; savatda takroriy variant qatorlari bo'lsa barcha dona jamlanib lock tekshirilishi (100 qoldiqdan 60+60 o'tmaydi); kasr dona va manfiy/nol narx taqiqlanishi; tizim narxi vs erkin narx va eski narx versiyasida qayta tasdiq; 60×6500 jami 390 000 / cost 300 000 / paid 140 000 / debt 250 000 / gross 90 000 qabul mezoni to'liq o'tgan; 20 bosish/parallel so'rov bitta chek; mijoz avansi ikkinchi cash emasligi; Livewire OptomPos xatolikda savat saqlanishi va elektron kvitansiya; SaleExecutionAdapterInterface arxitekturasi; 78/78 testlar (581 assertions) 100% o'tdi. | 09-bosqichni boshlash |
+| 09 | Qarzdorliklar va taraflar to‘lovlari | Kundalik ish | TODO | - | Mijoz/ta’minotchi ko‘chirmasi, qarz to‘lovi, avans |
 | 09 | Qarzdorliklar va taraflar to‘lovlari | Kundalik ish | TODO | - | Mijoz/ta’minotchi ko‘chirmasi, qarz to‘lovi, avans |
 | 10 | Kassa, xarajat, o‘tkazma va smena | Kundalik ish | TODO | - | Pul hisoblari, xarajat kategoriyalari, smena ochish/yopish |
 | 11 | Offline qurilmalar, qoldiq va kredit ajratmalari | Offline poydevori | TODO | - | Device registration, stock/credit allocation |
@@ -359,16 +360,48 @@
 
 ---
 
-## 13. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 13. 08-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Sotuv Jarayoni va Qabul Mezonlari Sinovi:**
+   - Qabul mezoni bo‘yicha sinov: 60 dona × 6500 so‘m = 390 000 so‘m savdo summasi (`total_amount`), 300 000 so‘m WAC tannarx (`total_cost`), 140 000 so‘m hozir to‘langan pul (`paid_amount`), 250 000 so‘m yangi nasiya qarz (`debt_amount`) va 90 000 so‘m yalpi foyda (`gross_profit`).
+   - WAC tannarx snapshot: Har bir `sale_items` qatori o‘sha paytdagi WAC o‘rtacha tannarxi (5000 so‘m) bilan saqlandi, ombor qoldig‘ida 40 dona va 200 000 so‘m qoldiq qiymat qoldi.
+   - Mijoz qarzi: Mijozning signed balansiga to‘liq 390 000 so‘m qarz (Debit) qo‘shildi, 140 000 so‘m to‘lov (Credit) ayirildi va yakuniy qarz 250 000 so‘m bo‘ldi.
+   - Kassa hisobi: Kassaga faqat hozir olingan haqiqiy 140 000 so‘m kirim qilindi.
+2. **Qat'iy Biznes Rad Etishlari (Rejections):**
+   - **Mijozsiz DEBT:** Noma'lum xaridorga nasiyaga savdo qilish taqiqlandi (`OperationValidationException: GUEST_DEBT_NOT_ALLOWED`).
+   - **Manfiy yoki Nol Narx:** `0` yoki manfiy narxda savdo qilish rad etildi (`INVALID_SALE_PRICE`).
+   - **Kasr Dona:** Butun bo‘lmagan miqdor (masalan, 2.5 dona) taqiqlandi (`INVALID_QUANTITY`).
+   - **100 qoldiqdan 60 + 60 o‘tmasligi:** Savatda bir xil variant takror qatorlarda kelsa yoki concurrent tranzaksiyalarda kelganda barcha dona jamlanib `lockForUpdate()` orqali tekshirildi (120 > 100 rad etildi; 60 o‘tgandan so‘ng qolgan 40 dan ikkinchi 60 rad etildi).
+   - **Tizim Narxi Yo‘q Holat:** Variantda tizim narxi belgilanmagan bo‘lsa tasodifiy default narx olinmasdan rad etildi (`SYSTEM_PRICE_NOT_SET`).
+   - **Online Eski Narx Versiyasida Qayta Tasdiq:** Narx versiyasi o‘zgarganda xaridordan qayta tasdiqlash so‘raldi (`PRICE_VERSION_MISMATCH`).
+3. **Idempotency va 20 Takroriy Bosish Sinovi:**
+   - Bir xil `operation_id` bilan 20 marta ketma-ket yuborilgan so‘rov faqat 1 ta chek yaratdi, ombor, mijoz qarzi va kassa faqat 1 marta o‘zgardi.
+4. **Mijozning Mavjud Avansi (Avans ikkinchi cash emas):**
+   - Xaridorning oldingi -100 000 so‘m avansi bo‘lganda, 65 000 so‘mlik savdo hisobiga qarz yozildi (-35 000 so‘m qoldi), kassa hisobiga esa soxta ikkinchi marta pul tushumi yozilmadi.
+5. **Livewire OptomPos Oynasi va Qoralama Saqlanishi:**
+   - Xatolik yuz berganda (masalan, mijozsiz nasiya qilishga urinilganda) savat qoralamasi buzilmay saqlanib qoldi ("xatoda savat qoladi"). Mijoz tanlangach savdo yakunlandi va elektron kvitansiya ko‘rsatildi.
+6. **POS Adapter Arxitekturasi:**
+   - `SaleExecutionAdapterInterface` va `OnlineSaleAdapter` yaratildi, keyingi bosqichlardagi offline sync adapteri uchun arxitektura to‘liq ajratildi.
+7. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - `php artisan test --filter=SaleOperationTest`: **10 passed (40 assertions, duration 4.8s)**.
+   - `php artisan test --filter=BeverageCrmCoreTest`: **8 passed (66 assertions, duration 4.9s)**.
+   - `php artisan test`: **78 passed out of 78 tests (581 assertions, duration 16.7s)**.
+   - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - `npm run build`: **0 errors (built in 787ms)**.
+   - `flutter analyze`: **No issues found! (ran in 2.5s)**.
+
+---
+
+## 14. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
-   - `BeverageCrmCoreTest.php` yangi kirim xizmati talablariga moslashtirildi va 8 ta testi to‘liq o‘tdi.
+   - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
    - Flutter `test/widget_test.dart` dagi default counter testi Prompt 20 da haqiqiy CRM kirish va savdo ekranlari widget testlariga almashtiriladi.
 2. **Offline qoldiq ajratish miqdori (Siyosat):** Qurilmalarga qoldiq rezervini avtomatik foizda (masalan, 30%) yoki do‘kon egasi tomonidan qo‘lda belgilash tartibi 11-bosqichda tasdiqlanishi kerak.
 3. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*07-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 08.*
+*08-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 09.*
 
 
 

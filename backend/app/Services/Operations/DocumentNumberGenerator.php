@@ -14,6 +14,11 @@ class DocumentNumberGenerator
         return static::next('INV', 'sales_invoice_seq');
     }
 
+    public static function nextSaleInvoiceNumber(): string
+    {
+        return static::nextSalesInvoiceNumber();
+    }
+
     /**
      * Kirim hujjati raqami: PUR-YYYY-000001
      */

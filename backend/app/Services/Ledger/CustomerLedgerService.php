@@ -4,6 +4,8 @@ namespace App\Services\Ledger;
 
 use App\Models\Customer;
 use App\Models\CustomerLedger;
+use App\Models\Payment;
+use App\Models\Sale;
 use Carbon\Carbon;
 use InvalidArgumentException;
 
@@ -96,6 +98,53 @@ class CustomerLedgerService
             'created_by' => $userId,
             'created_at' => Carbon::now(),
         ]);
+    }
+
+    /**
+     * Savdo cheki bo'yicha qarz yozish (Debit).
+     */
+    public function recordSale(
+        int $customerId,
+        int $amount,
+        int $saleId,
+        ?string $operationId = null,
+        ?int $userId = null,
+        ?string $description = null
+    ): CustomerLedger {
+        return $this->recordDebit(
+            customerId: $customerId,
+            amount: $amount,
+            type: 'SALE',
+            operationId: $operationId,
+            referenceType: Sale::class,
+            referenceId: $saleId,
+            notes: $description,
+            userId: $userId
+        );
+    }
+
+    /**
+     * Mijoz to'lovi bo'yicha qarzni kamaytirish (Credit).
+     */
+    public function recordPayment(
+        int $customerId,
+        int $amount,
+        ?int $paymentId = null,
+        ?string $operationId = null,
+        ?int $userId = null,
+        ?string $description = null
+    ): CustomerLedger {
+        return $this->recordCredit(
+            customerId: $customerId,
+            amount: $amount,
+            type: 'PAYMENT',
+            paymentMethod: 'CASH',
+            operationId: $operationId,
+            referenceType: Payment::class,
+            referenceId: $paymentId,
+            notes: $description,
+            userId: $userId
+        );
     }
 
     /**

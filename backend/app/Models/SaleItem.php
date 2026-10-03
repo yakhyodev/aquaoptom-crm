@@ -19,6 +19,7 @@ class SaleItem extends Model
         'cost_total',
         'gross_profit',
         'is_system_price',
+        'price_version',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class SaleItem extends Model
         'cost_total' => 'integer',
         'gross_profit' => 'integer',
         'is_system_price' => 'boolean',
+        'price_version' => 'integer',
     ];
 
     public function sale(): BelongsTo
