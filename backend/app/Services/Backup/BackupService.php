@@ -14,6 +14,7 @@ use ZipArchive;
 class BackupService
 {
     public const RPO_TARGET = '15 minutes';
+
     public const RTO_TARGET = '2 hours';
 
     /**
@@ -83,7 +84,7 @@ class BackupService
 
             // 5. Yagona ZIP arxivga birlashtirish
             $bundleZipPath = $this->getBackupStoragePath()."/aquaoptom_backup_{$timestamp}_{$backupId}.zip";
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($bundleZipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
                 throw new \RuntimeException("ZIP fayl yaratib bo'lmadi: {$bundleZipPath}");
             }
@@ -156,7 +157,7 @@ class BackupService
             $expectedChecksum = trim(File::get($checksumFile));
             $actualChecksum = hash_file('sha256', $archivePath);
             if ($expectedChecksum !== $actualChecksum) {
-                throw new \RuntimeException("Zaxira nusxa yaxlitligi buzilgan (Checksum mos kelmadi)!");
+                throw new \RuntimeException('Zaxira nusxa yaxlitligi buzilgan (Checksum mos kelmadi)!');
             }
         }
 
@@ -175,7 +176,7 @@ class BackupService
             }
 
             // 3. Arxivni ochish
-            $zip = new ZipArchive();
+            $zip = new ZipArchive;
             if ($zip->open($zipPath) !== true) {
                 throw new \RuntimeException("Zaxira arxivini ochib bo'lmadi!");
             }
@@ -185,7 +186,7 @@ class BackupService
             // 4. Manifestni o'qish
             $manifestPath = $tmpDir.'/manifest.json';
             if (! File::exists($manifestPath)) {
-                throw new \RuntimeException("Zaxira paketida manifest.json topilmadi!");
+                throw new \RuntimeException('Zaxira paketida manifest.json topilmadi!');
             }
             $manifest = json_decode(File::get($manifestPath), true);
 
@@ -195,7 +196,7 @@ class BackupService
 
             $dumpFile = $tmpDir.'/db_dump.sql';
             if (! File::exists($dumpFile)) {
-                throw new \RuntimeException("Zaxira paketida db_dump.sql topilmadi!");
+                throw new \RuntimeException('Zaxira paketida db_dump.sql topilmadi!');
             }
 
             $this->restoreDatabaseDump($dumpFile, $targetDb);
@@ -203,7 +204,7 @@ class BackupService
             // 6. Fayllarni tiklash (agar so'ralgan bo'lsa)
             $restoreFiles = $options['restore_files'] ?? false;
             if ($restoreFiles && File::exists($tmpDir.'/files.zip')) {
-                $filesZip = new ZipArchive();
+                $filesZip = new ZipArchive;
                 if ($filesZip->open($tmpDir.'/files.zip') === true) {
                     $filesZip->extractTo(storage_path('app'));
                     $filesZip->close();
@@ -355,10 +356,13 @@ class BackupService
      */
     protected function archiveFiles(string $outputZip): int
     {
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($outputZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             return 0;
         }
+
+        $zip->addEmptyDir('private');
+        $zip->addEmptyDir('public');
 
         $filesCount = 0;
         $privatePath = storage_path('app/private');

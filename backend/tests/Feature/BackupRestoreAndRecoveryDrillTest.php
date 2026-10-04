@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CashAccount;
 use App\Models\CashMovement;
+use App\Models\CashSession;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\Device;
@@ -12,7 +13,6 @@ use App\Models\InventoryBalance;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Role;
-use App\Models\Sale;
 use App\Models\Supplier;
 use App\Models\SupplierLedger;
 use App\Models\SystemSetting;
@@ -22,22 +22,28 @@ use App\Models\Warehouse;
 use App\Services\Backup\BackupService;
 use App\Services\Sync\RecoveryReconciliationService;
 use Carbon\Carbon;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use PDO;
 use Tests\TestCase;
+use ZipArchive;
 
 class BackupRestoreAndRecoveryDrillTest extends TestCase
 {
     protected User $owner;
+
     protected Device $device;
+
     protected Warehouse $warehouse;
+
     protected ProductVariant $variant;
+
     protected Customer $customer;
+
     protected Supplier $supplier;
+
     protected CashAccount $cashAccount;
 
     protected function setUp(): void
@@ -75,7 +81,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
             'status' => 'ACTIVE',
         ]);
 
-        \App\Models\CashSession::create([
+        CashSession::create([
             'session_number' => 'CS-DRILL-01',
             'cash_account_id' => $this->cashAccount->id,
             'opened_by' => $this->owner->id,
@@ -129,6 +135,30 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
             'device_type' => 'MOBILE',
             'status' => 'ACTIVE',
         ]);
+    }
+
+    public function test_backup_succeeds_without_user_files(): void
+    {
+        $originalStoragePath = storage_path();
+        $isolatedStoragePath = storage_path('framework/testing/empty-backup-'.Str::uuid());
+        File::ensureDirectoryExists($isolatedStoragePath.'/app/private');
+        File::ensureDirectoryExists($isolatedStoragePath.'/app/public');
+        $this->app->useStoragePath($isolatedStoragePath);
+
+        try {
+            $backup = app(BackupService::class)->createBackup(['encrypt' => false]);
+
+            $this->assertTrue($backup['success']);
+            $this->assertSame(0, $backup['manifest']['files_count']);
+
+            $archive = new ZipArchive;
+            $this->assertTrue($archive->open($backup['file_path']));
+            $this->assertIsString($archive->getFromName('files.zip'));
+            $archive->close();
+        } finally {
+            $this->app->useStoragePath($originalStoragePath);
+            File::deleteDirectory($isolatedStoragePath);
+        }
     }
 
     /**
@@ -193,7 +223,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
         $this->assertTrue($backup['success']);
         $this->assertTrue($backup['is_encrypted']);
         $this->assertFileExists($backup['file_path']);
-        $this->assertFileExists($backup['file_path'] . '.sha256');
+        $this->assertFileExists($backup['file_path'].'.sha256');
         $this->assertEquals(hash_file('sha256', $backup['file_path']), $backup['checksum']);
         $this->assertEquals(BackupService::RPO_TARGET, $backup['manifest']['rpo_target']);
         $this->assertEquals(BackupService::RTO_TARGET, $backup['manifest']['rto_target']);
@@ -224,23 +254,23 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
         $this->assertGreaterThan(50, $tablesCnt);
 
         // Mahsulotlar mavjudligi
-        $prodCnt = (int) $pdo->query("SELECT count(*) as cnt FROM products")->fetch(PDO::FETCH_OBJ)->cnt;
+        $prodCnt = (int) $pdo->query('SELECT count(*) as cnt FROM products')->fetch(PDO::FETCH_OBJ)->cnt;
         $this->assertEquals(1, $prodCnt);
 
         // Ombor qiymati (350,000 so'm)
-        $stockVal = (int) $pdo->query("SELECT COALESCE(SUM(total_value), 0) as val FROM inventory_balances")->fetch(PDO::FETCH_OBJ)->val;
+        $stockVal = (int) $pdo->query('SELECT COALESCE(SUM(total_value), 0) as val FROM inventory_balances')->fetch(PDO::FETCH_OBJ)->val;
         $this->assertEquals(350000, $stockVal);
 
         // Mijoz sof qarzi: debit - credit = 150000 - 50000 = 100000 so'm
-        $custDebt = (int) $pdo->query("SELECT COALESCE(SUM(debit - credit), 0) as val FROM customer_ledger")->fetch(PDO::FETCH_OBJ)->val;
+        $custDebt = (int) $pdo->query('SELECT COALESCE(SUM(debit - credit), 0) as val FROM customer_ledger')->fetch(PDO::FETCH_OBJ)->val;
         $this->assertEquals(100000, $custDebt);
 
         // Ta'minotchi sof qarzi: credit - debit = 600000 - 200000 = 400000 so'm
-        $suppDebt = (int) $pdo->query("SELECT COALESCE(SUM(credit - debit), 0) as val FROM supplier_ledger")->fetch(PDO::FETCH_OBJ)->val;
+        $suppDebt = (int) $pdo->query('SELECT COALESCE(SUM(credit - debit), 0) as val FROM supplier_ledger')->fetch(PDO::FETCH_OBJ)->val;
         $this->assertEquals(400000, $suppDebt);
 
         // Kassa harakatlari (50,000 so'm)
-        $cashVal = (int) $pdo->query("SELECT COALESCE(SUM(amount), 0) as val FROM cash_movements")->fetch(PDO::FETCH_OBJ)->val;
+        $cashVal = (int) $pdo->query('SELECT COALESCE(SUM(amount), 0) as val FROM cash_movements')->fetch(PDO::FETCH_OBJ)->val;
         $this->assertEquals(50000, $cashVal);
 
         // 5. Tozalash (cleanup)
@@ -248,7 +278,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
         DB::statement("DROP DATABASE IF EXISTS \"{$isolatedDb}\";");
         if (File::exists($backup['file_path'])) {
             File::delete($backup['file_path']);
-            File::delete($backup['file_path'] . '.sha256');
+            File::delete($backup['file_path'].'.sha256');
         }
     }
 
