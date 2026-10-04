@@ -767,6 +767,30 @@ class ReportQueryService
     }
 
     /**
+     * Savdo so'rovi bo'yicha paginatsiyadan oldin SQL yig'indilarini (agregatsiya) hisoblash
+     */
+    public function calculateSalesTotals(Builder $query): array
+    {
+        $agg = (clone $query)->where('status', '!=', 'CANCELLED')
+            ->selectRaw('
+                COUNT(id) as total_count,
+                COALESCE(SUM(total_amount), 0) as total_sales,
+                COALESCE(SUM(paid_amount), 0) as total_paid,
+                COALESCE(SUM(debt_amount), 0) as total_debt,
+                COALESCE(SUM(gross_profit), 0) as total_gross_profit
+            ')
+            ->first();
+
+        return [
+            'total_count' => (int) ($agg->total_count ?? 0),
+            'total_sales' => (int) ($agg->total_sales ?? 0),
+            'total_paid' => (int) ($agg->total_paid ?? 0),
+            'total_debt' => (int) ($agg->total_debt ?? 0),
+            'total_gross_profit' => (int) ($agg->total_gross_profit ?? 0),
+        ];
+    }
+
+    /**
      * Davrni aniqlash
      */
     protected function resolvePeriod(array $filters): array
@@ -779,3 +803,4 @@ class ReportQueryService
         );
     }
 }
+

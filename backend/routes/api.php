@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Route;
 
 // Public Authentication & Health Ping
 Route::get('/health', [SyncApiController::class, 'ping']);
-Route::post('/auth/login', [AuthApiController::class, 'login']);
+Route::post('/auth/login', [AuthApiController::class, 'login'])->middleware('throttle:login');
 
 // Protected API Routes (Sanctum Token + Active User Check)
 Route::middleware(['auth:sanctum', 'active'])->group(function () {
