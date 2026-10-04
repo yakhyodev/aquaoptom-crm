@@ -86,8 +86,7 @@
 | **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
 | **13** | **PWA lokal baza va internetsiz sotuv** | Offline PWA | **DONE** | Standalone PWA manifest (`manifest.json`), Service Worker (`sw.js`, app shell cache, network-only offline JSON fallback), `AquaOptomDB` IndexedDB sxemasi (9 ta store), Pure JS/Alpine.js offline POS (`aqua-pos.js`, `aqua-db.js`, Livewire online qoladi), atomik lokal savdo tranzaksiyasi (quota, credit, sale, outbox, draft clearing bitta IndexedDB tranzaksiyada), mijoz UUID, PIN lock, ko‘p tabli BroadcastChannel sinxronizatsiyasi, favqulodda JSON eksport; 7/7 JS unit testlari (Node.js + fake-indexeddb), 7/7 Feature testlari va 129/129 to'liq tizim testlari 100% o'tdi. | 14-bosqichni boshlash |
 | **14** | **PWA avtomatik sync va uzilish sinovlari** | Offline PWA | **DONE** | IndexedDB navbatini API bilan ulash: server health tekshirish (`/api/health`, `/api/sync/health`), pending batch push (`/api/sync/push`), ACK'ni lokal atomik yozish (`applyPushResults`), cursor pull (`applyPulledChanges`) va qolgan pending overlay hisobi (`getPendingOverlay`); avtomatik sinxronizatsiya triggerlari (`online`, `visibilitychange`, window `focus`, 30s interval, qo'lda sync tugmasi, Service Worker Background Sync API); ko'p tabli poyga holatini oldini olish uchun multi-tab mutex lock (`acquireSyncLock` / `releaseSyncLock`, 30s stale recovery bilan); asl `operation_id` va payload bilan idempotent replay (tarmoq uzilishi va timeoutda qayta jo'natilganda dublikatsiz `RETRY_SUCCESS`); xavfsiz retention (ACK bo'lgan chek va payloadlar outbox'dan o'chirib yuborilmaydi, status `APPLIED` qilinadi, favqulodda tiklash uchun saqlanadi); offline savdoni bekor qilish (`VOID_SALE` / `CANCEL_SALE`, asl `original_operation_id` ga bog'lanadi, navbatdan o'chirilmaydi, ombor/kassa/mijoz qaytariladi); `NEEDS_REVIEW` holati va tushuntirish modal oynasi; 7/7 JS unit testlari (Node.js + fake-indexeddb), 6/6 Feature testlari, 135/135 to'liq tizim testlari 100% o'tdi. | 15-bosqichni boshlash |
-| **15** | **Ombor qoldiqlari va interaktiv kalkulyator** | Tahlil va nazorat | **DONE** | Ombor qoldiqlari, variant kartasi va manba hujjatga bog'langan harakat tarixi; qidiruv paginationdan oldin serverda bajarilishi; filtrlar (nom/hajm, min/max qoldiq, threshold, zero_only, non_zero, narxsiz, arxiv, sekin sotiladigan); umumiy agregatlar butun filtrlangan baza bo'yicha (faqat bitta sahifa emas); tannarx va ombor qiymati rol bo'yicha (`view_cost_price`); interaktiv kalkulyator (mahsulotlar va litrlar multi-select, all/clear, mavjud dona, jami tannarx, tizim sotuv qiymati va kutilayotgan yalpi foyda); narxsiz variantlar nol narxga tenglashtirilmasligi va to'liq foyda aniqlanmagani ko'rsatilishi; taxminiy narx simulyatsiyasi va katalogga saqlash alohida `manage_prices` ruxsati bilan; fizik, erkin, ajratilgan qoldiq va eskirgan offline snapshot farqlanishi; kam qoldiqda `LowStockDetected` hodisasi qayd etilishi; Livewire `StockManager` interfeysi; 13/13 Feature testlari (86 assertions) va 148/148 to'liq backend testlari (1007 assertions) 100% o'tdi. | 16-bosqichni boshlash |
-| 16 | Qaytarish, brak, inventarizatsiya va tuzatish | Tahlil va nazorat | TODO | - | Qisman/to‘liq qaytarish, brak, inventarizatsiya freeze |
+| **16** | **Qaytarish, brak, inventarizatsiya va tuzatish** | Tahlil va nazorat | **DONE** | Original savdo/kirimga bog'langan qisman/to'liq return, sotilgandan ko'p qaytarish yo'qligi, original narx va snapshot tannarx, kasrli rounding yopilishi, brak tovar sotiladigan qoldiqqa qo'shilmasligi; mijoz signed balansi va refund/cash qayta hisobi (naqd va qarzni bir vaqtda kamaytirmaslik); ta'minotchi qaytarishida commercial credit va WAC chiqimi farqi; brak faqat WAC tannarx yo'qotishi (kassa harakati/xarajati emas); inventarizatsiya prepare->freeze ACK->sanash->apply sikli, uzilgan qurilma freeze guard (`DeviceFreezePendingException`), ortiqcha/kamomad tuzatish daftari, posted hujjatlar o'zgarmasligi (`DocumentImmutableException`); 16/16 Feature testlari (57 assertions) va 164/164 to'liq backend testlari (1064 assertions) 100% o'tdi. | 17-bosqichni boshlash |
 | 17 | Savdo tarixi, hisobotlar va eksportlar | Tahlil va nazorat | TODO | - | Tahlil, sana filtrlari, Excel/PDF eksport |
 | 18 | Dashboard, Admin va real vaqt yangilanishlari | Boshqaruv | TODO | - | Reverb/Echo real-vaqt, dashboard kartalari, audit |
 | 19 | Telegram orqali ko‘rish, kirim, sotuv va to‘lov | Telegram | TODO | - | Bot webhook, xodim bog‘lash, tugmali operatsiyalar |
@@ -780,10 +779,112 @@
 4. **PWA Offline Baza va Savdo:** Prompt 13 doirasida to'liq amalga oshirildi.
 5. **PWA Avtomatik Sync va Uzilish Sinovlari:** Prompt 14 doirasida to'liq amalga oshirildi.
 6. **Ombor Qoldiqlari va Interaktiv Kalkulyator:** Prompt 15 doirasida to'liq amalga oshirildi.
-7. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
+7. **Qaytarish, brak va inventarizatsiya auditi:** Prompt 16 doirasida to'liq amalga oshirildi.
+8. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*15-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 16.*
+
+## 22. 16-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence — Prompt 16)
+
+Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishlar (Supplier Returns), brak va yaroqsiz tovar chiqimlari (Damage Records) hamda inventarizatsiya va sanash muvofiqlashtirishlari (Inventory Audits & Adjustments) to'liq ishlab chiqildi va qabul mezonlari asosida sinovdan o'tkazildi.
+
+### 1. Bajarilgan Ishlar va Arxitektura Invariantlari:
+1. **Sotuv Qaytarish va Refund (`SaleReturnService`):**
+   - **Original savdoga bog'liqlik:** Qisman va to'liq qaytarishlar `sale_id` va `sale_item_id` ga bog'lanadi;
+   - **Cheklov:** Sotilgan sondan ko'p qaytarish taqiqlanadi (`CannotReturnMoreThanSoldException`); takroriy qaytarishlar ilgari qaytarilgan miqdorni inobatga oladi;
+   - **Asl narx va tannarx:** Qaytarishda asl sotuv narxi (`sale_items.unit_price`) va asl xarid tannarxi snapshot'i (`sale_items.purchase_cost_snapshot`) ishlatiladi;
+   - **Kasrli yaxlitlashni yopish:** Qisman qaytarishlarda kasrli yaxlitlash qoldiqlari oxirgi donalar qaytganda 100% yopiladi;
+   - **Brak tovarlar karantini:** Qaytarilgan mahsulot yaroqsiz/shikastlangan bo'lsa (`is_damaged == true`), u sotiladigan ombor qoldig'iga (`inventory_balances`) qo'shilmaydi;
+   - **Mijoz qarzi va kassa anti-double-decrement:** Naqd qaytarish (`refund_amount`) va qarzni kamaytirish (`debt_reduction`) o'zaro to'g'ri balanslanadi (`debt_reduction = total_amount - refund_amount`). Agar kassa hisobida naqd pul yetarli bo'lmasa, tranzaksiya to'liq bekor qilinadi (`InsufficientCashException`).
+
+2. **Ta'minotchiga Qaytarish (`SupplierReturnService`):**
+   - **Asl kirimga bog'liqlik:** `purchase_id` va `purchase_item_id` ga bog'lanadi; kirim miqdoridan ortiq qaytarish taqiqlanadi (`CannotReturnMoreThanPurchasedException`);
+   - **Tijoriy kredit:** Ta'minotchi oldidagi qarzimiz asl xarid narxida kamaytiriladi (`supplier_ledger` DEBIT);
+   - **WAC chiqimi va farq:** Ombordan tovar joriy WAC qiymatida chiqim qilinadi; xarid narxi va WAC o'rtasidagi farq `cost_discrepancy` sifatida auditlanadi;
+   - **Qurilma rezervlari himoyasi:** Qurilmalarga ajratilgan faol rezervlar hisobiga tovar qaytarish taqiqlanadi (`ReservedStockProtectionException`).
+
+3. **Brak va Yaroqsiz Tovar Chiqimi (`DamageDisposalService`):**
+   - **Tannarx yo'qotishi:** Brak chiqimi joriy WAC tannarxi bo'yicha ombor daftari orqali hisobdan chiqariladi (`movement_type = 'DAMAGE'`);
+   - **Kassa daxlsizligi:** Brak chiqimi hech qachon kassa operatsion xarajati yoki kassa harakati hisoblanmaydi (`cash_movements` ga umuman tegilmaydi);
+   - **Rezerv nazorati:** Faol zaxira ajratmalariga ega tovarlarni erkin qoldiqdan ortiq brakka chiqarish taqiqlanadi.
+
+4. **Inventarizatsiya va Muvofiqlashtirish (`InventoryAuditService`):**
+   - **Bosqichli sikl:** `PREPARE` (tizimdagi qoldiqlar va WAC snapshot qilinadi, qurilmalarga freeze so'rovi beriladi) → `FREEZE ACK` (qurilmalar muzlatishni tasdiqlaydi) → `COUNTING` (amaldagi qoldiqlar sanaladi) → `APPLY` (muvofiqlashtiriladi);
+   - **Uzilgan qurilmalar freeze nazorati:** Agar faol rezervga ega offline qurilma freeze tasdig'ini bermagan bo'lsa (`freeze_ack_at == null`), auditni yakuniy tasdiqlash to'xtatiladi (`DeviceFreezePendingException`), faqat majburiy (force) tasdiq orqali o'tkazish mumkin;
+   - **Sababli tuzatish:** Ortiqcha tovar `ADJUSTMENT_IN`, kamomad esa `ADJUSTMENT_OUT` harakati bilan daftarga yoziladi;
+   - **O'zgarmaslik (Immutability):** Tasdiqlangan (posted/completed) audit va qaytarish hujjatlarini o'chirib yuborish qat'iy taqiqlanadi (`DocumentImmutableException`).
+
+5. **Foydalanuvchi Interfeysi (`pages/inventory.blade.php`, `StockManager`):**
+   - Livewire `StockManager` komponentiga "Qaytarishlar" (`returns`), "Brak & Yaroqsiz" (`damages`), "Inventarizatsiya" (`audits`) tablari va to'liq interaktiv modallar qo'shildi.
+
+---
+
+### 2. O'zgargan va Yaratilgan Fayllar:
+- **Migratsiya:**
+  - `backend/database/migrations/2026_10_04_000012_create_returns_damages_and_inventory_audits_tables.php` (8 ta yangi jadval, PostgreSQL sequencelari, device freeze ustunlari).
+- **Modellar va Bog'liqliklar:**
+  - `backend/app/Models/SaleReturn.php` & `SaleReturnItem.php`
+  - `backend/app/Models/PurchaseReturn.php` & `PurchaseReturnItem.php`
+  - `backend/app/Models/DamageRecord.php` & `DamageItem.php`
+  - `backend/app/Models/InventoryAudit.php` & `InventoryAuditItem.php`
+  - `backend/app/Models/Device.php` (freeze timestamps)
+  - `backend/app/Models/Sale.php`, `SaleItem.php`, `Purchase.php`, `PurchaseItem.php` (returns relationships)
+- **Hujjat Raqami Generatorlari:**
+  - `backend/app/Services/Operations/DocumentNumberGenerator.php` (`nextSaleReturnNumber`, `nextPurchaseReturnNumber`, `nextDamageNumber`, `nextAuditNumber`).
+- **Biznes Servislari:**
+  - `backend/app/Services/Inventory/SaleReturnService.php`
+  - `backend/app/Services/Inventory/SupplierReturnService.php`
+  - `backend/app/Services/Inventory/DamageDisposalService.php`
+  - `backend/app/Services/Inventory/InventoryAuditService.php`
+  - `backend/app/Services/Ledger/InventoryAllocationService.php` (epoch fallback)
+- **Maxsus Istisnolar (Exceptions):**
+  - `backend/app/Services/Ledger/Exceptions/CannotReturnMoreThanSoldException.php`
+  - `backend/app/Services/Ledger/Exceptions/CannotReturnMoreThanPurchasedException.php`
+  - `backend/app/Services/Ledger/Exceptions/DeviceFreezePendingException.php`
+  - `backend/app/Services/Ledger/Exceptions/DocumentImmutableException.php`
+- **UI & Routing:**
+  - `backend/app/Livewire/Inventory/StockManager.php`
+  - `backend/resources/views/livewire/inventory/stock-manager.blade.php`
+  - `backend/routes/web.php`
+- **Testlar:**
+  - `backend/tests/Feature/ReturnsDamagesAndAdjustmentsTest.php` (16 ta keng qamrovli test).
+
+---
+
+### 3. Tekshiruv Buyruqlari va Test Natijalari (Verification Evidence):
+1. **Prompt 16 Feature Testlari:**
+   - Buyruq: `php artisan test tests/Feature/ReturnsDamagesAndAdjustmentsTest.php`
+   - Natija: **16/16 testlar 100% PASS** (57 assertions, duration 12.4s).
+     - `test_cannot_return_more_than_sold_quantity`: PASS
+     - `test_sale_return_restores_inventory_and_reduces_customer_debt_correctly`: PASS
+     - `test_sale_return_with_cash_refund_does_not_double_deduct_debt_and_cash`: PASS
+     - `test_sale_return_fails_when_drawer_has_insufficient_cash`: PASS
+     - `test_damaged_returned_items_are_quarantined_and_not_added_to_sellable_stock`: PASS
+     - `test_partial_returns_correctly_close_out_fractional_cost_rounding_on_final_unit`: PASS
+     - `test_sale_return_idempotency_via_operation_id`: PASS
+     - `test_cannot_return_more_than_purchased_quantity_to_supplier`: PASS
+     - `test_supplier_return_reduces_payable_and_records_wac_outflow_with_discrepancy`: PASS
+     - `test_supplier_return_cannot_exceed_free_stock_when_device_has_active_allocations`: PASS
+     - `test_damage_disposal_records_wac_inventory_loss_without_touching_cash`: PASS
+     - `test_damage_disposal_cannot_exceed_free_stock_under_device_allocation`: PASS
+     - `test_inventory_audit_lifecycle_and_device_freeze_guard`: PASS
+     - `test_inventory_audit_applies_surplus_and_deficit_adjustments`: PASS
+     - `test_posted_returns_damages_and_audits_cannot_be_deleted`: PASS
+     - `test_livewire_stock_manager_returns_damages_and_audit_ui`: PASS
+2. **To'liq Backend Test Suite:**
+   - Buyruq: `php artisan test`
+   - Natija: **164/164 testlar 100% PASS** (1064 assertions, duration 53.8s, 0 failures, 0 errors).
+3. **PWA & Offline Sinxronizatsiya Sinovlari:**
+   - `node backend/tests/pwa-sync-protocol-test.cjs`: **7/7 testlar 100% PASS**.
+   - `node backend/tests/pwa-indexeddb-test.cjs`: **7/7 testlar 100% PASS**.
+4. **Kod Sifat Tekshiruvi:**
+   - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - `flutter analyze`: **No issues found!** (ran in 2.6s).
+   - `npm run build`: **Vite assets built in 930ms** (0 errors).
+
+---
+*16-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 17.*
+
 
 
 

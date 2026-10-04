@@ -32,6 +32,8 @@ class Device extends Model
         'last_sync_at',
         'last_ip',
         'notes',
+        'freeze_requested_at',
+        'freeze_acknowledged_at',
     ];
 
     protected $casts = [
@@ -42,6 +44,8 @@ class Device extends Model
         'new_customer_debt_consumed' => 'integer',
         'last_seen_at' => 'datetime',
         'last_sync_at' => 'datetime',
+        'freeze_requested_at' => 'datetime',
+        'freeze_acknowledged_at' => 'datetime',
     ];
 
     public function registrant(): BelongsTo

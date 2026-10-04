@@ -118,7 +118,7 @@ class InventoryAllocationService
                     'allocated_quantity' => $quantity,
                     'consumed_quantity' => 0,
                     'returned_quantity' => 0,
-                    'epoch' => $device->current_lease_epoch,
+                    'epoch' => max(1, (int) $device->current_lease_epoch),
                     'status' => 'ACTIVE',
                     'notes' => $notes,
                 ]);

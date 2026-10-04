@@ -23,7 +23,25 @@
                     wire:click="$set('activeTab', 'inward')" 
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'inward' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Tovar Kirimi (Kirim qilish)
+                    Tovar Kirimi
+                </button>
+                <button 
+                    wire:click="$set('activeTab', 'returns')" 
+                    class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'returns' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                    Qaytarishlar
+                </button>
+                <button 
+                    wire:click="$set('activeTab', 'damages')" 
+                    class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'damages' ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    Brak & Yaroqsiz
+                </button>
+                <button 
+                    wire:click="$set('activeTab', 'audits')" 
+                    class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'audits' ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                    Inventarizatsiya
                 </button>
             </div>
         </div>
@@ -550,6 +568,590 @@
         <!-- TAB 3: TOVAR KIRIMI (QUICK INWARD) -->
         <div class="space-y-4">
             @livewire('quick-inward')
+        </div>
+    @elseif($activeTab === 'returns')
+        <!-- TAB 4: QAYTARISHLAR (RETURNS) -->
+        <div class="space-y-6">
+            @if($saleReturnSuccess)
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm flex items-center justify-between">
+                    <span>{{ $saleReturnSuccess }}</span>
+                    <button wire:click="$set('saleReturnSuccess', null)" class="text-emerald-500 hover:text-emerald-700 font-bold">&times;</button>
+                </div>
+            @endif
+            @if($saleReturnError)
+                <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-center justify-between">
+                    <span>{{ $saleReturnError }}</span>
+                    <button wire:click="$set('saleReturnError', null)" class="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
+                </div>
+            @endif
+            @if($supplierReturnSuccess)
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm flex items-center justify-between">
+                    <span>{{ $supplierReturnSuccess }}</span>
+                    <button wire:click="$set('supplierReturnSuccess', null)" class="text-emerald-500 hover:text-emerald-700 font-bold">&times;</button>
+                </div>
+            @endif
+            @if($supplierReturnError)
+                <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-center justify-between">
+                    <span>{{ $supplierReturnError }}</span>
+                    <button wire:click="$set('supplierReturnError', null)" class="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
+                </div>
+            @endif
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 1. Sotuv Qaytarishlari -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                Mijoz Qaytarishlari (Sale Returns)
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Original sotuv narxi va cost snapshot asosida</p>
+                        </div>
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-1.5">
+                                + Qaytarish Qilish
+                            </button>
+                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg z-30 p-2 text-xs space-y-1">
+                                <div class="font-semibold text-slate-600 px-2 py-1 border-b">So'nggi savdolar:</div>
+                                @forelse($recentSales as $sale)
+                                    <button wire:click="openSaleReturnModal({{ $sale->id }}); open = false" class="w-full text-left px-2 py-1.5 rounded hover:bg-amber-50 flex items-center justify-between">
+                                        <span class="font-mono font-medium">{{ $sale->invoice_number }}</span>
+                                        <span class="text-slate-500 truncate max-w-[120px]">{{ $sale->customer->name ?? 'Mehmon' }}</span>
+                                    </button>
+                                @empty
+                                    <div class="px-2 py-2 text-slate-400 text-center">Savdolar topilmadi</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-96 border rounded-lg">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b">
+                                <tr>
+                                    <th class="p-2.5">Qaytarish #</th>
+                                    <th class="p-2.5">Savdo Cheki</th>
+                                    <th class="p-2.5">Mijoz</th>
+                                    <th class="p-2.5 text-right">Tovar Qiymati</th>
+                                    <th class="p-2.5 text-right">Qaytarilgan Pul</th>
+                                    <th class="p-2.5 text-right">Qarz Kamaydi</th>
+                                    <th class="p-2.5">Sana</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($saleReturns as $sr)
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="p-2.5 font-mono font-semibold text-amber-700">{{ $sr->return_number }}</td>
+                                        <td class="p-2.5 font-mono text-slate-600">{{ $sr->sale->invoice_number ?? '-' }}</td>
+                                        <td class="p-2.5 text-slate-800 font-medium">{{ $sr->customer->name ?? 'Mehmon' }}</td>
+                                        <td class="p-2.5 text-right font-mono font-semibold text-slate-900">{{ number_format($sr->total_amount) }}</td>
+                                        <td class="p-2.5 text-right font-mono text-rose-600">{{ number_format($sr->refund_amount) }}</td>
+                                        <td class="p-2.5 text-right font-mono text-emerald-600">{{ number_format($sr->debt_deduction_amount) }}</td>
+                                        <td class="p-2.5 text-slate-500 text-[11px]">{{ $sr->posted_at ? $sr->posted_at->format('Y-m-d H:i') : '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="p-6 text-center text-slate-400">Hozircha sotuv qaytarishlari qayd etilmagan.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. Ta'minotchiga Qaytarishlar -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                                Ta'minotchi Qaytarishlari (Supplier Returns)
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Tijoriy kredit va joriy WAC chiqimi farqi bilan</p>
+                        </div>
+                        <div class="relative" x-data="{ open: false }">
+                            <button @click="open = !open" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-1.5">
+                                + Ta'minotchiga Qaytarish
+                            </button>
+                            <div x-show="open" @click.away="open = false" class="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-xl shadow-lg z-30 p-2 text-xs space-y-1">
+                                <div class="font-semibold text-slate-600 px-2 py-1 border-b">So'nggi kirimlar:</div>
+                                @forelse($recentPurchases as $purchase)
+                                    <button wire:click="openSupplierReturnModal({{ $purchase->id }}); open = false" class="w-full text-left px-2 py-1.5 rounded hover:bg-blue-50 flex items-center justify-between">
+                                        <span class="font-mono font-medium">{{ $purchase->invoice_number }}</span>
+                                        <span class="text-slate-500 truncate max-w-[120px]">{{ $purchase->supplier->name ?? 'Noma\'lum' }}</span>
+                                    </button>
+                                @empty
+                                    <div class="px-2 py-2 text-slate-400 text-center">Kirimlar topilmadi</div>
+                                @endforelse
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto max-h-96 border rounded-lg">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b">
+                                <tr>
+                                    <th class="p-2.5">Qaytarish #</th>
+                                    <th class="p-2.5">Kirim Nakladnoy</th>
+                                    <th class="p-2.5">Ta'minotchi</th>
+                                    <th class="p-2.5 text-right">Tijoriy Kredit</th>
+                                    <th class="p-2.5 text-right">WAC Chiqim</th>
+                                    <th class="p-2.5 text-right">Farq</th>
+                                    <th class="p-2.5">Sana</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($purchaseReturns as $pr)
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="p-2.5 font-mono font-semibold text-blue-700">{{ $pr->return_number }}</td>
+                                        <td class="p-2.5 font-mono text-slate-600">{{ $pr->purchase->invoice_number ?? '-' }}</td>
+                                        <td class="p-2.5 text-slate-800 font-medium">{{ $pr->supplier->name ?? '-' }}</td>
+                                        <td class="p-2.5 text-right font-mono font-semibold text-emerald-600">{{ number_format($pr->total_credit_amount) }}</td>
+                                        <td class="p-2.5 text-right font-mono text-slate-700">{{ number_format($pr->total_cost_amount) }}</td>
+                                        <td class="p-2.5 text-right font-mono font-semibold {{ $pr->cost_discrepancy >= 0 ? 'text-indigo-600' : 'text-rose-600' }}">{{ number_format($pr->cost_discrepancy) }}</td>
+                                        <td class="p-2.5 text-slate-500 text-[11px]">{{ $pr->posted_at ? $pr->posted_at->format('Y-m-d H:i') : '-' }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="7" class="p-6 text-center text-slate-400">Hozircha ta'minotchi qaytarishlari qayd etilmagan.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @elseif($activeTab === 'damages')
+        <!-- TAB 5: BRAK VA YAROQSIZ TOVAR CHIQIMI -->
+        <div class="space-y-6">
+            @if($damageSuccess)
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm flex items-center justify-between">
+                    <span>{{ $damageSuccess }}</span>
+                    <button wire:click="$set('damageSuccess', null)" class="text-emerald-500 hover:text-emerald-700 font-bold">&times;</button>
+                </div>
+            @endif
+            @if($damageError)
+                <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-center justify-between">
+                    <span>{{ $damageError }}</span>
+                    <button wire:click="$set('damageError', null)" class="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
+                </div>
+            @endif
+
+            <div class="bg-rose-50/70 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-rose-900 text-sm">
+                <svg class="w-5 h-5 text-rose-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <div>
+                    <strong class="font-semibold">Muhim qoida:</strong> Brak chiqimi faqat ombordagi WAC tannarx yo'qotishi hisoblanadi. U kassa harakati (Cash movement) yoki kassa operatsion xarajati (Cash expense) EMAS! Zaxira ajratmalariga daxl qilolmaydi.
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
+                            Brak & Yaroqsiz Tovar Chiqimlari Jurnali
+                        </h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Yaroqsiz idishlar, sinishlar va yo'qotishlar hisobi</p>
+                    </div>
+                    <button wire:click="openDamageModal()" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-2">
+                        + Brakka Chiqarish
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 text-slate-600 border-b">
+                            <tr>
+                                <th class="p-3">Hujjat #</th>
+                                <th class="p-3">Tovarlar</th>
+                                <th class="p-3 text-right">Jami Dona</th>
+                                <th class="p-3 text-right">Tannarx Yo'qotishi (WAC)</th>
+                                <th class="p-3">Sabab</th>
+                                <th class="p-3">Mas'ul</th>
+                                <th class="p-3">Sana</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($damageRecords as $dr)
+                                <tr class="hover:bg-slate-50/70">
+                                    <td class="p-3 font-mono font-semibold text-rose-700">{{ $dr->damage_number }}</td>
+                                    <td class="p-3 text-slate-700">
+                                        @foreach($dr->items as $dItem)
+                                            <div class="font-medium">{{ $dItem->variant->product->name ?? 'Mahsulot' }} ({{ $dItem->variant->volume->name ?? '' }}): {{ number_format($dItem->quantity) }} dona</div>
+                                        @endforeach
+                                    </td>
+                                    <td class="p-3 text-right font-mono font-bold text-slate-800">{{ number_format($dr->total_quantity) }}</td>
+                                    <td class="p-3 text-right font-mono font-bold text-rose-600">{{ number_format($dr->total_loss_value) }} so'm</td>
+                                    <td class="p-3 text-slate-600">{{ $dr->reason }}</td>
+                                    <td class="p-3 text-slate-500">{{ $dr->creator->name ?? '-' }}</td>
+                                    <td class="p-3 text-slate-500 text-[11px]">{{ $dr->posted_at ? $dr->posted_at->format('Y-m-d H:i') : '-' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="p-8 text-center text-slate-400">Brak chiqimlari mavjud emas.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    @elseif($activeTab === 'audits')
+        <!-- TAB 6: INVENTARIZATSIYA VA TUZATISHLAR -->
+        <div class="space-y-6">
+            @if($auditSuccess)
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-sm flex items-center justify-between">
+                    <span>{{ $auditSuccess }}</span>
+                    <button wire:click="$set('auditSuccess', null)" class="text-emerald-500 hover:text-emerald-700 font-bold">&times;</button>
+                </div>
+            @endif
+            @if($auditError)
+                <div class="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-sm flex items-center justify-between">
+                    <span>{{ $auditError }}</span>
+                    <button wire:click="$set('auditError', null)" class="text-rose-500 hover:text-rose-700 font-bold">&times;</button>
+                </div>
+            @endif
+
+            @if($selectedAudit)
+                <!-- AKTIV INVENTARIZATSIYA VARAQASI -->
+                <div class="bg-white rounded-xl shadow-sm border border-purple-200 p-5 space-y-5">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+                        <div>
+                            <div class="flex items-center gap-3">
+                                <h2 class="text-xl font-bold text-purple-950 font-mono">{{ $selectedAudit->audit_number }}</h2>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold {{ $selectedAudit->status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800' }}">
+                                    {{ $selectedAudit->status }}
+                                </span>
+                                <span class="px-3 py-1 rounded-full text-xs font-semibold {{ $selectedAudit->device_freeze_status === 'ACKNOWLEDGED' || $selectedAudit->device_freeze_status === 'NOT_REQUIRED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800' }}">
+                                    Freeze: {{ $selectedAudit->device_freeze_status }}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">Boshlangan: {{ $selectedAudit->started_at ? $selectedAudit->started_at->format('Y-m-d H:i') : '-' }} | Izoh: {{ $selectedAudit->notes }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button wire:click="closeAuditView" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold">
+                                Ro'yxatga Qaytish
+                            </button>
+                            @if($selectedAudit->status !== 'COMPLETED')
+                                <button wire:click="saveAuditCounts" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-xs">
+                                    Natijalarni Saqlash
+                                </button>
+                                <button wire:click="executeApplyAudit(false)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs">
+                                    Tasdiqlash & Muvofiqlashtirish
+                                </button>
+                                @if($selectedAudit->device_freeze_status === 'PENDING_ACK')
+                                    <button wire:click="executeApplyAudit(true)" class="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold" title="Uzilgan qurilmalarni kutmasdan majburiy tasdiqlash">
+                                        Majburiy Tasdiqlash
+                                    </button>
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+
+                    @if($selectedAudit->device_freeze_status === 'PENDING_ACK')
+                        <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs space-y-2">
+                            <div class="font-bold flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                                Uzilgan qurilmalar muzlatish tasdig'i (Freeze ACK) kutilmoqda!
+                            </div>
+                            <p>Ushbu tovarlar bo'yicha qurilmalarga rezerv ajratilgan. Inventarizatsiyani tasdiqlash uchun qurilmalar aloqaga chiqishi yoki freeze tasdig'i olinishi shart.</p>
+                            @if(!empty($devicesPendingFreeze))
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    @foreach($devicesPendingFreeze as $dev)
+                                        <button wire:click="acknowledgeDeviceFreezeAction({{ $dev->id }})" class="px-2.5 py-1 bg-white border border-amber-300 rounded text-amber-800 hover:bg-amber-100 flex items-center gap-1 font-mono">
+                                            <span>#{{ $dev->device_code }} ({{ $dev->name }})</span>
+                                            <span class="text-emerald-600 font-bold ml-1">✓ ACK</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <!-- Sanash jadvali -->
+                    <div class="overflow-x-auto border rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-700 border-b">
+                                <tr>
+                                    <th class="p-3">Tovar Nomi & Hajmi</th>
+                                    <th class="p-3 text-right">Kutilayotgan Qoldiq</th>
+                                    <th class="p-3 text-right w-36">Sanalgan Qoldiq</th>
+                                    <th class="p-3 text-right">Farq (Dona)</th>
+                                    <th class="p-3 text-right">WAC Tannarx</th>
+                                    <th class="p-3 text-right">Farq Qiymati</th>
+                                    <th class="p-3">Sabab / Izoh</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach($selectedAudit->items as $aItem)
+                                    @php
+                                        $exp = (int) $aItem->expected_quantity;
+                                        $cnt = (int) ($auditCountInputs[$aItem->product_variant_id] ?? $exp);
+                                        $diff = $cnt - $exp;
+                                        $diffVal = $diff * (int) $aItem->unit_cost;
+                                    @endphp
+                                    <tr class="hover:bg-slate-50/70 {{ $diff !== 0 ? 'bg-amber-50/30' : '' }}">
+                                        <td class="p-3 font-medium text-slate-900">
+                                            {{ $aItem->variant->product->name ?? 'Mahsulot' }}
+                                            <span class="text-slate-500 font-normal">({{ $aItem->variant->volume->name ?? '' }})</span>
+                                        </td>
+                                        <td class="p-3 text-right font-mono font-semibold text-slate-700">{{ number_format($exp) }}</td>
+                                        <td class="p-3 text-right">
+                                            @if($selectedAudit->status !== 'COMPLETED')
+                                                <input 
+                                                    type="number" 
+                                                    wire:model="auditCountInputs.{{ $aItem->product_variant_id }}" 
+                                                    class="w-24 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                                                >
+                                            @else
+                                                <span class="font-mono font-bold text-slate-800">{{ number_format($cnt) }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="p-3 text-right font-mono font-bold {{ $diff > 0 ? 'text-emerald-600' : ($diff < 0 ? 'text-rose-600' : 'text-slate-400') }}">
+                                            {{ $diff > 0 ? '+' : '' }}{{ number_format($diff) }}
+                                        </td>
+                                        <td class="p-3 text-right font-mono text-slate-600">{{ number_format($aItem->unit_cost) }}</td>
+                                        <td class="p-3 text-right font-mono font-bold {{ $diffVal > 0 ? 'text-emerald-600' : ($diffVal < 0 ? 'text-rose-600' : 'text-slate-400') }}">
+                                            {{ number_format($diffVal) }} so'm
+                                        </td>
+                                        <td class="p-3">
+                                            @if($selectedAudit->status !== 'COMPLETED')
+                                                <input 
+                                                    type="text" 
+                                                    wire:model="auditItemReasons.{{ $aItem->product_variant_id }}" 
+                                                    placeholder="Izoh..."
+                                                    class="w-full px-2 py-1 text-xs border rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                                                >
+                                            @else
+                                                <span class="text-slate-500">{{ $aItem->reason ?: '-' }}</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @else
+                <!-- INVENTARIZATSIYALAR RO'YXATI -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
+                                Inventarizatsiya & Sanash Tarixi
+                            </h2>
+                            <p class="text-xs text-slate-500 mt-0.5">Ombor qoldiqlarini haqiqiy sanash va farqlarni muvofiqlashtirish</p>
+                        </div>
+                        <button wire:click="prepareNewAudit" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-xs flex items-center gap-2">
+                            + Yangi Sanash Boshlash
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto border rounded-lg">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50 text-slate-600 border-b">
+                                <tr>
+                                    <th class="p-3">Audit #</th>
+                                    <th class="p-3">Holati</th>
+                                    <th class="p-3">Qurilmalar Freeze</th>
+                                    <th class="p-3 text-right">Kutilgan Dona</th>
+                                    <th class="p-3 text-right">Sanalgan Dona</th>
+                                    <th class="p-3 text-right">Farq (Dona)</th>
+                                    <th class="p-3 text-right">Farq Qiymati</th>
+                                    <th class="p-3">Boshlangan Sana</th>
+                                    <th class="p-3 text-right">Amal</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @forelse($inventoryAudits as $ia)
+                                    <tr class="hover:bg-slate-50/70">
+                                        <td class="p-3 font-mono font-semibold text-purple-700">{{ $ia->audit_number }}</td>
+                                        <td class="p-3">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold {{ $ia->status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' : 'bg-purple-100 text-purple-800' }}">
+                                                {{ $ia->status }}
+                                            </span>
+                                        </td>
+                                        <td class="p-3">
+                                            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold {{ $ia->device_freeze_status === 'ACKNOWLEDGED' || $ia->device_freeze_status === 'NOT_REQUIRED' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800' }}">
+                                                {{ $ia->device_freeze_status }}
+                                            </span>
+                                        </td>
+                                        <td class="p-3 text-right font-mono text-slate-600">{{ number_format($ia->total_expected_qty) }}</td>
+                                        <td class="p-3 text-right font-mono font-semibold text-slate-800">{{ number_format($ia->total_counted_qty) }}</td>
+                                        <td class="p-3 text-right font-mono font-bold {{ $ia->total_discrepancy_qty > 0 ? 'text-emerald-600' : ($ia->total_discrepancy_qty < 0 ? 'text-rose-600' : 'text-slate-400') }}">
+                                            {{ $ia->total_discrepancy_qty > 0 ? '+' : '' }}{{ number_format($ia->total_discrepancy_qty) }}
+                                        </td>
+                                        <td class="p-3 text-right font-mono font-bold {{ $ia->total_discrepancy_value > 0 ? 'text-emerald-600' : ($ia->total_discrepancy_value < 0 ? 'text-rose-600' : 'text-slate-400') }}">
+                                            {{ number_format($ia->total_discrepancy_value) }} so'm
+                                        </td>
+                                        <td class="p-3 text-slate-500 text-[11px]">{{ $ia->started_at ? $ia->started_at->format('Y-m-d H:i') : '-' }}</td>
+                                        <td class="p-3 text-right">
+                                            <button wire:click="viewAudit({{ $ia->id }})" class="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded font-semibold text-xs">
+                                                Ochish
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="9" class="p-8 text-center text-slate-400">Hozircha inventarizatsiya o'tkazilmagan.</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+        </div>
+    @endif
+
+    <!-- 1. SOTUV QAYTARISH MODALI -->
+    @if($showSaleReturnModal && $selectedSaleForReturn)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div class="p-5 border-b bg-amber-50/60 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Sotuvni Qaytarish (#{{ $selectedSaleForReturn->invoice_number }})</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Mijoz: {{ $selectedSaleForReturn->customer->name ?? 'Mehmon' }} | To'langan: {{ number_format($selectedSaleForReturn->paid_amount) }} so'm</p>
+                    </div>
+                    <button wire:click="closeSaleReturnModal" class="text-slate-400 hover:text-slate-700">&times;</button>
+                </div>
+                <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">Qaytariladigan tovarlar:</label>
+                        @foreach($selectedSaleForReturn->items as $item)
+                            @php
+                                $alreadyReturned = (int) \App\Models\SaleReturnItem::where('sale_item_id', $item->id)->sum('quantity');
+                                $available = (int) $item->quantity - $alreadyReturned;
+                            @endphp
+                            <div class="p-3 bg-slate-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                                <div>
+                                    <div class="font-bold text-slate-800">{{ $item->variant->product->name ?? 'Mahsulot' }} ({{ $item->variant->volume->name ?? '' }})</div>
+                                    <div class="text-slate-500 text-[11px]">Sotilgan: {{ (int)$item->quantity }} dona | Qaytarishga mavjud: {{ $available }} dona | Narx: {{ number_format($item->sale_price) }} so'm</div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-1.5 text-rose-600 text-[11px] font-semibold cursor-pointer">
+                                        <input type="checkbox" wire:model="saleReturnDamaged.{{ $item->id }}" class="rounded text-rose-600">
+                                        Brak / Yaroqsiz
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        min="0" 
+                                        max="{{ $available }}"
+                                        wire:model="saleReturnQuantities.{{ $item->id }}" 
+                                        class="w-20 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-amber-500"
+                                    >
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Qaytarish Sababi:</label>
+                            <input type="text" wire:model="saleReturnReason" class="w-full px-3 py-2 text-xs border rounded-lg focus:ring-amber-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-700 mb-1">Kassadan qaytariladigan naqd pul (so'm):</label>
+                            <input type="number" min="0" max="{{ $selectedSaleForReturn->paid_amount }}" wire:model="saleReturnRefundAmount" class="w-full px-3 py-2 text-xs border rounded-lg font-mono font-bold focus:ring-amber-500">
+                            <p class="text-[11px] text-slate-500 mt-1">Qolgan summa mijoz qarzidan chegiriladi.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                    <button wire:click="closeSaleReturnModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
+                    <button wire:click="submitSaleReturn" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold shadow-xs">Qaytarishni Tasdiqlash</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- 2. TA'MINOTCHIGA QAYTARISH MODALI -->
+    @if($showSupplierReturnModal && $selectedPurchaseForReturn)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div class="p-5 border-b bg-blue-50/60 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Ta'minotchiga Qaytarish (#{{ $selectedPurchaseForReturn->invoice_number }})</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Ta'minotchi: {{ $selectedPurchaseForReturn->supplier->name ?? '-' }}</p>
+                    </div>
+                    <button wire:click="closeSupplierReturnModal" class="text-slate-400 hover:text-slate-700">&times;</button>
+                </div>
+                <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    <div class="space-y-3">
+                        <label class="block text-xs font-bold text-slate-700 uppercase">Qaytariladigan tovarlar:</label>
+                        @foreach($selectedPurchaseForReturn->items as $item)
+                            @php
+                                $alreadyReturned = (int) \App\Models\PurchaseReturnItem::where('purchase_item_id', $item->id)->sum('quantity');
+                                $available = (int) $item->quantity - $alreadyReturned;
+                            @endphp
+                            <div class="p-3 bg-slate-50 rounded-xl border flex items-center justify-between gap-3 text-xs">
+                                <div>
+                                    <div class="font-bold text-slate-800">{{ $item->variant->product->name ?? 'Mahsulot' }} ({{ $item->variant->volume->name ?? '' }})</div>
+                                    <div class="text-slate-500 text-[11px]">Kirim: {{ (int)$item->quantity }} dona | Qaytarishga mavjud: {{ $available }} dona | Xarid narxi: {{ number_format($item->unit_cost) }} so'm</div>
+                                </div>
+                                <input 
+                                    type="number" 
+                                    min="0" 
+                                    max="{{ $available }}"
+                                    wire:model="supplierReturnQuantities.{{ $item->id }}" 
+                                    class="w-24 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-blue-500"
+                                >
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Qaytarish Sababi:</label>
+                        <input type="text" wire:model="supplierReturnReason" class="w-full px-3 py-2 text-xs border rounded-lg focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                    <button wire:click="closeSupplierReturnModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
+                    <button wire:click="submitSupplierReturn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs">Ta'minotchiga Qaytarish</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- 3. BRAKKA CHIQARISH MODALI -->
+    @if($showDamageModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div class="p-5 border-b bg-rose-50/60 flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-rose-950">Brak / Yaroqsiz Chiqimi</h3>
+                    <button wire:click="closeDamageModal" class="text-slate-400 hover:text-slate-700">&times;</button>
+                </div>
+                <div class="p-5 space-y-4 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Tovar Varianti:</label>
+                        <select wire:model="damageVariantId" class="w-full px-3 py-2 border rounded-lg focus:ring-rose-500">
+                            <option value="">-- Tanlang --</option>
+                            @foreach(\App\Models\ProductVariant::with(['product', 'volume'])->where('status', 'active')->get() as $pv)
+                                <option value="{{ $pv->id }}">{{ $pv->product->name ?? '' }} ({{ $pv->volume->name ?? '' }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Brak Soni (Dona):</label>
+                        <input type="number" min="1" wire:model="damageQuantity" class="w-full px-3 py-2 border rounded-lg font-mono font-bold focus:ring-rose-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Sababi:</label>
+                        <input type="text" wire:model="damageReason" class="w-full px-3 py-2 border rounded-lg focus:ring-rose-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">Qo'shimcha izoh:</label>
+                        <textarea wire:model="damageNotes" rows="2" class="w-full px-3 py-2 border rounded-lg focus:ring-rose-500"></textarea>
+                    </div>
+                </div>
+                <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
+                    <button wire:click="closeDamageModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
+                    <button wire:click="submitDamageDisposal" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold shadow-xs">Brakka Chiqarish</button>
+                </div>
+            </div>
         </div>
     @endif
 

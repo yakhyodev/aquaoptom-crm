@@ -36,11 +36,40 @@ class DocumentNumberGenerator
     }
 
     /**
-     * Qaytarish hujjati raqami: RET-YYYY-000001
+     * Sotuv qaytarish hujjati raqami: RET-YYYY-000001
      */
     public static function nextReturnNumber(): string
     {
         return static::next('RET', 'returns_number_seq');
+    }
+
+    public static function nextSaleReturnNumber(): string
+    {
+        return static::nextReturnNumber();
+    }
+
+    /**
+     * Ta'minotchiga qaytarish hujjati raqami: RET-P-YYYY-000001
+     */
+    public static function nextPurchaseReturnNumber(): string
+    {
+        return static::next('RET-P', 'purchase_returns_seq');
+    }
+
+    /**
+     * Brak / yaroqsiz chiqimi hujjati raqami: DMG-YYYY-000001
+     */
+    public static function nextDamageNumber(): string
+    {
+        return static::next('DMG', 'damage_records_seq');
+    }
+
+    /**
+     * Inventarizatsiya hujjati raqami: AUD-YYYY-000001
+     */
+    public static function nextAuditNumber(): string
+    {
+        return static::next('AUD', 'inventory_audits_seq');
     }
 
     /**

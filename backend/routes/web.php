@@ -69,6 +69,9 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/pos', fn () => view('pages.pos-offline'))->name('pos.pwa');
     Route::get('/inward', fn () => redirect()->route('inventory.index', ['tab' => 'inward']));
     Route::get('/calculator', fn () => redirect()->route('inventory.index', ['tab' => 'calculator']));
+    Route::get('/returns', fn () => redirect()->route('inventory.index', ['tab' => 'returns']));
+    Route::get('/damages', fn () => redirect()->route('inventory.index', ['tab' => 'damages']));
+    Route::get('/audits', fn () => redirect()->route('inventory.index', ['tab' => 'audits']));
     Route::get('/catalog', fn () => redirect()->route('inventory.index'));
     Route::get('/finance', fn () => redirect()->route('cash.index'));
 });
