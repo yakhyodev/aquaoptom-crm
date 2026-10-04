@@ -2,18 +2,22 @@ name: AquaOptom CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  backend-quality-and-tests:
-    name: Backend Lint, Migrations & PostgreSQL Tests
-    runs-on: ubuntu-latest
+  backend-and-pwa:
+    name: Backend, PostgreSQL, Redis & PWA tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -21,15 +25,14 @@ jobs:
         env:
           POSTGRES_DB: aquaoptom_test
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_PASSWORD: ci-only-password
         ports:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
           --health-timeout 3s
-          --health-retries 5
-
+          --health-retries 10
       redis:
         image: redis:7-alpine
         ports:
@@ -38,133 +41,161 @@ jobs:
           --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 3s
-          --health-retries 5
+          --health-retries 10
+
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'true'
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '5432'
+      DB_DATABASE: aquaoptom_test
+      DB_USERNAME: postgres
+      DB_PASSWORD: ci-only-password
+      DB_URL: ''
+      REDIS_CLIENT: predis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      MAIL_MAILER: array
+      BROADCAST_CONNECTION: 'null'
+      TELEGRAM_BOT_TOKEN: fake_testing_bot_token
+      TELEGRAM_CHANNEL_ID: '-1000000000000'
 
     defaults:
       run:
+        shell: bash
         working-directory: backend
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_pgsql, pgsql, bcmath, redis
+          php-version: '8.5'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_pgsql, pgsql, bcmath, zip, redis
           coverage: none
-
-      - name: Validate composer.json and composer.lock
-        run: composer validate --strict
-
-      - name: Cache Composer packages
-        id: composer-cache
-        uses: actions/cache@v4
-        with:
-          path: backend/vendor
-          key: ${{ runner.os }}-php-${{ hashFiles('backend/composer.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-php-
-
-      - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
-
-      - name: Run code styling / lint check (Laravel Pint)
-        run: ./vendor/bin/pint --test
-        continue-on-error: true
-
-      - name: Create CI environment file
-        run: |
-          cat << 'EOF' > .env.testing
-          APP_NAME="AquaOptom Wholesale CRM"
-          APP_ENV=testing
-          APP_KEY=base64:heXBNSJDegcPTQUWRj2hj3BTN/4rg/Ee4Dq5XGFGijg=
-          APP_DEBUG=true
-          APP_URL=http://localhost:8000
-
-          DB_CONNECTION=pgsql
-          DB_HOST=127.0.0.1
-          DB_PORT=5432
-          DB_DATABASE=aquaoptom_test
-          DB_USERNAME=postgres
-          DB_PASSWORD=postgrespassword
-          DB_SSLMODE=prefer
-
-          REDIS_CLIENT=predis
-          REDIS_HOST=127.0.0.1
-          REDIS_PORT=6379
-          CACHE_STORE=redis
-          QUEUE_CONNECTION=redis
-          SESSION_DRIVER=redis
-
-          TELEGRAM_BOT_TOKEN=fake-ci-bot-token
-          TELEGRAM_CHANNEL_ID=-1001234567890
-          PAYMENT_MOCK_ENABLED=true
-          EOF
-
-      - name: Test PostgreSQL migrations
-        run: php artisan migrate --env=testing --force
-
-      - name: Test PostgreSQL migration rollback and re-migrate
-        run: |
-          php artisan migrate:rollback --env=testing --force
-          php artisan migrate --env=testing --force
-          php artisan db:seed --class=RoleAndPermissionSeeder --env=testing --force
-
-      - name: Execute backend tests against PostgreSQL
-        run: php artisan test --env=testing
-
-  frontend-build:
-    name: Frontend Build & Asset Compilation
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: '24'
+          cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Locate Composer download cache
+        id: composer-cache
+        run: echo "directory=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
-      - name: Build frontend assets (Vite / Tailwind)
-        run: npm run build
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.directory }}
+          key: ${{ runner.os }}-php85-composer-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php85-composer-
 
-  mobile-checks:
-    name: Flutter Mobile Quality Checks
-    runs-on: ubuntu-latest
+      - name: Prepare isolated test environment
+        run: |
+          cp .env.example .env.testing
+          mkdir -p test-results
+
+      - name: Validate and install Composer dependencies
+        run: |
+          composer validate --strict
+          composer install --prefer-dist --no-progress --no-interaction
+          php artisan key:generate --env=testing --no-interaction
+
+      - name: Install JavaScript dependencies and build assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install matching PostgreSQL backup tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          echo '/usr/lib/postgresql/16/bin' >> "$GITHUB_PATH"
+
+      - name: Check PHP syntax
+        run: |
+          while IFS= read -r -d '' file; do
+            php -l "$file" >/dev/null || exit 1
+          done < <(find app bootstrap config database routes tests -name '*.php' -print0)
+
+      - name: Verify migrations, rollback and reference seeding
+        run: |
+          php artisan migrate --env=testing --force --no-interaction
+          php artisan migrate:rollback --env=testing --force --no-interaction
+          php artisan migrate --env=testing --force --no-interaction
+          php artisan db:seed --class=RoleAndPermissionSeeder --env=testing --force --no-interaction
+
+      # PHPUnit invokes both Node.js PWA suites; npm ci above is required.
+      - name: Run backend and PWA tests
+        run: php artisan test --env=testing --compact --log-junit=test-results/backend.xml 2>&1 | tee test-results/backend.log
+
+      - name: Save test results and failure logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            backend/test-results/
+            backend/storage/logs/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  mobile-tests:
+    name: Flutter analysis & offline tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
     defaults:
       run:
+        shell: bash
         working-directory: mobile
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          persist-credentials: false
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.x'
-          channel: 'stable'
+          flutter-version: '3.44.4'
+          channel: stable
           cache: true
 
-      - name: Get Flutter dependencies
-        run: flutter pub get
+      - name: Install native SQLite for offline tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libsqlite3-0
 
-      - name: Analyze Flutter codebase
-        run: flutter analyze --no-fatal-infos
+      - name: Install locked Flutter dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze Flutter code
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        run: |
+          mkdir -p test-results
+          flutter test --reporter expanded 2>&1 | tee test-results/flutter.log
+
+      - name: Save Flutter test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-test-results
+          path: mobile/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
