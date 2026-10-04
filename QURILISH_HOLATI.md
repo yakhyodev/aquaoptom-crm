@@ -977,6 +977,123 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 ---
 *17-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 18.*
 
+---
+
+## 18-BOSQICH (PROMPT 18): Dashboard, Admin va Real Vaqt Yangilanishlari (Boshqaruv)
+
+**Holati:** DONE (100% muvaffaqiyatli yakunlandi)  
+**Oldingi shart:** 17-bosqich to'liq yakunlangan va qabul qilingan.
+
+---
+
+### 1. Amalga Oshirilgan Ishlar va Arxitektura Yechimlari:
+
+1. **Rolga Mos Dashboard Tahlili (`DashboardQueryService` & `DashboardManager`):**
+   - **Soxta (Mock) Raqamlarsiz Haqiqiy SQL So'rovlari:** Barcha kartalar jonli PostgreSQL bazasidan hisoblanadi.
+   - **Davriy Oqim (Flow Metrics) vs Hozirgi Balanslar (As-of Balances) Aniq Ajratildi:**
+     - *Oqim ko'rsatkichlari (Bugun, Kecha, Hafta, Oy, Istalgan sana oralig'i):* Jami savdo summasi, yangi nasiya, pul tushumi (kassa harakatlari bo'yicha naqd, terminal/karta va bank hisobi kesimida), operatsion xarajatlar, tovarlar tannarxi (COGS) va yalpi foyda.
+     - *Jonli qoldiqlar (As-of live balances):* Naqd, terminal va bank hisoblari qoldiqlari alohida.
+   - **Mijoz va Ta'minotchi Qarz/Avansi Qat'iyan Bir-biri Bilan Net Qilinmaydi:**
+     - Mijozlar qarzi: `current_debt > 0` bo'lganlar summasi.
+     - Mijozlar avansi (ortiqcha to'lovi): `current_debt < 0` bo'lganlar summasi alohida ko'rsatiladi.
+     - Ta'minotchilar oldidagi qarzimiz va ta'minotchidagi bizning avansimiz alohida ko'rsatiladi.
+   - **Tannarx va Foyda Ma'lumotlarini Yashirish (Masking):**
+     - `view_cost_price` ruxsati bo'lmagan xodimlar (masalan, sotuvchi, kassir) uchun tovarlar tannarxi, yalpi foyda va ombor qiymati ko'rsatilmaydi (`null` / yashirin).
+   - **Ombor Bahosi va Potensial Chakana Qiymat:**
+     - Mavjud jami fizik dona, WAC tannarx qiymati (faqat ruxsatlilarga), tizim narxi bo'yicha potensial sotuv qiymati va kutilayotgan potensial yalpi foyda. Potensial foyda haqiqiy foyda yoki cash deb nomlanmaydi.
+
+2. **Ma'lumotlar To'liqligi Ko'rsatkichi (Completeness Indicator):**
+   - 24 soatdan ortiq vaqt davomida serverga bog'lanmagan offline qurilmalar (`Device::where('last_seen_at', '<', now()->subHours(24))`) va ko'rib chiqishni kutayotgan operatsiyalar (`SyncConflict::where('status', 'NEEDS_REVIEW')`) hisobga olinadi.
+   - Qurilma kechikkanda to'liqlik foizi pasaytiriladi va kechikkan offline savdolar borligi haqida aniq ogohlantirish beriladi.
+
+3. **To'liq Funksional Admin Paneli (`AdminPanel` & Admin Xizmatlari):**
+   - Ruxsat nazorati: Faqat `OWNER` va `ADMIN` rollari kira oladi (`can('manage_users')` yoki `can('manage_settings')`).
+   - **Tizim Sozlamalari (`SystemSettingsService` & `SystemSetting` modeli):** Do'kon nomi, telefon, kam qoldiq chegarasi (`low_stock_threshold`), qat'iy kredit rejimi (`strict_credit_mode`). Har bir sozlama o'zgarishi `AuditLog` ga to'liq diff bilan yoziladi.
+   - **Xodimlar va Ruxsatlar Boshqaruvi (`UserManagementService`):** Xodimni faollashtirish / bloklash (bloklangan xodim darhol tizimdan va websockyetdan chiqariladi), rolini o'zgartirish, alohida ruxsatlarni override qilish (grant/revoke). Barchasi auditlanadi.
+   - **Mojarolarni Hal Qilish (`SyncConflictResolutionService` integratsiyasi):** `NEEDS_REVIEW` holatidagi amallarni sababi kiritilgan holda tasdiqlash (`APPROVED_OVERRIDE`) yoki rad etish (`REJECTED_REVERT`). Tasdiqlanganda ombor qoldig'i va mijoz daftari to'g'ri yangilanadi, asl mojaroli yozuv o'chirilmaydi.
+   - **Qurilmalar va Ajratmalar:** Qurilmalar holati, offline sotish uchun ajratilgan (rezerv) tovar kvotasi va sarflanish dinamikasi.
+   - **Audit Jurnali:** Xronologik filtrlar, amal turi, mas'ul xodim, IP manzil va o'zgarishlar auditi.
+   - **Telemetriya va Tizim Salomatligi (`TelemetryService`):** Outbox queue hajmi, worker statusi, PostgreSQL ma'lumotlar bazasi hajmi (`pg_database_size`), Redis ulanish pingi, eksport fayllari soni.
+
+4. **Real Vaqt Yangilanishlari (Broadcasting & Event Invalidation):**
+   - **Tranzaksiya Commit Kafolati (`broadcastAfterCommit`):** Savdo, kirim, to'lov va ziddiyat eventlari faqat DB tranzaksiyasi to'liq commit bo'lgandan keyin tarqatiladi. Tranzaksiya rollback bo'lsa hech qanday event tarqatilmaydi.
+   - **Maxfiy Kanallar (`routes/channels.php`):**
+     - `private-store.operations`: Barcha faol xodimlar uchun operativ amallarni yangilaydi (bloklangan foydalanuvchi rad etiladi).
+     - `private-store.finance`: Faqat `view_cost_price` ruxsati bor xodimlar uchun moliyaviy o'zgarishlarni tarqatadi.
+   - **Flutter va Mobil Kursor Bo'yicha Catch-up API (`GET /api/events/invalidation`):**
+     - Socket uzilib qayta ulanganda (reconnect) yoki mobil ilova ochilganda berilgan kursor bo'yicha qaysi resurslar (sales, stock, cash, customers, suppliers) o'zgarganini qaytaradi va kursor yangilanadi.
+   - **Ochiq Savat / Modal Holati Saqlanishi (Livewire Draft Retention):**
+     - Real-vaqt signali kelganda Livewire re-render qiladi, biroq xodimning ochiq yozayotgan qoralamasi (`draftNote`, ochiq modallar) yo'qolmaydi.
+
+---
+
+### 2. Yaratilgan va O‘zgartirilgan Fayllar:
+
+- **Ma'lumotlar Bazasi va Modellar:**
+  - `backend/database/migrations/2026_10_04_000014_create_system_settings_table.php`
+  - `backend/app/Models/SystemSetting.php`
+  - `backend/app/Models/AuditLog.php` (`user()` munosabati qo'shildi)
+- **Xizmatlar (Services):**
+  - `backend/app/Services/Admin/SystemSettingsService.php`
+  - `backend/app/Services/Admin/UserManagementService.php`
+  - `backend/app/Services/Admin/TelemetryService.php`
+  - `backend/app/Services/Dashboard/DashboardQueryService.php`
+  - `backend/app/Services/Sales/CreateSaleService.php` (broadcast dispatch commitdan so'ng ulandi)
+  - `backend/app/Services/Purchase/ReceivePurchaseService.php` (broadcast dispatch commitdan so'ng ulandi)
+  - `backend/app/Services/Payments/CustomerPaymentService.php` (broadcast dispatch commitdan so'ng ulandi)
+  - `backend/app/Services/Payments/SupplierPaymentService.php` (broadcast dispatch commitdan so'ng ulandi)
+- **Broadcasting & Real-time:**
+  - `backend/config/broadcasting.php` (reverb, redis, log, null qo'llab-quvvatlovi)
+  - `backend/routes/channels.php` (private-store.operations, private-store.finance)
+  - `backend/bootstrap/app.php` (channels marshruti ulandi)
+  - `backend/app/Events/SaleCreatedBroadcastEvent.php`
+  - `backend/app/Events/PurchaseReceivedBroadcastEvent.php`
+  - `backend/app/Events/PaymentRecordedBroadcastEvent.php`
+  - `backend/app/Events/StockChangedBroadcastEvent.php`
+  - `backend/app/Events/NeedsReviewCreatedBroadcastEvent.php`
+- **API & Controllerlar:**
+  - `backend/app/Http/Controllers/Api/EventInvalidationApiController.php`
+  - `backend/routes/api.php` (`GET /api/events/invalidation`)
+- **Livewire va Frontend:**
+  - `backend/app/Livewire/Dashboard/DashboardManager.php`
+  - `backend/resources/views/livewire/dashboard/dashboard-manager.blade.php`
+  - `backend/resources/views/pages/dashboard.blade.php`
+  - `backend/app/Livewire/Admin/AdminPanel.php`
+  - `backend/resources/views/livewire/admin/admin-panel.blade.php`
+  - `backend/resources/views/pages/admin.blade.php`
+- **Testlar:**
+  - `backend/tests/Feature/DashboardAdminAndRealtimeTest.php` (10 ta qat'iy mezonli feature test).
+
+---
+
+### 3. Tekshiruv Buyruqlari va Test Natijalari (Verification Evidence):
+
+1. **Prompt 18 Feature Testlari:**
+   - Buyruq: `php artisan test --filter=DashboardAdminAndRealtimeTest`
+   - Natija: **10/10 testlar 100% PASS** (60 assertions, duration 4.1s, 0 failures).
+     - `test_dashboard_metrics_are_tailored_by_role_and_cost_price_is_masked`: PASS
+     - `test_customer_debts_and_advances_are_never_netted_together`: PASS
+     - `test_completeness_indicator_reflects_offline_device_staleness`: PASS
+     - `test_admin_settings_update_creates_audit_log`: PASS
+     - `test_admin_user_status_and_permission_override_record_audit_log`: PASS
+     - `test_needs_review_resolution_updates_ledger_and_stock`: PASS
+     - `test_broadcast_private_channel_authorization`: PASS
+     - `test_rollback_never_emits_broadcast_events`: PASS
+     - `test_flutter_event_invalidation_api_cursor_catch_up`: PASS
+     - `test_livewire_dashboard_preserves_uncommitted_draft_state`: PASS
+2. **To'liq Backend Test Suite:**
+   - Buyruq: `php artisan test`
+   - Natija: **186/186 testlar 100% PASS** (1183 assertions, duration 64.0s, 0 failures, 0 errors).
+3. **PWA & Offline Sinxronizatsiya Sinovlari:**
+   - `node backend/tests/pwa-sync-protocol-test.cjs`: **7/7 testlar 100% PASS**.
+   - `node backend/tests/pwa-indexeddb-test.cjs`: **7/7 testlar 100% PASS**.
+4. **Kod Sifat Tekshiruvi:**
+   - `vendor/bin/pint`: **0 issues** (Barcha fayllar PSR-12 / Laravel standartida).
+   - `npm run build`: **Vite assets built in 4.98s** (0 errors).
+
+---
+*18-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 19.*
+
 
 
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Payments;
 
+use App\Events\PaymentRecordedBroadcastEvent;
 use App\Models\AuditLog;
 use App\Models\CashAccount;
 use App\Models\Customer;
@@ -230,5 +231,18 @@ class CustomerPaymentService
             },
             actorId: $userId
         );
+
+        if (isset($result['payment_id'])) {
+            $payment = Payment::find($result['payment_id']);
+            if ($payment) {
+                try {
+                    broadcast(new PaymentRecordedBroadcastEvent($payment));
+                } catch (\Throwable $e) {
+                    // Broadcasting xatosi commit bo'lgan to'lovni buzmaydi
+                }
+            }
+        }
+
+        return $result;
     }
 }

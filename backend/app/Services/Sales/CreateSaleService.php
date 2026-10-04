@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Events\SaleCreatedBroadcastEvent;
 use App\Models\CashAccount;
 use App\Models\CreditAllocation;
 use App\Models\Customer;
@@ -641,7 +642,15 @@ class CreateSaleService
         );
 
         // Qaytarishda yangilangan Sale modelini to'liq aloqalari bilan yuklaymiz
-        return Sale::with(['items.variant.product', 'items.variant.volume', 'customer', 'cashAccount'])->find($resultData['sale_id']);
+        $sale = Sale::with(['items.variant.product', 'items.variant.volume', 'customer', 'cashAccount'])->find($resultData['sale_id']);
+
+        try {
+            broadcast(new SaleCreatedBroadcastEvent($sale));
+        } catch (\Throwable $e) {
+            // Broadcasting xatosi commit bo'lgan savdoni buzmasligi kerak
+        }
+
+        return $sale;
     }
 
     /**

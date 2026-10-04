@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\EventInvalidationApiController;
 use App\Http\Controllers\Api\OperationApiController;
 use App\Http\Controllers\Api\SyncApiController;
 use Illuminate\Support\Facades\Route;
@@ -49,4 +50,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:manage_devices');
     Route::post('/sync/conflicts/{id}/resolve', [SyncApiController::class, 'resolveConflict'])
         ->middleware('permission:manage_devices');
+
+    // Event Invalidation for Mobile (Flutter) and PWA (Prompt 18)
+    Route::get('/events/invalidation', [EventInvalidationApiController::class, 'index']);
 });

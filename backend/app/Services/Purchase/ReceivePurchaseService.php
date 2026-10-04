@@ -2,6 +2,7 @@
 
 namespace App\Services\Purchase;
 
+use App\Events\PurchaseReceivedBroadcastEvent;
 use App\Models\Payment;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -351,6 +352,15 @@ class ReceivePurchaseService
 
         $res['id'] = $res['purchase_id'] ?? null;
         $res['status'] = 'POSTED';
+
+        $purchase = Purchase::with(['supplier', 'items.variant.product'])->find($res['purchase_id']);
+        if ($purchase) {
+            try {
+                broadcast(new PurchaseReceivedBroadcastEvent($purchase));
+            } catch (\Throwable $e) {
+                // Broadcasting xatosi commit bo'lgan kirimni buzmaydi
+            }
+        }
 
         return new Fluent($res);
     }
