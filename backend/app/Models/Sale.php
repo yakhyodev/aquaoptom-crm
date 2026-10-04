@@ -33,6 +33,7 @@ class Sale extends Model
         'posted_at',
         'device_created_at',
         'received_at',
+        'created_at',
     ];
 
     protected $casts = [

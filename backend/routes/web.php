@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\Auth\WebAuthController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\TelegramController;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,11 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/hisobotlar', function () {
         return view('pages.reports');
     })->name('reports.index')->middleware('permission:view_reports');
+
+    // 6.1. Hisobotlarni yuklab olish (Ruxsatli: export_reports)
+    Route::get('/exports/download/{uuid}', [ReportExportController::class, 'download'])
+        ->name('exports.download')
+        ->middleware('permission:export_reports');
 
     // 7. Kassa va xarajatlar (Ruxsatli: view_cash)
     Route::get('/kassa', function () {

@@ -113,6 +113,12 @@ class RoleAndPermissionSeeder extends Seeder
                 'description' => 'Savdo dinamikasi, rentabellik va davriy hisobotlarni ko\'rish',
             ],
             [
+                'name' => 'export_reports',
+                'display_name' => 'Hisobotlarni eksport qilish',
+                'category' => 'reports',
+                'description' => 'Excel va PDF formatida hisobotlarni yuklab olish huquqi',
+            ],
+            [
                 'name' => 'manage_users',
                 'display_name' => 'Xodimlarni boshqarish',
                 'category' => 'admin',
@@ -181,6 +187,7 @@ class RoleAndPermissionSeeder extends Seeder
                     'offline_sales',
                     'manage_users',
                     'view_reports',
+                    'export_reports',
                     'receive_stock',
                     'stock_adjustment',
                     'view_cash',

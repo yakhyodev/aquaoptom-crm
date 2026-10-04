@@ -87,7 +87,7 @@
 | **13** | **PWA lokal baza va internetsiz sotuv** | Offline PWA | **DONE** | Standalone PWA manifest (`manifest.json`), Service Worker (`sw.js`, app shell cache, network-only offline JSON fallback), `AquaOptomDB` IndexedDB sxemasi (9 ta store), Pure JS/Alpine.js offline POS (`aqua-pos.js`, `aqua-db.js`, Livewire online qoladi), atomik lokal savdo tranzaksiyasi (quota, credit, sale, outbox, draft clearing bitta IndexedDB tranzaksiyada), mijoz UUID, PIN lock, ko‘p tabli BroadcastChannel sinxronizatsiyasi, favqulodda JSON eksport; 7/7 JS unit testlari (Node.js + fake-indexeddb), 7/7 Feature testlari va 129/129 to'liq tizim testlari 100% o'tdi. | 14-bosqichni boshlash |
 | **14** | **PWA avtomatik sync va uzilish sinovlari** | Offline PWA | **DONE** | IndexedDB navbatini API bilan ulash: server health tekshirish (`/api/health`, `/api/sync/health`), pending batch push (`/api/sync/push`), ACK'ni lokal atomik yozish (`applyPushResults`), cursor pull (`applyPulledChanges`) va qolgan pending overlay hisobi (`getPendingOverlay`); avtomatik sinxronizatsiya triggerlari (`online`, `visibilitychange`, window `focus`, 30s interval, qo'lda sync tugmasi, Service Worker Background Sync API); ko'p tabli poyga holatini oldini olish uchun multi-tab mutex lock (`acquireSyncLock` / `releaseSyncLock`, 30s stale recovery bilan); asl `operation_id` va payload bilan idempotent replay (tarmoq uzilishi va timeoutda qayta jo'natilganda dublikatsiz `RETRY_SUCCESS`); xavfsiz retention (ACK bo'lgan chek va payloadlar outbox'dan o'chirib yuborilmaydi, status `APPLIED` qilinadi, favqulodda tiklash uchun saqlanadi); offline savdoni bekor qilish (`VOID_SALE` / `CANCEL_SALE`, asl `original_operation_id` ga bog'lanadi, navbatdan o'chirilmaydi, ombor/kassa/mijoz qaytariladi); `NEEDS_REVIEW` holati va tushuntirish modal oynasi; 7/7 JS unit testlari (Node.js + fake-indexeddb), 6/6 Feature testlari, 135/135 to'liq tizim testlari 100% o'tdi. | 15-bosqichni boshlash |
 | **16** | **Qaytarish, brak, inventarizatsiya va tuzatish** | Tahlil va nazorat | **DONE** | Original savdo/kirimga bog'langan qisman/to'liq return, sotilgandan ko'p qaytarish yo'qligi, original narx va snapshot tannarx, kasrli rounding yopilishi, brak tovar sotiladigan qoldiqqa qo'shilmasligi; mijoz signed balansi va refund/cash qayta hisobi (naqd va qarzni bir vaqtda kamaytirmaslik); ta'minotchi qaytarishida commercial credit va WAC chiqimi farqi; brak faqat WAC tannarx yo'qotishi (kassa harakati/xarajati emas); inventarizatsiya prepare->freeze ACK->sanash->apply sikli, uzilgan qurilma freeze guard (`DeviceFreezePendingException`), ortiqcha/kamomad tuzatish daftari, posted hujjatlar o'zgarmasligi (`DocumentImmutableException`); 16/16 Feature testlari (57 assertions) va 164/164 to'liq backend testlari (1064 assertions) 100% o'tdi. | 17-bosqichni boshlash |
-| 17 | Savdo tarixi, hisobotlar va eksportlar | Tahlil va nazorat | TODO | - | Tahlil, sana filtrlari, Excel/PDF eksport |
+| **17** | **Savdo tarixi, hisobotlar va eksportlar** | Tahlil va nazorat | **DONE** | Bugun/kecha/hafta/oy/sana-oraliq/yil+oy (UTC saqlash, Asia/Tashkent kun chegaralari); dastlabki paid/debt snapshot bilan keyingi to'lov aralashmasligi, soxta invoice paid allocation taqiqlanishi (sentabr savdosi 100k qarz va oktabr 100k qarz to'lovi ikki davrda aniq ajratilishi, cash/debt double-count yo'qligi); umumiy hisobotlar so'rov kontrakti (Savdo tahlili, P&L, Kirim/Ta'minotchi, Ombor qoldig'i/Valuation ledgerdan, Taraf ko'chirmalari, Kassa/Smenalar, Xodimlar, Qurilma sync); paginatsiya va eksport totals 100% bir xilligi; CSV formula inyeksiyasidan himoya ('=, +, -, @, \t, \r); ruxsatli (/exports/download/{uuid}) CSV va DomPDF oqimli eksport; 12/12 Feature testlari va 176/176 to'liq backend testlari 100% o'tdi. | 18-bosqichni boshlash |
 | 18 | Dashboard, Admin va real vaqt yangilanishlari | Boshqaruv | TODO | - | Reverb/Echo real-vaqt, dashboard kartalari, audit |
 | 19 | Telegram orqali ko‘rish, kirim, sotuv va to‘lov | Telegram | TODO | - | Bot webhook, xodim bog‘lash, tugmali operatsiyalar |
 | 20 | Flutter Android: kirish va online biznes oynalari | Mobil ilova | TODO | - | API client, offline smoke test, counter test almashtirish |
@@ -884,6 +884,98 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 
 ---
 *16-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 17.*
+
+---
+
+## 23. Prompt 17 — Savdo tarixi, hisobotlar va eksportlar (Bajarildi)
+
+### 1. Arxitektura Qarorlari va Bajarilgan Ishlar:
+1. **Sana va Vaqt Chegaralari (`ReportPeriod`):**
+   - Barcha ma'lumotlar bazasi so'rovlari UTC vaqtida bajariladi, biroq kun, hafta, oy va yil chegaralari `Asia/Tashkent` (+05:00) mahalliy vaqt mintaqasi bo'yicha to'liq `00:00:00` dan `23:59:59.999999` gacha hisoblanadi.
+   - Qo'llab-quvvatlanadigan presetlar: `today`, `yesterday`, `this_week`, `this_month`, `last_month`, `this_year`, `month` (masalan, `2026-09`), `custom` (`from_date` va `to_date`).
+2. **Savdo Tarixi va To'lovlar Taqsimoti Qoidasi:**
+   - Dastlabki savdo cheki snapshotidagi to'langan va nasiya miqdorlari (`paid_amount`, `debt_amount`) keyingi umumiy mijoz to'lovlari bilan aslo aralashtirilmaydi.
+   - Soxta invoice-level allocation to'qilmaydi.
+   - **Qabul mezonining asosiy talabi:** Sentabrda rasmiylashtirilgan 100 000 so'mlik nasiya savdo va oktabrda kelib to'langan 100 000 so'mlik qarz to'lovi ikki alohida davrda to'liq ajratildi. Naqd pul va qarz hech qachon takror (double-count) hisoblanmaydi.
+3. **Boshqaruv Hisobotlarining Umumiy So'rov Kontrakti (`ReportQueryService`):**
+   - **Savdo Tahlili (Sales Summary):** Brutto/sof tushum, POS naqd/karta/bank, cheklar soni, o'rtacha chek, tovarlar va variantlar kesimidagi sotuv, kunlik trend dinamikasi.
+   - **Yalpi va Operatsion Natija (Profit & Loss):** Sof savdo, WAC tannarx (COGS — yaroqli qaytarishlar chegirilgan), Yalpi foyda va marja %, Operatsion xarajatlar (`cash_movements` da `type = 'EXPENSE'`), Brak yo'qotishi (`DamageRecord` posted loss), Sof operatsion foyda va rentabellik %. **Egasi pul yechishi (`OWNER_WITHDRAWAL` / `OWNER_DRAW`) operatsion xarajat hisoblanmaydi!** `view_cost_price` ruxsati bo'lmagan xodim uchun tannarx va foyda to'liq yashiriladi (masking).
+   - **Kirim va Ta'minotchilar (Purchases):** Kirim qilingan partiyalar, to'langan va qarz, ta'minotchiga qaytarishlar krediti, sof kirim.
+   - **Tarixiy Ombor Qoldig'i (Stock & Valuation):** Qat'iy buxgalteriya qoidasi: Davr boshi va yakuni qoldiqlari hozirgi jonli snapshotdan emas, balki rasmiy ombor harakatlari daftari (`inventory_movements`) bo'yicha retrospektiv hisoblanadi.
+   - **Taraf Ko'chirmalari (Customer & Supplier Statements):** Davr boshi signed balansi, debetlar, kreditlar, davr yakuni balansi hamda xronologik harakatlar daftari.
+   - **Kassa va Smenalar (Cash & Sessions):** Hisoblar bo'yicha boshlang'ich kassa, kirim, chiqim, yakuniy kassa hamda kassa smenalari farqlari (`discrepancy`).
+   - **Xodimlar (Staff Performance):** Savdo soni, jami tushum, naqd va nasiya ulushi.
+   - **Qurilmalar va Sinxronizatsiya (Device Sync):** Qurilma turi, statusi, ajratilgan va sarflangan tovar kvotasi, oxirgi aloqa vaqti.
+4. **Paginatsiya va Eksport Totals 100% Bir Xilligi:**
+   - 35 ta savdo yoki ko'p sahifali ro'yxat bo'lganda, sahifa 1 dagi paginator (20 ta element) va tepasidagi KPI summary kartalari butun 35 ta qatorning umumiy summasini jamlaydi.
+   - Eksport qilinganda (CSV/PDF) barcha 35 ta qator to'liq eksport qilinadi, ko'p sahifali data yo'qolmaydi.
+5. **Eksport Xavfsizligi va Formula In'eksiyasidan Himoyalash (CSV/Formula Injection Guard):**
+   - OWASP xavfsizlik standartiga muvofiq, jadval kataklarida `=`, `+`, `-`, `@`, `\t`, `\r` bilan boshlangan har qanday matn spreadsheet tomonidan formula sifatida bajarilib ketmasligi uchun oldiga bitta `'` (single quote) qo'yilib zararsizlantirildi (`escapeFormula`).
+   - Barcha eksport fayllari `storage/app/exports` yopiq papkasida saqlanadi va bevosita public URL orqali ochilmaydi.
+   - Yuklab olish faqat autentifikatsiyalangan va `export_reports` ruxsatiga ega xodimlar uchun `/exports/download/{uuid}` himoyalangan marshrut orqali amalga oshiriladi (begona yoki ruxsatsiz foydalanuvchilar uchun 403 Forbidden).
+   - CSV eksporti UTF-8 BOM (`\xEF\xBB\xBF`) bilan yoziladi va metadata sarlavhasiga ega.
+   - PDF eksporti `barryvdh/laravel-dompdf` orqali formatlangan chiroyli hisobot ko'rinishida generatsiya qilinadi.
+6. **Foydalanuvchi Interfeysi (Livewire):**
+   - `SalesHistory` Livewire komponenti (`pages/sales-history.blade.php`).
+   - `ReportDashboard` 8 ta interaktiv tabga ega Livewire komponenti (`pages/reports.blade.php`).
+
+---
+
+### 2. Yaratilgan va O‘zgartirilgan Fayllar:
+- **Ma'lumotlar Bazasi va Ruxsatlar:**
+  - `backend/database/migrations/2026_10_04_000013_create_report_exports_table.php`
+  - `backend/database/seeders/RoleAndPermissionSeeder.php` (`export_reports` ruxsati OWNER va ADMIN rollariga biriktirildi)
+- **Modellar va Xizmatlar:**
+  - `backend/app/Models/ReportExport.php`
+  - `backend/app/Models/Sale.php` (`created_at` fillable ro'yxatiga qo'shildi)
+  - `backend/app/Services/Reports/ReportPeriod.php`
+  - `backend/app/Services/Reports/ReportQueryService.php`
+  - `backend/app/Services/Reports/ExportService.php`
+  - `backend/app/Services/Reports/Exceptions/UnauthorizedExportException.php`
+- **Controller, Marshrutlar va Shablonlar:**
+  - `backend/app/Http/Controllers/ReportExportController.php`
+  - `backend/routes/web.php`
+  - `backend/resources/views/exports/pdf-report.blade.php`
+  - `backend/app/Livewire/Sales/SalesHistory.php`
+  - `backend/resources/views/livewire/sales/sales-history.blade.php`
+  - `backend/app/Livewire/Reports/ReportDashboard.php`
+  - `backend/resources/views/livewire/reports/report-dashboard.blade.php`
+  - `backend/resources/views/pages/sales-history.blade.php`
+  - `backend/resources/views/pages/reports.blade.php`
+- **Testlar:**
+  - `backend/tests/Feature/SalesHistoryAndReportsTest.php` (12 ta qat'iy mezonli feature test).
+
+---
+
+### 3. Tekshiruv Buyruqlari va Test Natijalari (Verification Evidence):
+1. **Prompt 17 Feature Testlari:**
+   - Buyruq: `php artisan test tests/Feature/SalesHistoryAndReportsTest.php`
+   - Natija: **12/12 testlar 100% PASS** (59 assertions, duration 16.5s).
+     - `test_period_resolution_and_asia_tashkent_boundaries`: PASS
+     - `test_september_sale_and_october_debt_payment_do_not_double_count`: PASS
+     - `test_pagination_and_export_produce_identical_totals_across_all_pages`: PASS
+     - `test_formula_injection_escaping_protects_spreadsheets`: PASS
+     - `test_export_file_download_is_protected_and_unauthorized_user_gets_403`: PASS
+     - `test_user_without_export_permission_cannot_initiate_export`: PASS
+     - `test_csv_export_contains_utf8_bom_and_header_metadata`: PASS
+     - `test_pdf_export_is_generated_and_contains_valid_pdf_stream`: PASS
+     - `test_inventory_valuation_report_uses_historical_ledger_movements`: PASS
+     - `test_profit_and_loss_excludes_owner_draw_from_operating_expenses`: PASS
+     - `test_pnl_is_masked_when_view_cost_price_is_denied`: PASS
+     - `test_livewire_report_dashboard_renders_and_switches_tabs`: PASS
+2. **To'liq Backend Test Suite:**
+   - Buyruq: `php artisan test`
+   - Natija: **176/176 testlar 100% PASS** (1123 assertions, duration 57.0s, 0 failures, 0 errors).
+3. **PWA & Offline Sinxronizatsiya Sinovlari:**
+   - `node backend/tests/pwa-sync-protocol-test.cjs`: **7/7 testlar 100% PASS**.
+   - `node backend/tests/pwa-indexeddb-test.cjs`: **7/7 testlar 100% PASS**.
+4. **Kod Sifat Tekshiruvi:**
+   - `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - `flutter analyze`: **No issues found!** (ran in 14.6s).
+   - `npm run build`: **Vite assets built in 5.47s** (0 errors).
+
+---
+*17-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 18.*
 
 
 
