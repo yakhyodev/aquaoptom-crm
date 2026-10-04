@@ -1,0 +1,59 @@
+name: Web Preview UI Check
+on:
+  workflow_dispatch:
+    inputs:
+      preview_run_id:
+        description: Run ID of the active Temporary Web Preview
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PREVIEW_OWNER_PASSWORD: ${{ secrets.AQUAOPTOM_PREVIEW_OWNER_PASSWORD }}
+      PREVIEW_RUN_ID: ${{ inputs.preview_run_id }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Locate trusted preview
+        run: |
+          [[ "$PREVIEW_RUN_ID" =~ ^[0-9]+$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREVIEW_RUN_ID" > "$RUNNER_TEMP/preview-run.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          run = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'preview-run.json').read_text())
+          assert run['name'] == 'Temporary Web Preview' and run['event'] == 'workflow_dispatch'
+          assert run['repository']['full_name'] == os.environ['GITHUB_REPOSITORY']
+          PY
+          gh run download "$PREVIEW_RUN_ID" --repo "$GITHUB_REPOSITORY" --name aquaoptom-web-preview-info --dir "$RUNNER_TEMP/preview-info"
+          python3 - <<'PY'
+          import json, os, pathlib, re
+          info = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'preview-info/connection.json').read_text())
+          assert info['temporary'] and not info['data_persistent']
+          assert info['login'] == 'owner@preview.aquaoptom.test'
+          assert re.fullmatch(r'https://[a-z0-9-]+\.trycloudflare\.com', info['url'])
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('PREVIEW_URL=' + info['url'] + '\n')
+          PY
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - name: Install isolated browser tooling on GitHub runner
+        run: |
+          npm install --prefix "$RUNNER_TEMP/preview-browser" --no-save playwright@1.63.0
+          node "$RUNNER_TEMP/preview-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Verify forms and text contrast without creating business data
+        run: NODE_PATH="$RUNNER_TEMP/preview-browser/node_modules" node backend/tests/web-preview-ui.cjs
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: web-preview-ui-evidence
+          path: ui-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
