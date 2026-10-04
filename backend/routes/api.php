@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\EventInvalidationApiController;
 use App\Http\Controllers\Api\OperationApiController;
 use App\Http\Controllers\Api\SyncApiController;
+use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -54,3 +55,6 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Event Invalidation for Mobile (Flutter) and PWA (Prompt 18)
     Route::get('/events/invalidation', [EventInvalidationApiController::class, 'index']);
 });
+
+// Telegram Bot Webhook
+Route::post('/telegram/webhook', [TelegramController::class, 'webhook']);

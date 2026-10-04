@@ -156,4 +156,28 @@ class UserManagementService
 
         return $user;
     }
+
+    /**
+     * Foydalanuvchiga Telegram Chat ID biriktirish yoki uzish.
+     */
+    public function updateTelegramChatId(User $targetUser, ?int $chatId, ?string $username, User $admin): User
+    {
+        $oldChatId = $targetUser->telegram_chat_id;
+        $targetUser->telegram_chat_id = $chatId;
+        $targetUser->telegram_username = $username;
+        $targetUser->save();
+
+        AuditLog::create([
+            'user_id' => $admin->id,
+            'action' => 'USER_TELEGRAM_LINKED',
+            'auditable_type' => User::class,
+            'auditable_id' => $targetUser->id,
+            'old_values' => ['telegram_chat_id' => $oldChatId],
+            'new_values' => ['telegram_chat_id' => $chatId, 'telegram_username' => $username],
+            'ip_address' => request()->ip() ?? '127.0.0.1',
+            'created_at' => now(),
+        ]);
+
+        return $targetUser;
+    }
 }

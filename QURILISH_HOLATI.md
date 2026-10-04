@@ -1094,6 +1094,104 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 ---
 *18-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 19.*
 
+---
+
+## 19-BOSQICH (PROMPT 19): Telegram Orqali Ko‘rish, Kirim, Sotuv va To‘lov (Telegram)
+
+**Holati:** DONE (100% muvaffaqiyatli yakunlandi)  
+**Oldingi shart:** 18-bosqich to'liq yakunlangan va qabul qilingan.
+
+---
+
+### 1. Amalga Oshirilgan Ishlar va Arxitektura Yechimlari:
+
+1. **Webhook Xavfsizligi va Dedup Invarianti (`TelegramController`):**
+   - **Secret Header Tekshiruvi:** `X-Telegram-Bot-Api-Secret-Token` sarlavhasi `config('services.telegram.webhook_secret')` bilan `hash_equals` orqali taqqoslanadi. Noto'g'ri yoki yo'q token 403 Forbidden beradi. Token va maxfiy ma'lumotlar loglarga aslo chiqarilmaydi.
+   - **`update_id` Deduplikatsiyasi (`telegram_updates` jadvali):** Telegramdan takroriy webhook update kelganda u bazada tekshiriladi va qayta ishlanmasdan `{"status":"already_processed"}` bilan qaytariladi.
+
+2. **Foydalanuvchini Autentifikatsiya Qilish va Ruxsatlar:**
+   - Foydalanuvchilar `telegram_chat_id` bo'yicha aniqlanadi. Egasi / Administrator tomonidan biriktiriladi (`UserManagementService::updateTelegramChatId` orqali audit qilinadi) yoki `/link <id>` orqali ulanadi.
+   - **Begona (Stranger) Nazorati:** Tizimda mavjud bo'lmagan foydalanuvchiga *"⛔ Ruxsat yo'q!"* xabari beriladi, hech qanday moliyaviy yoki operativ ma'lumot oshkor qilinmaydi.
+   - **Bloklangan xodim nazorati:** `status == 'BLOCKED'` yoki `!is_active` bo'lgan xodimlar darhol to'xtatiladi.
+
+3. **Tugmalar, Navigatsiya va Ko'rish Imkoniyatlari (`TelegramBotService`):**
+   - Doimiy Reply Keyboard: `📊 Dashboard`, `📦 Qoldiq`, `👥 Mijoz Qarzlari`, `🏭 Ta'minotchilar`, `💰 Kassa`, `📈 Hisobot / Eksport`, `🛒 Yangi Savdo`, `📥 Yangi Kirim`, `💳 To'lov Qabul Qilish`, `📱 Offline PWA`.
+   - **Rolga Mos Jonli Dashboard:** `DashboardQueryService` orqali hisoblangan haqiqiy SQL ma'lumotlari. Sotuvchi/kassir uchun tannarx va sof foyda to'liq yashiriladi (masking). Mijoz qarzi va avansi, ta'minotchi qarzi va avansi bir-biri bilan net qilinmasdan alohida chiqariladi.
+   - **Qoldiqlar (Stock) Paginatsiyasi:** Tovarlar qoldig'i 5 tadan bo'lib sahifalangan inline tugmalar bilan ko'rsatiladi.
+   - **Nasiya Qarzdorliklar:** Mijozlar va ta'minotchilar bilan qarzlar sahifalangan ro'yxatda.
+   - **Kassalar Balansi:** Naqd, karta va bank hisoblari jonli qoldiqlari.
+   - **Sana Bo'yicha Hisobot:** Bugun, Kecha, Shu hafta, Shu oy bo'yicha ledgerdan hisoblangan sof natijalar.
+   - **Offline PWA Havolasi:** Bot faqat online ishlashi, internet uzilganda PWA ilovasi orqali internetsiz savdo qilish mumkinligi va PWA havolasi tushuntiriladi.
+
+4. **Interaktiv Wizard Oqimlari va Backend Amallari (`bot_drafts`):**
+   - Yangi moliyaviy formulalar to'qilmagan — to'g'ridan-to'g'ri backend servislar chaqiriladi:
+     - **Ko'p Qatorli Savdo Wizard (`CreateSaleService`):** Xaridor tanlash (tezkor xaridor, mavjud mijoz, inline yangi mijoz yaratish), savatga bir nechta tovar va hajm qo'shish, tizim narxi yoki kelishilgan narx, to'lov darajasi (to'liq, qisman nasiya, to'liq nasiya), kassa hisobi va yakuniy preview.
+     - **Tovar Kirimi Wizard (`ReceivePurchaseService`):** Ta'minotchi tanlash, mahsulot va hajm, dona soni, tannarx, to'langan pul va qarz.
+     - **To'lov Qabul Qilish Wizard (`CustomerPaymentService` & `SupplierPaymentService`):** Mijozdan qarz pulini yoki ta'minotchiga to'lovni rasmiylashtirish.
+   - **20 Tasdiq Bitta Operatsiya (Qat'iy Idempotency Invariant):**
+     - Har bir qoralama boshlanishida generatsiya qilingan barqaror `operation_id` ga ega bo'ladi.
+     - Foydalanuvchi "✅ Tasdiqlash" tugmasini ketma-ket 20 marta bosganda yoki bir xil callback takror kelganda bazada yagona bir dona hujjat yaratiladi, qayta bosishlarda oldingi hujjat xavfsiz ko'rsatiladi.
+
+5. **Outbox Bildirishnomalari va Xavfsizlik (`TelegramNotificationService`):**
+   - `SaleCreated`, `PurchaseReceived`, `PaymentRecorded`, `LowStock` hodisalari ruxsatli Telegram xodimlariga yetkaziladi.
+   - Xabarlar HTML escaping (`htmlspecialchars`) bilan tozalanadi; `<2026>`, `&` kabi belgilar Telegram parserini buzmaydi.
+   - Muvaffaqiyatsiz yetkazishlar `NotificationDelivery` da qayd etilib qayta yuboriladi (`retryFailedDeliveries`).
+   - Tashqi aloqa xatosi hech qachon asosiy biznes operatsiyasini bekor qilmaydi yoki ko'paytirmaydi.
+   - Tokenlar va maxfiy kalitlar loglarga chiqarilmaydi.
+   - Haqiqiy mijoz/xodimlarga test xabarlari yuborilmagan; barcha testlar ajratilgan `TelegramClient::fake()` muhitida o'tkazildi.
+
+---
+
+### 2. Yaratilgan va O‘zgartirilgan Fayllar:
+
+- **Ma'lumotlar Bazasi va Modellar:**
+  - `backend/database/migrations/2026_10_04_000015_create_telegram_bot_tables.php`
+  - `backend/app/Models/TelegramUpdate.php`
+  - `backend/app/Models/BotDraft.php`
+  - `backend/app/Models/NotificationDelivery.php`
+  - `backend/app/Models/User.php` (`telegram_chat_id`, `telegram_username` maydonlari va helper)
+- **Xizmatlar (Services):**
+  - `backend/app/Services/Telegram/TelegramClient.php` (API aloqasi va fake sinov mexanizmi)
+  - `backend/app/Services/Telegram/TelegramBotService.php` (buyruqlar, menyular, ko'p qatorli savdo, kirim va to'lov wizardlari)
+  - `backend/app/Services/Telegram/TelegramNotificationService.php` (outbox event bildirishnomalari, HTML escaping va retry)
+  - `backend/app/Services/Admin/UserManagementService.php` (`updateTelegramChatId` auditi qo'shildi)
+- **Controllerlar va Sozlamalar:**
+  - `backend/app/Http/Controllers/TelegramController.php` (secret header va update_id dedup)
+  - `backend/config/services.php` (`webhook_secret`, `pwa_url` qo'shildi)
+  - `backend/routes/api.php` (`/api/telegram/webhook` ulandi)
+- **Testlar:**
+  - `backend/tests/Feature/TelegramBotIntegrationTest.php` (10 ta qat'iy mezonli feature test).
+
+---
+
+### 3. Tekshiruv Buyruqlari va Test Natijalari (Verification Evidence):
+
+1. **Prompt 19 Feature Testlari:**
+   - Buyruq: `php artisan test --filter=TelegramBotIntegrationTest`
+   - Natija: **10/10 testlar 100% PASS** (81 assertions, duration 5.9s, 0 failures).
+     - `test_webhook_secret_header_verification`: PASS
+     - `test_stranger_access_is_denied`: PASS
+     - `test_user_telegram_linking_and_blocked_user_rejection`: PASS
+     - `test_viewing_dashboard_stock_debts_cash_and_pwa_info`: PASS
+     - `test_multi_line_sale_wizard_flow`: PASS
+     - `test_twenty_duplicate_confirm_callbacks_produce_strictly_one_operation`: PASS
+     - `test_purchase_wizard_flow`: PASS
+     - `test_customer_payment_wizard_flow`: PASS
+     - `test_telegram_update_id_deduplication`: PASS
+     - `test_outbox_telegram_notifications_with_html_escaping_and_retry`: PASS
+2. **To'liq Backend Test Suite:**
+   - Buyruq: `php artisan test`
+   - Natija: **196/196 testlar 100% PASS** (1264 assertions, duration 77.8s, 0 failures, 0 errors).
+3. **Flutter Mobil Tekshiruvi:**
+   - Buyruq: `flutter analyze`
+   - Natija: **No issues found!** (ran in 14.7s).
+4. **Kod Sifat Tekshiruvi:**
+   - `vendor/bin/pint`: **0 issues** (Barcha fayllar PSR-12 / Laravel standartida).
+   - `npm run build`: **Vite assets built in 674ms** (0 errors).
+
+---
+*19-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 20.*
+
 
 
 

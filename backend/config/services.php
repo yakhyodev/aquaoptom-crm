@@ -38,6 +38,8 @@ return [
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'channel_id' => env('TELEGRAM_CHANNEL_ID'),
+        'webhook_secret' => env('TELEGRAM_WEBHOOK_SECRET', 'test_secret_token_123'),
+        'pwa_url' => env('PWA_URL', env('APP_URL', 'http://127.0.0.1:8000')),
     ],
 
 ];

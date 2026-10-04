@@ -24,7 +24,21 @@ class User extends Authenticatable
         'is_active',
         'phone',
         'current_store_id',
+        'telegram_chat_id',
+        'telegram_username',
     ];
+
+    /**
+     * Telegram chat ID orqali xodimni topish
+     */
+    public static function findByTelegramChatId(int|string|null $chatId): ?self
+    {
+        if (! $chatId) {
+            return null;
+        }
+
+        return static::where('telegram_chat_id', $chatId)->first();
+    }
 
     protected $hidden = [
         'password',
