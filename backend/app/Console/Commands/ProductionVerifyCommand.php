@@ -3,14 +3,6 @@
 namespace App\Console\Commands;
 
 use App\Http\Controllers\Api\HealthController;
-use App\Models\CashAccount;
-use App\Models\Device;
-use App\Models\Product;
-use App\Models\Sale;
-use App\Models\SystemSetting;
-use App\Models\User;
-use App\Models\Warehouse;
-use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -18,15 +10,21 @@ use Illuminate\Support\Facades\File;
 
 class ProductionVerifyCommand extends Command
 {
-    protected $signature = 'app:production-verify';
-    protected $description = 'Perform production-grade readiness, clean state, health probes, and signed artifact audit (Prompt 25)';
+    protected $signature = 'app:production-verify {--expect-empty : Require an unused opening database}';
+
+    protected $description = 'Read-only local release profile checks; does not certify a live deployment or APK signature';
 
     public function handle(): int
     {
-        $this->info("================================================================================");
-        $this->info("   AQUAOPTOM CRM — PRODUCTION RELEASE VERIFICATION & HANDOVER (PROMPT 25)");
-        $this->info("================================================================================");
+        $this->info('================================================================================');
+        $this->info('   AQUAOPTOM CRM — PRODUCTION RELEASE VERIFICATION & HANDOVER (PROMPT 25)');
+        $this->info('================================================================================');
 
+        if (! $this->laravel->environment('production') || config('app.debug') || ! str_starts_with((string) config('app.url'), 'https://')) {
+            $this->error('Production profile requires APP_ENV=production, APP_DEBUG=false and HTTPS APP_URL.');
+
+            return self::FAILURE;
+        }
         $activeDb = DB::connection()->getDatabaseName();
         $this->info("1. Ma'lumotlar Bazasi & Topologiya:");
         $this->line("   - Faol Baza: {$activeDb}");
@@ -34,7 +32,8 @@ class ProductionVerifyCommand extends Command
         $this->line("   - Jadvallar soni: {$tableCount} ta (Kutilgan: 62)");
 
         if ($tableCount < 62) {
-            $this->error("   XATOLIK: Jadvallar soni yetarli emas!");
+            $this->error('   XATOLIK: Jadvallar soni yetarli emas!');
+
             return self::FAILURE;
         }
 
@@ -51,8 +50,9 @@ class ProductionVerifyCommand extends Command
         $this->line("   - Mijozlar qarz yozuvlari (customer_ledger): {$custLedgerCount} ta (Kutilgan: 0)");
         $this->line("   - Kassa harakatlari (cash_movements): {$cashMovCount} ta (Kutilgan: 0)");
 
-        if ($saleCount > 0 || $customerCount > 0 || $productCount > 0) {
-            $this->error("   XATOLIK: Production bazasida soxta/test ma'lumotlar aniqlandi!");
+        if ($this->option('expect-empty') && ($saleCount > 0 || $customerCount > 0 || $productCount > 0 || $custLedgerCount > 0 || $cashMovCount > 0)) {
+            $this->error('   XATOLIK: Baza bo‘sh emas. Yozuvlar soni ularning soxta ekanini isbotlamaydi.');
+
             return self::FAILURE;
         }
 
@@ -72,14 +72,20 @@ class ProductionVerifyCommand extends Command
         $this->info("\n4. Health Probelari (Liveness & Readiness Probes):");
         $healthController = app(HealthController::class);
         $liveness = $healthController->liveness();
-        $readiness = $healthController->readiness(new Request());
+        $readiness = $healthController->readiness(new Request);
         $isLive = $liveness->getStatusCode() === 200;
         $isReady = $readiness->getStatusCode() === 200;
-        $this->line("   - Liveness probe: " . ($isLive ? "HTTP 200 LIVE" : "FAIL"));
-        $this->line("   - Readiness probe: " . ($isReady ? "HTTP 200 READY" : "FAIL"));
+        $this->line('   - Liveness probe: '.($isLive ? 'HTTP 200 LIVE' : 'FAIL'));
+        $this->line('   - Readiness probe: '.($isReady ? 'HTTP 200 READY' : 'FAIL'));
 
-        // 5. Signed Android Release APK Tekshiruvi
-        $this->info("\n5. Mobil Ilova Artefakti (Signed Android Release APK):");
+        if (! $isLive || ! $isReady) {
+            $this->error('Local health checks failed; release profile verification failed.');
+
+            return self::FAILURE;
+        }
+
+        // 5. APK file checksum does not prove signature or source revision.
+        $this->info("\n5. Mobil Ilova Artefakti (Android APK file (signature and source revision NOT VERIFIED)):");
         $apkPath = base_path('../mobile/build/app/outputs/flutter-apk/app-release.apk');
         $hasApk = File::exists($apkPath);
         if ($hasApk) {
@@ -96,11 +102,11 @@ class ProductionVerifyCommand extends Command
 
         // 6. Xulosa
         $this->info("\n================================================================================");
-        $this->info("   PRODUCTION CERTIFICATE: TIZIM TOPSHIRISHGA TO'LIQ TAYYOR");
-        $this->info("================================================================================");
-        $this->line("Versiya: " . config('app.version', '1.0.0'));
-        $this->line("Arxitektura: AquaOptom V2 (62 jadvalli PostgreSQL + Redis + Signed APK)");
-        $this->line("Holati: Pristine Clean Database (Haqiqiy opening data importini kutmoqda)");
+        $this->info('   LOCAL PROFILE CHECKS PASSED — LIVE PRODUCTION NOT VERIFIED');
+        $this->info('================================================================================');
+        $this->line('Versiya: '.config('app.version', '1.0.0'));
+        $this->line('Arxitektura: AquaOptom V2 (PostgreSQL + Redis); APK signing requires separate verification');
+        $this->line('These checks do not prove public HTTPS, workers, real devices, bot delivery, backup RPO/RTO or a deployed release.');
 
         return self::SUCCESS;
     }

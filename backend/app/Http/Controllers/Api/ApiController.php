@@ -548,7 +548,7 @@ class ApiController extends Controller
             $method = strtoupper($validated['payment_method'] ?? 'CASH');
             $opId = $validated['operation_id'] ?? null;
             $notes = $validated['notes'] ?? null;
-            $confirmAdvance = (bool) ($validated['confirm_excess_as_advance'] ?? true);
+            $confirmAdvance = (bool) ($validated['confirm_excess_as_advance'] ?? false);
 
             if ($type === 'customer') {
                 $result = $this->customerPaymentService->execute(

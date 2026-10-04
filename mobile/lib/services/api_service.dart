@@ -395,10 +395,12 @@ class ApiService {
     String paymentMethod = 'CASH',
     String? operationId,
     String? notes,
+    bool confirmExcessAsAdvance = false,
   }) async {
     final body = <String, dynamic>{
       'type': type,
       'party_id': partyId,
+      'confirm_excess_as_advance': confirmExcessAsAdvance,
       'amount': amount,
       'payment_method': paymentMethod,
     };

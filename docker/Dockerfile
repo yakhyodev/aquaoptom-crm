@@ -12,7 +12,6 @@ RUN apk add --no-cache \
     libpq-dev \
     libzip-dev \
     libxml2-dev \
-    lexbor-dev \
     icu-dev \
     oniguruma-dev \
     linux-headers \
@@ -20,17 +19,14 @@ RUN apk add --no-cache \
     nginx \
     postgresql-client
 
-# Install PHP extensions
+# DOM, XML, mbstring and OPcache are built into the official PHP 8.5 image.
+# Install only extensions absent from that image.
 RUN docker-php-ext-install \
-    mbstring \
-    dom \
-    xml \
     pdo_pgsql \
     pgsql \
     bcmath \
     intl \
     zip \
-    opcache \
     pcntl
 
 # Install Redis extension via PECL

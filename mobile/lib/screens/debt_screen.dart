@@ -81,8 +81,13 @@ class _DebtScreenState extends State<DebtScreen>
       text: currentBalance > 0 ? currentBalance.toString() : '',
     );
     final notesCtrl = TextEditingController();
-    int? selectedAccountId = _cashAccounts.isNotEmpty ? _cashAccounts.first.id : null;
+    int? selectedAccountId = _cashAccounts.isNotEmpty
+        ? _cashAccounts.first.id
+        : null;
     String selectedMethod = 'CASH';
+    final opId = OperationId.generate();
+    bool submitting = false;
+    bool confirmAdvance = false;
 
     showDialog(
       context: context,
@@ -91,7 +96,9 @@ class _DebtScreenState extends State<DebtScreen>
           return AlertDialog(
             backgroundColor: const Color(0xFF1E293B),
             title: Text(
-              isCustomer ? 'Mijozdan To\'lov Qabul Qilish' : 'Ta\'minotchiga Qarz To\'lash',
+              isCustomer
+                  ? 'Mijozdan To\'lov Qabul Qilish'
+                  : 'Ta\'minotchiga Qarz To\'lash',
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
             content: SingleChildScrollView(
@@ -102,13 +109,17 @@ class _DebtScreenState extends State<DebtScreen>
                   Text(
                     'Taraf: $partyName',
                     style: const TextStyle(
-                        color: Colors.cyanAccent, fontWeight: FontWeight.bold),
+                      color: Colors.cyanAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Joriy qarz: ${Formatters.formatMoney(currentBalance)}',
                     style: TextStyle(
-                      color: currentBalance > 0 ? Colors.redAccent : Colors.greenAccent,
+                      color: currentBalance > 0
+                          ? Colors.redAccent
+                          : Colors.greenAccent,
                       fontSize: 13,
                     ),
                   ),
@@ -117,6 +128,7 @@ class _DebtScreenState extends State<DebtScreen>
                   // Amount
                   TextField(
                     controller: amountCtrl,
+                    onChanged: (_) => setDlgState(() {}),
                     keyboardType: TextInputType.number,
                     style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
@@ -144,7 +156,9 @@ class _DebtScreenState extends State<DebtScreen>
                     items: _cashAccounts.map((a) {
                       return DropdownMenuItem(
                         value: a.id,
-                        child: Text('${a.name} (${Formatters.formatMoney(a.balance)})'),
+                        child: Text(
+                          '${a.name} (${Formatters.formatMoney(a.balance)})',
+                        ),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -159,26 +173,43 @@ class _DebtScreenState extends State<DebtScreen>
                       ChoiceChip(
                         label: const Text('Naqd'),
                         selected: selectedMethod == 'CASH',
-                        onSelected: (_) => setDlgState(() => selectedMethod = 'CASH'),
+                        onSelected: (_) =>
+                            setDlgState(() => selectedMethod = 'CASH'),
                         selectedColor: Colors.blueAccent,
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('Karta'),
                         selected: selectedMethod == 'CARD',
-                        onSelected: (_) => setDlgState(() => selectedMethod = 'CARD'),
+                        onSelected: (_) =>
+                            setDlgState(() => selectedMethod = 'CARD'),
                         selectedColor: Colors.blueAccent,
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('Bank'),
                         selected: selectedMethod == 'BANK',
-                        onSelected: (_) => setDlgState(() => selectedMethod = 'BANK'),
+                        onSelected: (_) =>
+                            setDlgState(() => selectedMethod = 'BANK'),
                         selectedColor: Colors.blueAccent,
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
+
+                  if ((int.tryParse(amountCtrl.text) ?? 0) >
+                      (currentBalance > 0 ? currentBalance : 0))
+                    CheckboxListTile(
+                      title: const Text(
+                        'Ortiqcha summani avans sifatida tasdiqlayman',
+                      ),
+                      value: confirmAdvance,
+                      onChanged: submitting
+                          ? null
+                          : (value) => setDlgState(
+                              () => confirmAdvance = value ?? false,
+                            ),
+                    ),
 
                   // Notes
                   TextField(
@@ -201,52 +232,72 @@ class _DebtScreenState extends State<DebtScreen>
                 child: const Text('Bekor qilish'),
               ),
               ElevatedButton(
-                onPressed: () async {
-                  final messenger = ScaffoldMessenger.of(context);
-                  final amount = int.tryParse(amountCtrl.text.trim()) ?? 0;
-                  if (amount <= 0) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('To\'lov summasi 0 dan katta bo\'lishi shart!')),
-                      );
-                    }
-                    return;
-                  }
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        if (submitting) return;
+                        final messenger = ScaffoldMessenger.of(context);
+                        final amount =
+                            int.tryParse(amountCtrl.text.trim()) ?? 0;
+                        if (amount <= 0) {
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'To\'lov summasi 0 dan katta bo\'lishi shart!',
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
 
-                  final opId = OperationId.generate();
+                        setDlgState(() => submitting = true);
 
-                  try {
-                    await _api.createPayment(
-                      type: isCustomer ? 'customer' : 'supplier',
-                      partyId: partyId,
-                      amount: amount,
-                      cashAccountId: selectedAccountId,
-                      paymentMethod: selectedMethod,
-                      operationId: opId,
-                      notes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                    );
+                        try {
+                          await _api.createPayment(
+                            type: isCustomer ? 'customer' : 'supplier',
+                            partyId: partyId,
+                            amount: amount,
+                            cashAccountId: selectedAccountId,
+                            paymentMethod: selectedMethod,
+                            operationId: opId,
+                            confirmExcessAsAdvance: confirmAdvance,
+                            notes: notesCtrl.text.trim().isEmpty
+                                ? null
+                                : notesCtrl.text.trim(),
+                          );
 
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                    }
-                    messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text('To\'lov muvaffaqiyatli qabul qilindi!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    if (mounted) {
-                      _loadData();
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text('To\'lov xatosi: $e'), backgroundColor: Colors.redAccent),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'To\'lov muvaffaqiyatli qabul qilindi!',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                          if (mounted) {
+                            _loadData();
+                          }
+                        } catch (e) {
+                          if (ctx.mounted)
+                            setDlgState(() => submitting = false);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('To\'lov xatosi: $e'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                ),
                 child: const Text('Tasdiqlash'),
               ),
             ],
@@ -299,7 +350,10 @@ class _DebtScreenState extends State<DebtScreen>
                 decoration: InputDecoration(
                   hintText: 'Qidirish (ism, do\'kon, telefon)...',
                   hintStyle: const TextStyle(color: Colors.blueGrey),
-                  prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.blueAccent,
+                  ),
                   filled: true,
                   fillColor: const Color(0xFF1E293B),
                   border: OutlineInputBorder(
@@ -313,8 +367,10 @@ class _DebtScreenState extends State<DebtScreen>
             if (_errorMessage != null)
               Padding(
                 padding: const EdgeInsets.all(12),
-                child: Text(_errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent)),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
               ),
             Expanded(
               child: _isLoading
@@ -325,8 +381,10 @@ class _DebtScreenState extends State<DebtScreen>
                         // Customer Debts Tab
                         filteredCustomers.isEmpty
                             ? const Center(
-                                child: Text('Mijozlar topilmadi',
-                                    style: TextStyle(color: Colors.blueGrey)),
+                                child: Text(
+                                  'Mijozlar topilmadi',
+                                  style: TextStyle(color: Colors.blueGrey),
+                                ),
                               )
                             : ListView.builder(
                                 padding: const EdgeInsets.all(12),
@@ -340,14 +398,16 @@ class _DebtScreenState extends State<DebtScreen>
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
                                       side: const BorderSide(
-                                          color: Color(0xFF334155)),
+                                        color: Color(0xFF334155),
+                                      ),
                                     ),
                                     child: ListTile(
                                       title: Text(
                                         c.name,
                                         style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       subtitle: Column(
                                         crossAxisAlignment:
@@ -358,22 +418,25 @@ class _DebtScreenState extends State<DebtScreen>
                                             Text(
                                               c.storeName!,
                                               style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 12),
+                                                color: Colors.blueGrey,
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           if (c.phone != null)
                                             Text(
                                               c.phone!,
                                               style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 12),
+                                                color: Colors.blueGrey,
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           if (c.debtLimit > 0)
                                             Text(
                                               'Limit: ${Formatters.formatMoney(c.debtLimit)}',
                                               style: const TextStyle(
-                                                  color: Colors.grey,
-                                                  fontSize: 11),
+                                                color: Colors.grey,
+                                                fontSize: 11,
+                                              ),
                                             ),
                                         ],
                                       ),
@@ -385,13 +448,14 @@ class _DebtScreenState extends State<DebtScreen>
                                         children: [
                                           Text(
                                             Formatters.formatMoney(
-                                                c.currentDebt),
+                                              c.currentDebt,
+                                            ),
                                             style: TextStyle(
                                               color: hasDebt
                                                   ? Colors.redAccent
                                                   : (c.currentDebt < 0
-                                                      ? Colors.greenAccent
-                                                      : Colors.grey),
+                                                        ? Colors.greenAccent
+                                                        : Colors.grey),
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
@@ -405,15 +469,19 @@ class _DebtScreenState extends State<DebtScreen>
                                               currentBalance: c.currentDebt,
                                             ),
                                             style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blueAccent,
+                                              backgroundColor:
+                                                  Colors.blueAccent,
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4),
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
                                               minimumSize: Size.zero,
                                             ),
-                                            child: const Text('To\'lov',
-                                                style: TextStyle(fontSize: 11)),
+                                            child: const Text(
+                                              'To\'lov',
+                                              style: TextStyle(fontSize: 11),
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -425,8 +493,10 @@ class _DebtScreenState extends State<DebtScreen>
                         // Supplier Payables Tab
                         filteredSuppliers.isEmpty
                             ? const Center(
-                                child: Text('Ta\'minotchilar topilmadi',
-                                    style: TextStyle(color: Colors.blueGrey)),
+                                child: Text(
+                                  'Ta\'minotchilar topilmadi',
+                                  style: TextStyle(color: Colors.blueGrey),
+                                ),
                               )
                             : ListView.builder(
                                 padding: const EdgeInsets.all(12),
@@ -440,14 +510,16 @@ class _DebtScreenState extends State<DebtScreen>
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
                                       side: const BorderSide(
-                                          color: Color(0xFF334155)),
+                                        color: Color(0xFF334155),
+                                      ),
                                     ),
                                     child: ListTile(
                                       title: Text(
                                         s.name,
                                         style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       subtitle: Column(
                                         crossAxisAlignment:
@@ -458,15 +530,17 @@ class _DebtScreenState extends State<DebtScreen>
                                             Text(
                                               s.companyName!,
                                               style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 12),
+                                                color: Colors.blueGrey,
+                                                fontSize: 12,
+                                              ),
                                             ),
                                           if (s.phone != null)
                                             Text(
                                               s.phone!,
                                               style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 12),
+                                                color: Colors.blueGrey,
+                                                fontSize: 12,
+                                              ),
                                             ),
                                         ],
                                       ),
@@ -482,8 +556,8 @@ class _DebtScreenState extends State<DebtScreen>
                                               color: hasDebt
                                                   ? Colors.redAccent
                                                   : (s.balance < 0
-                                                      ? Colors.greenAccent
-                                                      : Colors.grey),
+                                                        ? Colors.greenAccent
+                                                        : Colors.grey),
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
@@ -500,12 +574,15 @@ class _DebtScreenState extends State<DebtScreen>
                                               backgroundColor: Colors.teal,
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 10,
-                                                      vertical: 4),
+                                                    horizontal: 10,
+                                                    vertical: 4,
+                                                  ),
                                               minimumSize: Size.zero,
                                             ),
-                                            child: const Text('To\'lash',
-                                                style: TextStyle(fontSize: 11)),
+                                            child: const Text(
+                                              'To\'lash',
+                                              style: TextStyle(fontSize: 11),
+                                            ),
                                           ),
                                         ],
                                       ),

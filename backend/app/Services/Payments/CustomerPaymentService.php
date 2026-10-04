@@ -119,7 +119,7 @@ class CustomerPaymentService
                 $currentDebt = (int) $customer->current_debt;
 
                 // Qarzdan ortiq to'lov tekshiruvi (Advance confirmation guard)
-                if ($currentDebt > 0 && $amount > $currentDebt && ! $confirmExcessAsAdvance) {
+                if ($amount > max(0, $currentDebt) && ! $confirmExcessAsAdvance) {
                     $excessAmount = $amount - $currentDebt;
                     throw new OperationValidationException(
                         operationId: $operationId,

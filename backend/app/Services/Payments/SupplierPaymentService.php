@@ -74,6 +74,9 @@ class SupplierPaymentService
             'amount' => $amount,
             'cash_account_id' => $cashAccountId,
             'payment_method' => strtoupper($paymentMethod),
+            'notes' => $notes,
+            'confirm_excess_advance' => $confirmExcessAsAdvance,
+            'happened_at' => $happenedAt instanceof \DateTimeInterface ? $happenedAt->format(DATE_ATOM) : $happenedAt,
         ];
 
         return $this->operationService->execute(
@@ -128,7 +131,7 @@ class SupplierPaymentService
                 $currentPayable = (int) $supplier->balance;
 
                 // Qarzdan ortiq to'lov tekshiruvi (Advance confirmation guard)
-                if ($currentPayable > 0 && $amount > $currentPayable && ! $confirmExcessAsAdvance) {
+                if ($amount > max(0, $currentPayable) && ! $confirmExcessAsAdvance) {
                     $excessAmount = $amount - $currentPayable;
                     throw new OperationValidationException(
                         operationId: $operationId,
