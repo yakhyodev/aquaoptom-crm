@@ -33,7 +33,7 @@ class StagingAcceptanceCommand extends Command
 {
     protected $signature = 'app:staging-acceptance {--report-path=docs/STAGING_ACCEPTANCE_REPORT.md}';
 
-    protected $description = 'Execute full Staging deployment verification, pilot acceptance drills, resilience, and generate GO/NO-GO report (Prompt 24)';
+    protected $description = 'Run an isolated simulation; does not certify live staging or production acceptance';
 
     public function handle(
         ReceivePurchaseService $purchaseService,
@@ -44,6 +44,12 @@ class StagingAcceptanceCommand extends Command
         RecoveryReconciliationService $recoveryService,
         BackupService $backupService
     ): int {
+        $databaseName = (string) config('database.connections.'.config('database.default').'.database');
+        if (! app()->environment(['testing', 'staging', 'local']) || ! preg_match('/(?:^|[_-])(test|testing|staging)(?:$|[_-])/i', $databaseName)) {
+            $this->error('Simulation requires an isolated test/staging database; production data must not be modified.');
+
+            return self::FAILURE;
+        }
         $startTime = microtime(true);
         $this->info('================================================================================');
         $this->info('   AQUAOPTOM CRM — STAGING ACCEPTANCE & PILOT REHEARSAL DRILL (PROMPT 24)');
@@ -482,7 +488,7 @@ class StagingAcceptanceCommand extends Command
         $allPassed = ! in_array(false, $results, true);
 
         // Hardware / External connection audit:
-        // Physical Android USB/WiFi device and Live Production Bot Token are nonblocking staging criteria
+        // Physical Android and live bot tests are mandatory release gates; this command only simulates
         // that must be noted in the Production Checklist.
         $this->table(
             ['Sinov Bosqichi', 'Natija', 'Vaqt (ms)'],
@@ -496,7 +502,7 @@ class StagingAcceptanceCommand extends Command
             ]
         );
 
-        $goStatus = $allPassed ? 'GO' : 'NO-GO';
+        $goStatus = $allPassed ? 'SIMULATION_PASSED — LIVE ACCEPTANCE NOT VERIFIED' : 'NO-GO';
         $this->info("\n>>> UMUMIY STAGING STATUS: [ {$goStatus} ] (Jami vaqt: {$totalDuration}s) <<<");
 
         // Write report
@@ -514,7 +520,7 @@ class StagingAcceptanceCommand extends Command
         $now = Carbon::now('Asia/Tashkent')->format('Y-m-d H:i:s');
 
         return <<<MARKDOWN
-# AQUAOPTOM CRM — STAGING QABUL VA RELIZGA TAYYORLIK HISOBOTI (PROMPT 24)
+# AQUAOPTOM CRM — ISOLATED SIMULATION REPORT — LIVE STAGING NOT VERIFIED (PROMPT 24)
 
 **Sana:** {$now} (Asia/Tashkent)  
 **Reliz Versiyasi:** `{$version}`  
@@ -555,7 +561,7 @@ class StagingAcceptanceCommand extends Command
 
 ## 4. Production Relizga Qabul Xulosasi (GO / NO-GO)
 
-- **Xulosa:** **{$status} (PRODUCTION GA CHIQARISHGA TAYYOR)**
+- **Xulosa:** **{$status} (PRODUCTION APPROVAL NOT GRANTED)**
 - **Reliz Versiyasi:** `{$version}`
 - **Tavsiya etilgan keyingi bosqich:** Prompt 25 (Productionga chiqarish va yakuniy topshirish).
 MARKDOWN;

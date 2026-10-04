@@ -15,6 +15,14 @@ class ReleaseProfileVerificationTest extends TestCase
         $this->artisan('app:production-verify')->expectsOutputToContain('Production profile requires')->assertFailed();
     }
 
+    public function test_staging_drill_is_blocked_in_production_before_any_write(): void
+    {
+        $this->app['env'] = 'production';
+        $this->artisan('app:staging-acceptance')->expectsOutputToContain('Simulation requires an isolated')->assertFailed();
+        $this->assertDatabaseCount('system_settings', 0);
+        $this->assertDatabaseCount('sales', 0);
+    }
+
     public function test_failed_readiness_does_not_print_a_success_certificate(): void
     {
         $this->app['env'] = 'production';
@@ -24,5 +32,14 @@ class ReleaseProfileVerificationTest extends TestCase
             $mock->shouldReceive('readiness')->once()->andReturn(response()->json(['status' => 'NOT_READY'], 503));
         });
         $this->artisan('app:production-verify')->expectsOutputToContain('Local health checks failed')->assertFailed();
+    }
+
+    public function test_staging_drill_rejects_nonisolated_database_in_testing(): void
+    {
+        $connection = config('database.default');
+        config(['database.connections.'.$connection.'.database' => 'aquaoptom_contest']);
+        $this->artisan('app:staging-acceptance')->expectsOutputToContain('Simulation requires an isolated')->assertFailed();
+        $this->assertDatabaseCount('system_settings', 0);
+        $this->assertDatabaseCount('sales', 0);
     }
 }
