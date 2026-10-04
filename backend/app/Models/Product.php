@@ -25,6 +25,18 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    protected static function booted(): void
+    {
+        static::saving(function ($product) {
+            if (empty($product->normalized_name) && ! empty($product->name)) {
+                $product->normalized_name = static::normalizeName($product->name);
+            }
+            if (empty($product->code)) {
+                $product->code = static::generateCode();
+            }
+        });
+    }
+
     /**
      * Yangi mahsulot kodi avtomatik generatsiyasi (PRD-000001) — Concurrency safe
      */

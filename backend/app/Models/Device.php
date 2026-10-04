@@ -59,6 +59,11 @@ class Device extends Model
         return $this->hasMany(OfflineAuthorization::class);
     }
 
+    public function offlineAuthorizations(): HasMany
+    {
+        return $this->authorizations();
+    }
+
     public function activeAuthorization(): HasOne
     {
         return $this->hasOne(OfflineAuthorization::class)

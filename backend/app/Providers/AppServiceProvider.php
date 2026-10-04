@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Livewire\Inventory\StockManager;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -57,6 +59,9 @@ class AppServiceProvider extends ServiceProvider
                 return method_exists($user, 'hasPermission') && $user->hasPermission($permission);
             });
         }
+
+        // Livewire Component Aliases
+        Livewire::component('stock-manager', StockManager::class);
 
         // Guard testing environment: strictly ensure test database is isolated
         if ($this->app->environment('testing')) {

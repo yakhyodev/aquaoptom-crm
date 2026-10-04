@@ -82,6 +82,12 @@ class ProductVariant extends Model
         return $this->hasMany(InventoryAllocation::class, 'product_variant_id');
     }
 
+    public function activeAllocations(): HasMany
+    {
+        return $this->hasMany(InventoryAllocation::class, 'product_variant_id')
+            ->where('status', 'ACTIVE');
+    }
+
     /**
      * SKU generatsiyasi (FANTA-500)
      */

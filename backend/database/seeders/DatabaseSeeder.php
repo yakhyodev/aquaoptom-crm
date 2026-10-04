@@ -126,6 +126,7 @@ class DatabaseSeeder extends Seeder
                     [
                         'quantity' => $qty,
                         'average_cost' => $cost,
+                        'total_value' => $qty * $cost,
                         'updated_at' => Carbon::now(),
                     ]
                 );

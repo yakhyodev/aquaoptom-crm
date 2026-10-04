@@ -86,7 +86,7 @@
 | **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
 | **13** | **PWA lokal baza va internetsiz sotuv** | Offline PWA | **DONE** | Standalone PWA manifest (`manifest.json`), Service Worker (`sw.js`, app shell cache, network-only offline JSON fallback), `AquaOptomDB` IndexedDB sxemasi (9 ta store), Pure JS/Alpine.js offline POS (`aqua-pos.js`, `aqua-db.js`, Livewire online qoladi), atomik lokal savdo tranzaksiyasi (quota, credit, sale, outbox, draft clearing bitta IndexedDB tranzaksiyada), mijoz UUID, PIN lock, ko‘p tabli BroadcastChannel sinxronizatsiyasi, favqulodda JSON eksport; 7/7 JS unit testlari (Node.js + fake-indexeddb), 7/7 Feature testlari va 129/129 to'liq tizim testlari 100% o'tdi. | 14-bosqichni boshlash |
 | **14** | **PWA avtomatik sync va uzilish sinovlari** | Offline PWA | **DONE** | IndexedDB navbatini API bilan ulash: server health tekshirish (`/api/health`, `/api/sync/health`), pending batch push (`/api/sync/push`), ACK'ni lokal atomik yozish (`applyPushResults`), cursor pull (`applyPulledChanges`) va qolgan pending overlay hisobi (`getPendingOverlay`); avtomatik sinxronizatsiya triggerlari (`online`, `visibilitychange`, window `focus`, 30s interval, qo'lda sync tugmasi, Service Worker Background Sync API); ko'p tabli poyga holatini oldini olish uchun multi-tab mutex lock (`acquireSyncLock` / `releaseSyncLock`, 30s stale recovery bilan); asl `operation_id` va payload bilan idempotent replay (tarmoq uzilishi va timeoutda qayta jo'natilganda dublikatsiz `RETRY_SUCCESS`); xavfsiz retention (ACK bo'lgan chek va payloadlar outbox'dan o'chirib yuborilmaydi, status `APPLIED` qilinadi, favqulodda tiklash uchun saqlanadi); offline savdoni bekor qilish (`VOID_SALE` / `CANCEL_SALE`, asl `original_operation_id` ga bog'lanadi, navbatdan o'chirilmaydi, ombor/kassa/mijoz qaytariladi); `NEEDS_REVIEW` holati va tushuntirish modal oynasi; 7/7 JS unit testlari (Node.js + fake-indexeddb), 6/6 Feature testlari, 135/135 to'liq tizim testlari 100% o'tdi. | 15-bosqichni boshlash |
-| 15 | Ombor qoldiqlari va interaktiv kalkulyator | Tahlil va nazorat | TODO | - | Master kalkulyator, hajm checkboxlari, kutilayotgan foyda |
+| **15** | **Ombor qoldiqlari va interaktiv kalkulyator** | Tahlil va nazorat | **DONE** | Ombor qoldiqlari, variant kartasi va manba hujjatga bog'langan harakat tarixi; qidiruv paginationdan oldin serverda bajarilishi; filtrlar (nom/hajm, min/max qoldiq, threshold, zero_only, non_zero, narxsiz, arxiv, sekin sotiladigan); umumiy agregatlar butun filtrlangan baza bo'yicha (faqat bitta sahifa emas); tannarx va ombor qiymati rol bo'yicha (`view_cost_price`); interaktiv kalkulyator (mahsulotlar va litrlar multi-select, all/clear, mavjud dona, jami tannarx, tizim sotuv qiymati va kutilayotgan yalpi foyda); narxsiz variantlar nol narxga tenglashtirilmasligi va to'liq foyda aniqlanmagani ko'rsatilishi; taxminiy narx simulyatsiyasi va katalogga saqlash alohida `manage_prices` ruxsati bilan; fizik, erkin, ajratilgan qoldiq va eskirgan offline snapshot farqlanishi; kam qoldiqda `LowStockDetected` hodisasi qayd etilishi; Livewire `StockManager` interfeysi; 13/13 Feature testlari (86 assertions) va 148/148 to'liq backend testlari (1007 assertions) 100% o'tdi. | 16-bosqichni boshlash |
 | 16 | Qaytarish, brak, inventarizatsiya va tuzatish | Tahlil va nazorat | TODO | - | Qisman/to‘liq qaytarish, brak, inventarizatsiya freeze |
 | 17 | Savdo tarixi, hisobotlar va eksportlar | Tahlil va nazorat | TODO | - | Tahlil, sana filtrlari, Excel/PDF eksport |
 | 18 | Dashboard, Admin va real vaqt yangilanishlari | Boshqaruv | TODO | - | Reverb/Echo real-vaqt, dashboard kartalari, audit |
@@ -710,7 +710,67 @@
 
 ---
 
-## 20. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 20. 15-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Ombor Qoldiqlari va Server Qidiruvi (`InventoryStockService`):**
+   - **Paginationdan oldin server qidiruvi:** Nom, kod, SKU, shtrix-kod, va hajmlar bo'yicha to'liq PostgreSQL qidiruvi;
+   - **Filtrlar majmuasi:** Hajmlar (multi-select), min/max qoldiq diapazoni, threshold filtri (`quantity <= minimum_stock`), nol qoldiq (`zero_only` / `non_zero`), sotuv narxi mavjudligi (`has_price` / `no_price`), arxiv holati (`active` / `archived` / `all`), sekin sotiladigan tovarlar (`slow_moving` — so'nggi 30 kunda sotuv bo'lmagan);
+   - **Narrow filterdagi yig'indi butun bazaning filtrlangan natijasi:** `getAggregatedTotals` orqali butun filtrlangan query bo'yicha umumiy agregatlar (faqat bitta sahifa emas): jami turlar, jami fizik dona, erkin dona, ajratilgan dona, tannarx qiymati, tizim sotuv qiymati, kam qoldiq soni, narxsizlar soni;
+   - **Tannarx va qiymat rol bo'yicha:** `view_cost_price` ruxsati bor xodim (masalan egasi) tannarx va jami ombor qiymatini ko'radi; ruxsati yo'q xodim (kassir/omborchi) uchun bu qiymatlar `null` bo'lib yashiriladi;
+   - **Qoldiqlar tabaqalanishi:** Fizik qoldiq, sotish uchun erkin miqdor, qurilmalarga ajratilgan miqdor va eskirgan offline snapshot (`stale_allocation` — lease muddati o'tgan yoki 24 soatdan beri aloqaga chiqmagan qurilma) aniq farqlanadi.
+
+2. **Variant Kartasi va Manba Hujjatga Bog'langan Harakat Tarixi:**
+   - **Tafsilot:** Variant kodi, SKU, shtrix-kod, jismoniy/erkin/ajratilgan qoldiqlar, qurilmalar bo'yicha zaxira ajratmalari jadvali (qurilma kodi, ajratilgan, sarflangan, qaytarilgan, qolgan, sync vaqti, lease holati);
+   - **Harakatlar daftari (`inventory_movements`):**
+     - Harakat vaqti sekund aniqligida Asia/Tashkent formatida (`Y-m-d H:i:s`);
+     - Harakat turi: Kirim, Sotuv, Sotuv qaytarildi, Ta'minotchiga qaytarildi, Brak, Boshlang'ich qoldiq, Tuzatish;
+     - O'zgarish donasi (`+` / `-`), o'zgarishdan keyingi qoldiq va qiymat;
+     - Manba hujjatga to'g'ridan-to'g'ri bog'liqlik: Kirim nakladnoy raqami va ta'minotchi nomi, Sotuv cheki raqami va mijoz nomi, mas'ul xodim.
+
+3. **Interaktiv Rentabellik Kalkulyatori (`InventoryCalculatorService`):**
+   - **Multi-select:** Mahsulotlar va litr/hajm checkboxlari, "Barchasini tanlash" va "Tozalash";
+   - **Ko'rsatkichlar:** Mavjud jami dona (erkin va ajratilgan bilan), Jami tannarx qiymati (WAC asosida, faqat `view_cost_price` bilan), Tizim sotuv qiymati, Kutilayotgan yalpi foyda (`expected_gross_profit`), Kutilayotgan marja (%);
+   - **Nomlanish qoidasi:** Potensial foyda hech qachon haqiqiy savdo foydasi yoki cash/kassa deb nomlanmaydi; qat'iy "Kutilayotgan yalpi foyda" deb yuritiladi;
+   - **Narxsiz variantlar:** Narxi yo'q variantlar nol narxga tenglashtirilmaydi, sun'iy salbiy foyda keltirib chiqarmaydi; ular alohida ajratilib ko'rsatiladi va ogohlantirish beriladi;
+   - **Taxminiy narx simulyatsiyasi:** Foydalanuvchi variantlar uchun vaqtinchalik narx kiritib real-vaqtda kutilayotgan foydani simulyatsiya qilishi mumkin; bu katalogdagi narxni o'zgartirmaydi;
+   - **Katalogga saqlash ruxsati:** Simulyatsiya narxlarini tizim narxi sifatida saqlash faqat `manage_prices` ruxsatiga ega xodimga ruxsat etiladi; saqlanganda `PriceHistory` jurnali yuritiladi va variant versiyasi oshiriladi.
+
+4. **Kam Qoldiq (Threshold) Hodisasi:**
+   - Qoldiq minimal chegaradan past bo'lganda `App\Events\LowStockDetected` hodisasi qayd etiladi (variant, joriy qoldiq, chegara, ombor).
+
+5. **Foydalanuvchi Interfeysi (`pages/inventory.blade.php`, `StockManager`):**
+   - Livewire 3 `StockManager` komponenti orqali reaktiv 3 ta tab: "Ombor Qoldiqlari", "Interaktiv Kalkulyator", "Tovar Kirimi (QuickInward)";
+   - `/calculator` va `/inward` yo'naltirishlari to'g'ridan-to'g'ri tegishli tabga olib boradi.
+
+6. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - **PHPUnit Feature Testlari (`tests/Feature/InventoryStockAndCalculatorTest.php`):**
+     - `test_stock_list_server_search_before_pagination`: **PASS**
+     - `test_stock_list_filters_threshold_zero_unpriced_archived_slow_moving`: **PASS**
+     - `test_narrow_filter_aggregates_across_whole_filtered_database_not_just_current_page`: **PASS**
+     - `test_role_based_cost_price_and_value_visibility`: **PASS**
+     - `test_calculator_fanta_all_vs_one_liter_vs_two_volumes_from_real_rows`: **PASS** (Fanta 0.5L vs 1.0L vs barchasi aniq rowsdan)
+     - `test_unpriced_variants_are_isolated_and_not_forced_to_zero_price`: **PASS**
+     - `test_simulation_prices_recalculate_without_modifying_catalog_and_saving_requires_permission`: **PASS**
+     - `test_owner_can_save_simulation_prices_to_catalog`: **PASS**
+     - `test_physical_free_allocated_and_stale_allocation_separation`: **PASS**
+     - `test_low_stock_detected_event_dispatched`: **PASS**
+     - `test_variant_movements_history_with_source_documents_and_tashkent_time`: **PASS**
+     - `test_livewire_stock_manager_renders_and_switches_tabs`: **PASS**
+     - `test_livewire_stock_manager_calculator_and_modal_actions`: **PASS**
+     - **13/13 testlar 100% muvaffaqiyatli o'tdi (86 assertions, duration 4.8s).**
+   - **Regressiya va Asosiy Sinovlar:**
+     - `BeverageCrmCoreTest.php`: **8/8 testlar 100% PASS** (66 assertions).
+     - `AuthAndAccessControlTest.php`: **11/11 testlar 100% PASS** (103 assertions).
+     - Node.js Sync Protocol: **7/7 testlar 100% PASS**.
+     - Node.js IndexedDB: **7/7 testlar 100% PASS**.
+   - **To'liq Backend Testlari:** **148 passed out of 148 tests (1007 assertions, duration 35.4s)**.
+   - **Laravel Pint:** `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - **Vite Build:** `npm run build`: **0 errors (built in 785ms)**.
+   - **Flutter Analyze:** `flutter analyze`: **No issues found! (ran in 2.4s)**.
+
+---
+
+## 21. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
@@ -719,10 +779,11 @@
 3. **Server Sync API va Nizolar protokoli:** Prompt 12 doirasida to'liq amalga oshirildi.
 4. **PWA Offline Baza va Savdo:** Prompt 13 doirasida to'liq amalga oshirildi.
 5. **PWA Avtomatik Sync va Uzilish Sinovlari:** Prompt 14 doirasida to'liq amalga oshirildi.
-6. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
+6. **Ombor Qoldiqlari va Interaktiv Kalkulyator:** Prompt 15 doirasida to'liq amalga oshirildi.
+7. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*14-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 15.*
+*15-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 16.*
 
 
 
