@@ -1,0 +1,14 @@
+.git
+.serena
+**/.env
+**/.env.*
+**/vendor
+**/node_modules
+**/storage
+**/test-results
+mobile/build
+**/*.jks
+**/*.keystore
+**/key.properties
+**/*.enc
+**/*.sql

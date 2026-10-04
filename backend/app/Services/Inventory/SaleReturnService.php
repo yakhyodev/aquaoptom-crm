@@ -7,6 +7,7 @@ use App\Models\OutboxEvent;
 use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
+use App\Models\User;
 use App\Services\Ledger\CashAccountService;
 use App\Services\Ledger\CustomerLedgerService;
 use App\Services\Ledger\Exceptions\CannotReturnMoreThanSoldException;
@@ -14,6 +15,7 @@ use App\Services\Ledger\Exceptions\InsufficientCashException;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Operations\TransactionalOperationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -38,6 +40,41 @@ class SaleReturnService
      * 6. Kassa mablag'i yetarli bo'lmasa, atomik rollback.
      */
     public function createSaleReturn(
+        int $saleId,
+        array $items,
+        string $reason,
+        ?string $operationId = null,
+        int $refundAmount = 0,
+        ?int $cashAccountId = null,
+        ?string $refundPaymentMethod = 'CASH',
+        ?int $cashSessionId = null,
+        ?int $userId = null,
+        ?string $notes = null
+    ): array {
+        $operationId ??= (string) Str::uuid();
+        $actor = $userId ? User::find($userId) : auth()->user();
+        if (! $actor || ! $actor->hasPermission('process_refund')) {
+            throw new OperationValidationException($operationId, 'Qaytarish qilishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+        }
+        $payload = compact('saleId', 'items', 'reason', 'refundAmount', 'cashAccountId', 'refundPaymentMethod', 'cashSessionId', 'notes');
+        $isReplay = app(TransactionalOperationService::class)->replay($operationId, 'SALE_RETURN', $payload, $actor->id) !== null;
+        $result = app(TransactionalOperationService::class)->execute(
+            $operationId, 'SALE_RETURN', $payload,
+            function () use ($saleId, $items, $reason, $operationId, $refundAmount, $cashAccountId, $refundPaymentMethod, $cashSessionId, $actor, $notes) {
+                $result = $this->postSaleReturn($saleId, $items, $reason, $operationId, $refundAmount, $cashAccountId, $refundPaymentMethod, $cashSessionId, $actor->id, $notes);
+                $result['return_id'] = $result['return']->id;
+                unset($result['return']);
+
+                return $result;
+            }, actorId: $actor->id
+        );
+        $result['return'] = SaleReturn::with('items')->findOrFail($result['return_id']);
+        $result['is_replay'] = $isReplay;
+
+        return $result;
+    }
+
+    private function postSaleReturn(
         int $saleId,
         array $items,
         string $reason,
@@ -109,16 +146,22 @@ class SaleReturnService
 
             // 3. Qatorlarni tekshirish va yaxlitlashni hisoblash
             $preparedItems = [];
+            $seenItems = [];
             $totalReturnAmount = 0;
             $totalReturnCost = 0;
 
             foreach ($items as $itemReq) {
                 $saleItemId = (int) ($itemReq['sale_item_id'] ?? 0);
-                $quantity = (int) ($itemReq['quantity'] ?? 0);
+                if (isset($seenItems[$saleItemId])) {
+                    throw new OperationValidationException($operationId, 'Bitta qaytarish qatorini takror kiritish mumkin emas.', errorCode: 'DUPLICATE_RETURN_ITEM');
+                }
+                $seenItems[$saleItemId] = true;
+                $rawQuantity = $itemReq['quantity'] ?? 0;
+                $quantity = (int) $rawQuantity;
                 $isDamaged = (bool) ($itemReq['is_damaged'] ?? false);
                 $itemCondition = $isDamaged ? 'DAMAGED' : 'SELLABLE';
 
-                if ($quantity <= 0) {
+                if (! is_numeric($rawQuantity) || $rawQuantity != $quantity || $quantity <= 0 || $quantity > InventoryLedgerService::MAX_QUANTITY) {
                     throw new OperationValidationException(
                         $operationId,
                         "Qaytariladigan tovar miqdori 0 dan katta butun son bo'lishi shart!",
@@ -166,7 +209,8 @@ class SaleReturnService
                     $costTotal = (int) $saleItem->cost_total - $alreadyReturnedCostTotal;
                 } else {
                     $lineTotal = (int) round($quantity * $saleItem->sale_price);
-                    $costTotal = (int) round($quantity * $saleItem->purchase_cost_snapshot);
+                    $alreadyReturnedCostTotal = (int) SaleReturnItem::where('sale_item_id', $saleItem->id)->sum('cost_total');
+                    $costTotal = $this->inventoryLedgerService->proportionalCost((int) $saleItem->cost_total - $alreadyReturnedCostTotal, $quantity, $availableToReturn);
                 }
 
                 $totalReturnAmount += $lineTotal;
@@ -261,7 +305,8 @@ class SaleReturnService
                         operationId: $operationId,
                         referenceType: SaleReturn::class,
                         referenceId: $saleReturn->id,
-                        userId: $userId
+                        userId: $userId,
+                        totalCost: $prep['cost_total']
                     );
                 }
                 // DIQQAT: Yaroqsiz (is_damaged) tovar sotiladigan qoldiqqa QO'SHILMAYDI!

@@ -18,8 +18,8 @@ use App\Services\Ledger\Exceptions\InsufficientAllocationException;
 use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\Exceptions\OperationConflictException;
+use App\Services\Operations\Exceptions\OperationException;
 use App\Services\Operations\Exceptions\OperationValidationException;
-use App\Services\Operations\PayloadFingerprint;
 use App\Services\Operations\TransactionalOperationService;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Payments\SupplierPaymentService;
@@ -42,11 +42,17 @@ class FullSystemReleaseRegressionTest extends TestCase
     use RefreshDatabase;
 
     protected User $owner;
+
     protected User $cashier;
+
     protected Warehouse $warehouse;
+
     protected CashAccount $cashAccount;
+
     protected ProductVariant $variantFanta05;
+
     protected Customer $customer;
+
     protected Supplier $supplier;
 
     protected function setUp(): void
@@ -241,7 +247,7 @@ class FullSystemReleaseRegressionTest extends TestCase
                 warehouseId: $this->warehouse->id,
                 userId: $this->owner->id
             );
-            $this->fail("Jismoniy qoldiqdan oshiqcha ajratma berilmasligi kerak edi!");
+            $this->fail('Jismoniy qoldiqdan oshiqcha ajratma berilmasligi kerak edi!');
         } catch (\Exception $e) {
             $this->assertTrue(
                 $e instanceof InsufficientAllocationException ||
@@ -308,7 +314,7 @@ class FullSystemReleaseRegressionTest extends TestCase
             operationId: $opId,
             operationType: 'SALES_CHECKOUT',
             payload: $payloadOriginal,
-            businessCallback: fn() => ['status' => 'SUCCESS'],
+            businessCallback: fn () => ['status' => 'SUCCESS'],
             actorId: $this->owner->id
         );
 
@@ -320,7 +326,7 @@ class FullSystemReleaseRegressionTest extends TestCase
             operationId: $opId,
             operationType: 'SALES_CHECKOUT',
             payload: $payloadTampered,
-            businessCallback: fn() => ['status' => 'SUCCESS'],
+            businessCallback: fn () => ['status' => 'SUCCESS'],
             actorId: $this->owner->id
         );
     }
@@ -347,7 +353,9 @@ class FullSystemReleaseRegressionTest extends TestCase
             );
             $this->fail("Crash exceptionsiz o'tib ketmasligi kerak edi!");
         } catch (\Throwable $e) {
-            $this->assertStringContainsString('Simulated mid-transaction system crash!', $e->getMessage());
+            $this->assertInstanceOf(OperationException::class, $e);
+            $this->assertSame('INTERNAL_OPERATION_ERROR', $e->errorCode);
+            $this->assertStringNotContainsString('Simulated mid-transaction system crash!', $e->getMessage());
         }
 
         // Kassa balansi o'zgarmagan bo'lishi shart (0 so'm)
@@ -359,7 +367,7 @@ class FullSystemReleaseRegressionTest extends TestCase
 
     /**
      * 6. QABUL DARVOZASI: Arxitektura 14.3 to'liq nazorat misoli.
-     * 
+     *
      * 1) Boshlang'ich kassa: 500 000 UZS.
      * 2) Fanta 0.5L 150 dona x 5 000 UZS kirim = 750 000 UZS ta'minotchi majburiyati.
      * 3) Ta'minotchiga 300 000 to'landi -> kassa 200 000; ta'minotchi qarzi 450 000.
@@ -369,7 +377,7 @@ class FullSystemReleaseRegressionTest extends TestCase
      *    Tizim narxi 7 000 bo'lsa: kutilayotgan sotuv 630 000, kutilayotgan yalpi foyda 180 000 (SIMULATION).
      * 6) Keyin mijoz 100 000 to'ladi -> qarz 150 000; kassa 440 000; eski savdo/foyda o'zgarmaydi.
      * 7) Keyin ta'minotchiga 50 000 to'landi -> bizning qarz 400 000; yakuniy kassa: 390 000 UZS!
-     * 
+     *
      * 8) Qat'iy tasdiq: 500 000 - 300 000 + 140 000 + 100 000 - 50 000 = 390 000 UZS.
      *    Mijoz qarzi (150k), ta'minotchi qarzi (400k) va ombor qiymati (450k) kassaga qo'shilmaydi!
      */
@@ -489,7 +497,7 @@ class FullSystemReleaseRegressionTest extends TestCase
         $this->assertEquals(390000, $finalCash, "Yakuniy kassa balansi aniq 390 000 so'm bo'lishi shart!");
         $this->assertEquals(150000, $finalCustomerDebt, "Mijoz qarzi 150 000 so'm bo'lishi shart!");
         $this->assertEquals(400000, $finalSupplierDebt, "Ta'minotchi qarzi 400 000 so'm bo'lishi shart!");
-        $this->assertEquals(90, $finalStockQty, "Omborda 90 dona tovar qolishi shart!");
+        $this->assertEquals(90, $finalStockQty, 'Omborda 90 dona tovar qolishi shart!');
         $this->assertEquals(450000, $finalStockCost, "Ombor tannarx qiymati 450 000 so'm bo'lishi shart!");
     }
 
@@ -516,7 +524,7 @@ class FullSystemReleaseRegressionTest extends TestCase
             'password' => 'wrong_password',
         ]);
 
-        $this->assertEquals(429, $throttled->status(), "11-urinishda 429 Too Many Requests kutilgan!");
+        $this->assertEquals(429, $throttled->status(), '11-urinishda 429 Too Many Requests kutilgan!');
     }
 
     /**
@@ -566,7 +574,7 @@ class FullSystemReleaseRegressionTest extends TestCase
         $this->assertEquals("'+cmd|' /C calc'!A0", ExportService::escapeFormula("+cmd|' /C calc'!A0"));
         $this->assertEquals("'-100", ExportService::escapeFormula('-100'));
         $this->assertEquals("'@SUM(A1:A10)", ExportService::escapeFormula('@SUM(A1:A10)'));
-        $this->assertEquals("Oddiy matn", ExportService::escapeFormula('Oddiy matn'));
+        $this->assertEquals('Oddiy matn', ExportService::escapeFormula('Oddiy matn'));
     }
 
     /**
@@ -665,6 +673,6 @@ class FullSystemReleaseRegressionTest extends TestCase
         $this->assertEquals(100, $paginated->total());
 
         // So'rov 500ms dan tezroq bajarilishi shart
-        $this->assertLessThan(500, $queryDurationMs, "Katta dataset hisoboti 500ms dan kam vaqt olishi shart!");
+        $this->assertLessThan(500, $queryDurationMs, 'Katta dataset hisoboti 500ms dan kam vaqt olishi shart!');
     }
 }

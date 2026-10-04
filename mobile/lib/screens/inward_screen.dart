@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../models/product_model.dart';
 import '../models/supplier_model.dart';
 import '../services/api_service.dart';
@@ -29,6 +30,7 @@ class _InwardScreenState extends State<InwardScreen> {
   final _costPriceController = TextEditingController();
   final _invoiceNumberController = TextEditingController();
   String _selectedPackage = 'dona';
+  final String _operationId = const Uuid().v4();
 
   @override
   void initState() {
@@ -87,12 +89,16 @@ class _InwardScreenState extends State<InwardScreen> {
           children: [
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Ismi / Mas\'ul shaxs *'),
+              decoration: const InputDecoration(
+                labelText: 'Ismi / Mas\'ul shaxs *',
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
               controller: companyCtrl,
-              decoration: const InputDecoration(labelText: 'Kompaniya / Zavod nomi'),
+              decoration: const InputDecoration(
+                labelText: 'Kompaniya / Zavod nomi',
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -112,8 +118,12 @@ class _InwardScreenState extends State<InwardScreen> {
               try {
                 final newSupp = await _api.createSupplier(
                   name: nameCtrl.text.trim(),
-                  companyName: companyCtrl.text.trim().isEmpty ? null : companyCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                  companyName: companyCtrl.text.trim().isEmpty
+                      ? null
+                      : companyCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim().isEmpty
+                      ? null
+                      : phoneCtrl.text.trim(),
                 );
                 if (!ctx.mounted) return;
                 Navigator.pop(ctx);
@@ -125,9 +135,9 @@ class _InwardScreenState extends State<InwardScreen> {
                 }
               } catch (e) {
                 if (!ctx.mounted) return;
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text('Xatolik: $e')),
-                );
+                ScaffoldMessenger.of(
+                  ctx,
+                ).showSnackBar(SnackBar(content: Text('Xatolik: $e')));
               }
             },
             child: const Text('Saqlash'),
@@ -138,8 +148,9 @@ class _InwardScreenState extends State<InwardScreen> {
   }
 
   Future<void> _submitInward() async {
+    if (_isLoading) return;
     final qty = double.tryParse(_quantityController.text.trim()) ?? 0.0;
-    if (qty <= 0) {
+    if (qty <= 0 || qty != qty.roundToDouble()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Miqdor musbat bo\'lishi shart!')),
       );
@@ -162,6 +173,7 @@ class _InwardScreenState extends State<InwardScreen> {
         }
 
         await _api.createInward(
+          operationId: _operationId,
           productName: prodName,
           litres: litres,
           quantity: qty,
@@ -178,6 +190,7 @@ class _InwardScreenState extends State<InwardScreen> {
         }
 
         await _api.createInward(
+          operationId: _operationId,
           variantId: _selectedVariant!.id,
           quantity: qty,
           packageName: _selectedPackage,
@@ -231,7 +244,10 @@ class _InwardScreenState extends State<InwardScreen> {
                       ),
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -254,14 +270,16 @@ class _InwardScreenState extends State<InwardScreen> {
                               ChoiceChip(
                                 label: const Text('Mavjud Mahsulot'),
                                 selected: !_isNewProduct,
-                                onSelected: (_) => setState(() => _isNewProduct = false),
+                                onSelected: (_) =>
+                                    setState(() => _isNewProduct = false),
                                 selectedColor: Colors.blueAccent,
                               ),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('Yangi Mahsulot'),
                                 selected: _isNewProduct,
-                                onSelected: (_) => setState(() => _isNewProduct = true),
+                                onSelected: (_) =>
+                                    setState(() => _isNewProduct = true),
                                 selectedColor: Colors.blueAccent,
                               ),
                             ],
@@ -279,20 +297,25 @@ class _InwardScreenState extends State<InwardScreen> {
                                 fillColor: Color(0xFF0F172A),
                                 border: OutlineInputBorder(),
                               ),
-                              items: _products.expand((p) => p.variants.map((v) {
-                                return DropdownMenuItem(
-                                  value: v,
-                                  child: Text(
-                                    '${p.name} — ${v.displayVolume} (qoldiq: ${v.stockQty})',
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                );
-                              })).toList(),
+                              items: _products
+                                  .expand(
+                                    (p) => p.variants.map((v) {
+                                      return DropdownMenuItem(
+                                        value: v,
+                                        child: Text(
+                                          '${p.name} — ${v.displayVolume} (qoldiq: ${v.stockQty})',
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                      );
+                                    }),
+                                  )
+                                  .toList(),
                               onChanged: (val) {
                                 setState(() {
                                   _selectedVariant = val;
                                   if (val?.costPrice != null) {
-                                    _costPriceController.text = val!.costPrice.toString();
+                                    _costPriceController.text = val!.costPrice
+                                        .toString();
                                   }
                                 });
                               },
@@ -312,10 +335,13 @@ class _InwardScreenState extends State<InwardScreen> {
                             TextField(
                               controller: _newLitresController,
                               keyboardType:
-                                  const TextInputType.numberWithOptions(decimal: true),
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                               style: const TextStyle(color: Colors.white),
                               decoration: const InputDecoration(
-                                labelText: 'Hajmi (litr, masalan: 0.5 yoki 1.5) *',
+                                labelText:
+                                    'Hajmi (litr, masalan: 0.5 yoki 1.5) *',
                                 filled: true,
                                 fillColor: Color(0xFF0F172A),
                                 border: OutlineInputBorder(),
@@ -346,11 +372,15 @@ class _InwardScreenState extends State<InwardScreen> {
                               const Text(
                                 'Ta\'minotchi (Zavod / Diler)',
                                 style: TextStyle(
-                                    color: Colors.white, fontWeight: FontWeight.bold),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.add_business,
-                                    color: Colors.cyanAccent),
+                                icon: const Icon(
+                                  Icons.add_business,
+                                  color: Colors.cyanAccent,
+                                ),
                                 tooltip: 'Yangi ta\'minotchi qo\'shish',
                                 onPressed: _showAddSupplierDialog,
                               ),
@@ -376,7 +406,8 @@ class _InwardScreenState extends State<InwardScreen> {
                                 ),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedSupplier = val),
+                            onChanged: (val) =>
+                                setState(() => _selectedSupplier = val),
                           ),
                           const SizedBox(height: 12),
                           TextField(
@@ -410,8 +441,10 @@ class _InwardScreenState extends State<InwardScreen> {
                           // Package selector
                           Row(
                             children: [
-                              const Text('Qadoq turi: ',
-                                  style: TextStyle(color: Colors.blueGrey)),
+                              const Text(
+                                'Qadoq turi: ',
+                                style: TextStyle(color: Colors.blueGrey),
+                              ),
                               const SizedBox(width: 8),
                               ChoiceChip(
                                 label: const Text('Dona'),
@@ -484,11 +517,16 @@ class _InwardScreenState extends State<InwardScreen> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text(
                             'Kirimni tasdiqlash va qabul qilish',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                   ),
                 ],

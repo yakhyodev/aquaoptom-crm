@@ -42,7 +42,8 @@ class ApiService {
       body = json.decode(response.body) as Map<String, dynamic>;
     } catch (_) {}
 
-    final message = body['message'] as String? ??
+    final message =
+        body['message'] as String? ??
         body['error'] as String? ??
         'Xatolik yuz berdi (${response.statusCode})';
 
@@ -84,7 +85,9 @@ class ApiService {
     } on SocketException catch (e) {
       throw NetworkException("Serverga ulanib bo'lmadi: ${e.message}");
     } on TimeoutException {
-      throw const NetworkException("Server javob berish vaqti tugadi (Timeout).");
+      throw const NetworkException(
+        "Server javob berish vaqti tugadi (Timeout).",
+      );
     } on http.ClientException catch (e) {
       throw NetworkException("Tarmoq xatosi: ${e.message}");
     } catch (e) {
@@ -101,18 +104,20 @@ class ApiService {
     required String password,
     String deviceName = 'AquaOptom Android Mobile',
   }) async {
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/auth/login'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: json.encode({
-            'email': email.trim(),
-            'password': password,
-            'device_name': deviceName,
-          }),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'email': email.trim(),
+          'password': password,
+          'device_name': deviceName,
+        }),
+      ),
+    );
 
     final data = json.decode(response.body) as Map<String, dynamic>;
     final token = data['token'] as String? ?? '';
@@ -124,10 +129,10 @@ class ApiService {
   }
 
   Future<UserModel> me() async {
-    final response = await _sendRequest(() => _client.get(
-          Uri.parse('$baseUrl/auth/me'),
-          headers: _buildHeaders(),
-        ));
+    final response = await _sendRequest(
+      () =>
+          _client.get(Uri.parse('$baseUrl/auth/me'), headers: _buildHeaders()),
+    );
 
     final data = json.decode(response.body) as Map<String, dynamic>;
     final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
@@ -137,10 +142,12 @@ class ApiService {
 
   Future<void> logout() async {
     try {
-      await _sendRequest(() => _client.post(
-            Uri.parse('$baseUrl/auth/logout'),
-            headers: _buildHeaders(),
-          ));
+      await _sendRequest(
+        () => _client.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: _buildHeaders(),
+        ),
+      );
     } finally {
       SessionService().clearSession();
     }
@@ -159,8 +166,12 @@ class ApiService {
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
 
-    final uri = Uri.parse('$baseUrl/dashboard').replace(queryParameters: queryParams);
-    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final uri = Uri.parse(
+      '$baseUrl/dashboard',
+    ).replace(queryParameters: queryParams);
+    final response = await _sendRequest(
+      () => _client.get(uri, headers: _buildHeaders()),
+    );
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return DashboardData.fromJson(data);
   }
@@ -170,13 +181,15 @@ class ApiService {
   // ==========================================
 
   Future<List<Product>> getProducts() async {
-    final response = await _sendRequest(() => _client.get(
-          Uri.parse('$baseUrl/products'),
-          headers: _buildHeaders(),
-        ));
+    final response = await _sendRequest(
+      () =>
+          _client.get(Uri.parse('$baseUrl/products'), headers: _buildHeaders()),
+    );
 
     final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data.map((json) => Product.fromJson(json as Map<String, dynamic>)).toList();
+    return data
+        .map((json) => Product.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   // ==========================================
@@ -193,10 +206,12 @@ class ApiService {
     int? costPrice,
     String? supplierName,
     String? invoiceNumber,
+    String? operationId,
   }) async {
     final body = <String, dynamic>{
       'quantity': quantity,
       'package_name': packageName,
+      if (operationId != null) 'operation_id': operationId,
     };
 
     if (variantId != null) body['variant_id'] = variantId;
@@ -211,11 +226,13 @@ class ApiService {
       body['invoice_number'] = invoiceNumber;
     }
 
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/inward'),
-          headers: _buildHeaders(),
-          body: json.encode(body),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/inward'),
+        headers: _buildHeaders(),
+        body: json.encode(body),
+      ),
+    );
 
     return json.decode(response.body) as Map<String, dynamic>;
   }
@@ -252,11 +269,13 @@ class ApiService {
     }
     if (notes != null && notes.isNotEmpty) body['notes'] = notes;
 
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/sales'),
-          headers: _buildHeaders(),
-          body: json.encode(body),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/sales'),
+        headers: _buildHeaders(),
+        body: json.encode(body),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return SaleRecord.fromJson(data);
@@ -270,10 +289,16 @@ class ApiService {
     final queryParams = <String, String>{};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
-    final uri = Uri.parse('$baseUrl/customers').replace(queryParameters: queryParams);
-    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final uri = Uri.parse(
+      '$baseUrl/customers',
+    ).replace(queryParameters: queryParams);
+    final response = await _sendRequest(
+      () => _client.get(uri, headers: _buildHeaders()),
+    );
     final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data.map((c) => CustomerModel.fromJson(c as Map<String, dynamic>)).toList();
+    return data
+        .map((c) => CustomerModel.fromJson(c as Map<String, dynamic>))
+        .toList();
   }
 
   Future<CustomerModel> createCustomer({
@@ -283,17 +308,19 @@ class ApiService {
     String? address,
     int debtLimit = 0,
   }) async {
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/customers'),
-          headers: _buildHeaders(),
-          body: json.encode({
-            'name': name.trim(),
-            'phone': phone?.trim(),
-            'store_name': storeName?.trim(),
-            'address': address?.trim(),
-            'debt_limit': debtLimit,
-          }),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/customers'),
+        headers: _buildHeaders(),
+        body: json.encode({
+          'name': name.trim(),
+          'phone': phone?.trim(),
+          'store_name': storeName?.trim(),
+          'address': address?.trim(),
+          'debt_limit': debtLimit,
+        }),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return CustomerModel.fromJson(data);
@@ -307,10 +334,16 @@ class ApiService {
     final queryParams = <String, String>{};
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
-    final uri = Uri.parse('$baseUrl/suppliers').replace(queryParameters: queryParams);
-    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final uri = Uri.parse(
+      '$baseUrl/suppliers',
+    ).replace(queryParameters: queryParams);
+    final response = await _sendRequest(
+      () => _client.get(uri, headers: _buildHeaders()),
+    );
     final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data.map((s) => SupplierModel.fromJson(s as Map<String, dynamic>)).toList();
+    return data
+        .map((s) => SupplierModel.fromJson(s as Map<String, dynamic>))
+        .toList();
   }
 
   Future<SupplierModel> createSupplier({
@@ -319,16 +352,18 @@ class ApiService {
     String? phone,
     String? address,
   }) async {
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/suppliers'),
-          headers: _buildHeaders(),
-          body: json.encode({
-            'name': name.trim(),
-            'company_name': companyName?.trim(),
-            'phone': phone?.trim(),
-            'address': address?.trim(),
-          }),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/suppliers'),
+        headers: _buildHeaders(),
+        body: json.encode({
+          'name': name.trim(),
+          'company_name': companyName?.trim(),
+          'phone': phone?.trim(),
+          'address': address?.trim(),
+        }),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return SupplierModel.fromJson(data);
@@ -339,13 +374,17 @@ class ApiService {
   // ==========================================
 
   Future<List<CashAccountModel>> getCashAccounts() async {
-    final response = await _sendRequest(() => _client.get(
-          Uri.parse('$baseUrl/cash-accounts'),
-          headers: _buildHeaders(),
-        ));
+    final response = await _sendRequest(
+      () => _client.get(
+        Uri.parse('$baseUrl/cash-accounts'),
+        headers: _buildHeaders(),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data.map((a) => CashAccountModel.fromJson(a as Map<String, dynamic>)).toList();
+    return data
+        .map((a) => CashAccountModel.fromJson(a as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> createPayment({
@@ -369,11 +408,13 @@ class ApiService {
     }
     if (notes != null && notes.isNotEmpty) body['notes'] = notes;
 
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/payments'),
-          headers: _buildHeaders(),
-          body: json.encode(body),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/payments'),
+        headers: _buildHeaders(),
+        body: json.encode(body),
+      ),
+    );
 
     return json.decode(response.body) as Map<String, dynamic>;
   }
@@ -383,13 +424,17 @@ class ApiService {
   // ==========================================
 
   Future<List<SaleRecord>> getSalesHistory() async {
-    final response = await _sendRequest(() => _client.get(
-          Uri.parse('$baseUrl/sales/history'),
-          headers: _buildHeaders(),
-        ));
+    final response = await _sendRequest(
+      () => _client.get(
+        Uri.parse('$baseUrl/sales/history'),
+        headers: _buildHeaders(),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data.map((s) => SaleRecord.fromJson(s as Map<String, dynamic>)).toList();
+    return data
+        .map((s) => SaleRecord.fromJson(s as Map<String, dynamic>))
+        .toList();
   }
 
   // ==========================================
@@ -405,8 +450,12 @@ class ApiService {
     if (startDate != null) queryParams['start_date'] = startDate;
     if (endDate != null) queryParams['end_date'] = endDate;
 
-    final uri = Uri.parse('$baseUrl/reports').replace(queryParameters: queryParams);
-    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final uri = Uri.parse(
+      '$baseUrl/reports',
+    ).replace(queryParameters: queryParams);
+    final response = await _sendRequest(
+      () => _client.get(uri, headers: _buildHeaders()),
+    );
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return ReportsData.fromJson(data);
   }
@@ -418,11 +467,13 @@ class ApiService {
   Future<Map<String, dynamic>> calculateCalculator({
     List<int>? variantIds,
   }) async {
-    final response = await _sendRequest(() => _client.post(
-          Uri.parse('$baseUrl/calculator'),
-          headers: _buildHeaders(),
-          body: json.encode({'variant_ids': variantIds ?? []}),
-        ));
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/calculator'),
+        headers: _buildHeaders(),
+        body: json.encode({'variant_ids': variantIds ?? []}),
+      ),
+    );
 
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return data;

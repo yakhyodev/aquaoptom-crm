@@ -70,6 +70,11 @@ class TelegramBotService
             return;
         }
 
+        // Financial commands are permitted only in the linked user's private chat.
+        if ((string) $telegramUserId !== (string) $chatId || $chatId < 0) {
+            return;
+        }
+
         // Acknowledge callback immediately
         if ($callbackQueryId) {
             $this->client->answerCallbackQuery($callbackQueryId);
@@ -132,42 +137,9 @@ class TelegramBotService
      */
     protected function handleSelfLink(int|string $chatId, ?string $username, string $text): void
     {
-        $parts = preg_split('/\s+/', trim($text));
-        $target = $parts[1] ?? null;
+        $this->client->sendMessage($chatId,
+            'Telegram hisobingizni OWNER yoki ADMIN admin panel orqali ulaydi. Foydalanuvchi ID bilan mustaqil ulash taqiqlangan.');
 
-        if (! $target) {
-            $this->client->sendMessage(
-                $chatId,
-                'ℹ️ Foydalanuvchini ulash uchun: <code>/link &lt;foydalanuvchi_id&gt;</code> shaklida yuboring.'
-            );
-
-            return;
-        }
-
-        $targetUser = User::find($target);
-        if (! $targetUser) {
-            $this->client->sendMessage($chatId, "❌ Foydalanuvchi (#{$target}) topilmadi.");
-
-            return;
-        }
-
-        // Agar boshqa kishi ulangan bo'lsa
-        if ($targetUser->telegram_chat_id && (string) $targetUser->telegram_chat_id !== (string) $chatId) {
-            $this->client->sendMessage($chatId, '❌ Ushbu foydalanuvchi profiliga boshqa Telegram ID ulangan.');
-
-            return;
-        }
-
-        $targetUser->update([
-            'telegram_chat_id' => $chatId,
-            'telegram_username' => $username,
-        ]);
-
-        $this->client->sendMessage(
-            $chatId,
-            "✅ <b>Muvaffaqiyatli ulandi!</b>\n\nAssalomu alaykum, <b>".$this->escape($targetUser->name).'</b>! Siz tizimga kirdingiz.',
-            $this->getMainReplyKeyboard()
-        );
     }
 
     /**
@@ -883,7 +855,7 @@ class TelegramBotService
     protected function confirmSale(User $user, int|string $chatId, string $operationId): void
     {
         // 1. Idempotency tekshiruvi: ushbu operation_id bilan allaqachon savdo bo'lganmi?
-        $existingSale = Sale::where('operation_id', $operationId)->first();
+        $existingSale = Sale::where('operation_id', $operationId)->where('created_by', $user->id)->first();
         if ($existingSale) {
             // Allaqachon yaratilgan bo'lsa yangi qo'shmaymiz, faqat ma'lumot beramiz
             $this->client->sendMessage(
@@ -898,7 +870,7 @@ class TelegramBotService
             return;
         }
 
-        $draft = BotDraft::where('operation_id', $operationId)->first();
+        $draft = BotDraft::where('operation_id', $operationId)->where('user_id', $user->id)->where('chat_id', $chatId)->first();
         if (! $draft) {
             $this->client->sendMessage($chatId, "❌ Savdo qoralamasi topilmadi yoki muddati o'tgan.", $this->getMainReplyKeyboard());
 
@@ -925,7 +897,9 @@ class TelegramBotService
                 cashAccountId: $payload['cash_account_id'] ?? null,
                 warehouseId: $warehouse?->id ?? 1,
                 userId: $user->id,
-                source: 'telegram'
+                source: 'telegram',
+                paymentType: (int) ($payload['paid_amount'] ?? 0) === 0 ? 'DEBT' : 'PARTIAL',
+                paymentMethod: $payload['payment_method'] ?? 'CASH'
             );
 
             // Draftni o'chiramiz
@@ -1109,7 +1083,7 @@ class TelegramBotService
     protected function confirmPurchase(User $user, int|string $chatId, string $operationId): void
     {
         // Idempotency: allaqachon kirim qilinganmi?
-        $existing = Purchase::where('operation_id', $operationId)->first();
+        $existing = Purchase::where('operation_id', $operationId)->where('created_by', $user->id)->first();
         if ($existing) {
             $this->client->sendMessage(
                 $chatId,
@@ -1120,7 +1094,7 @@ class TelegramBotService
             return;
         }
 
-        $draft = BotDraft::where('operation_id', $operationId)->first();
+        $draft = BotDraft::where('operation_id', $operationId)->where('user_id', $user->id)->where('chat_id', $chatId)->first();
         if (! $draft) {
             $this->client->sendMessage($chatId, '❌ Kirim qoralamasi topilmadi.', $this->getMainReplyKeyboard());
 
@@ -1145,7 +1119,8 @@ class TelegramBotService
                 cashAccountId: $payload['cash_account_id'] ?? null,
                 warehouseId: $warehouse?->id ?? 1,
                 userId: $user->id,
-                source: 'telegram'
+                source: 'telegram',
+                paymentMethod: $payload['payment_method'] ?? 'CASH'
             );
 
             $draft->delete();
@@ -1257,7 +1232,7 @@ class TelegramBotService
 
     protected function confirmCustomerPayment(User $user, int|string $chatId, string $operationId): void
     {
-        $existing = Payment::where('operation_id', $operationId)->first();
+        $existing = Payment::where('operation_id', $operationId)->where('created_by', $user->id)->first();
         if ($existing) {
             $this->client->sendMessage(
                 $chatId,
@@ -1268,7 +1243,7 @@ class TelegramBotService
             return;
         }
 
-        $draft = BotDraft::where('operation_id', $operationId)->first();
+        $draft = BotDraft::where('operation_id', $operationId)->where('user_id', $user->id)->where('chat_id', $chatId)->first();
         if (! $draft) {
             $this->client->sendMessage($chatId, "❌ To'lov qoralamasi topilmadi.", $this->getMainReplyKeyboard());
 
@@ -1311,7 +1286,7 @@ class TelegramBotService
         // Cancel draft
         if (str_starts_with($data, 'draft_cancel:')) {
             $opId = str_replace('draft_cancel:', '', $data);
-            BotDraft::where('operation_id', $opId)->delete();
+            BotDraft::where('operation_id', $opId)->where('user_id', $user->id)->where('chat_id', $chatId)->delete();
             $this->client->sendMessage($chatId, '🚫 Amal bekor qilindi.', $this->getMainReplyKeyboard());
 
             return;

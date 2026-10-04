@@ -44,10 +44,10 @@ class DashboardManager extends Component
      * Reverb/Echo yoki ichki event orqali real vaqtda kartalarni yangilash.
      * Foydalanuvchining ochiq modal yoki form maydonlari buzilmaydi.
      */
-    #[On('echo:store.operations,SaleCreatedBroadcastEvent')]
-    #[On('echo:store.operations,PurchaseReceivedBroadcastEvent')]
-    #[On('echo:store.operations,PaymentRecordedBroadcastEvent')]
-    #[On('echo:store.operations,StockChangedBroadcastEvent')]
+    #[On('echo-private:store.operations,SaleCreatedBroadcastEvent')]
+    #[On('echo-private:store.operations,PurchaseReceivedBroadcastEvent')]
+    #[On('echo-private:store.operations,PaymentRecordedBroadcastEvent')]
+    #[On('echo-private:store.operations,StockChangedBroadcastEvent')]
     #[On('refresh-dashboard')]
     public function refreshDashboard(): void
     {

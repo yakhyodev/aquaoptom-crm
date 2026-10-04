@@ -141,6 +141,37 @@ jobs:
       - name: Run backend and PWA tests
         run: php artisan test --env=testing --compact --log-junit=test-results/backend.xml 2>&1 | tee test-results/backend.log
 
+      - name: Audit locked dependencies
+        run: |
+          composer audit --locked --no-interaction
+          npm audit
+
+      - name: Verify Reverb WebSocket handshake
+        env:
+          REVERB_APP_ID: ci-app
+          REVERB_APP_KEY: ci-public-key
+          REVERB_APP_SECRET: ci-only-secret
+        run: |
+          php artisan reverb:start --host=127.0.0.1 --port=18080 > test-results/reverb.log 2>&1 &
+          reverb_pid=$!
+          trap 'kill "$reverb_pid" 2>/dev/null || true' EXIT
+          python3 - <<'PY'
+          import socket, time
+          for attempt in range(20):
+              try:
+                  client = socket.create_connection(('127.0.0.1', 18080), timeout=1)
+                  break
+              except OSError:
+                  time.sleep(0.2)
+          else:
+              raise RuntimeError('Reverb did not start')
+          with client:
+              client.sendall(b'GET /app/ci-public-key?protocol=7&client=js&version=8.0.0 HTTP/1.1\r\nHost: 127.0.0.1:18080\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n')
+              response = client.recv(4096)
+              assert b'101 Switching Protocols' in response, response[:200]
+          print('Reverb WebSocket handshake passed')
+          PY
+
       - name: Save test results and failure logs
         if: ${{ always() }}
         uses: actions/upload-artifact@v7.0.1
@@ -199,3 +230,31 @@ jobs:
           path: mobile/test-results/
           if-no-files-found: ignore
           retention-days: 7
+
+  production-image:
+    name: Production container & deployment syntax
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate deployment script
+        run: bash -n deploy/deploy.sh
+      - name: Validate compose configuration
+        env:
+          DB_PASSWORD: ci-only-password
+          REDIS_PASSWORD: ci-only-password
+          REVERB_APP_KEY: ci-public-key
+          VITE_REVERB_HOST: crm.example.invalid
+        run: |
+          cp backend/.env.example backend/.env
+          docker compose -f docker/docker-compose.yml config --quiet
+      - name: Build production PHP and Nginx images
+        run: |
+          docker build --target production --build-arg VITE_REVERB_APP_KEY=ci-public-key --build-arg VITE_REVERB_HOST=crm.example.invalid -f docker/Dockerfile -t aquaoptom:ci .
+          docker build --target nginx --build-arg VITE_REVERB_APP_KEY=ci-public-key --build-arg VITE_REVERB_HOST=crm.example.invalid -f docker/Dockerfile -t aquaoptom-nginx:ci .
+      - name: Verify runtime, assets and excluded secrets
+        run: |
+          docker run --rm aquaoptom:ci sh -c 'php artisan --version && php artisan reverb:start --help && test -f public/build/manifest.json && test ! -f .env && test ! -f .env.production'
+          docker run --rm aquaoptom-nginx:ci sh -c 'test -f /var/www/html/public/build/manifest.json'

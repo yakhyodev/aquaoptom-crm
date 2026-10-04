@@ -4,10 +4,8 @@ namespace App\Services\Sync;
 
 use App\Models\AuditLog;
 use App\Models\CashAccount;
-use App\Models\CashMovement;
 use App\Models\CashSession;
 use App\Models\Customer;
-use App\Models\CustomerLedger;
 use App\Models\Device;
 use App\Models\OperationResult;
 use App\Models\ProductVariant;
@@ -18,6 +16,7 @@ use App\Models\User;
 use App\Services\Devices\Exceptions\DeviceRevokedException;
 use App\Services\Devices\Exceptions\LeaseExpiredException;
 use App\Services\Devices\OfflineLeaseService;
+use App\Services\Inventory\SaleReturnService;
 use App\Services\Ledger\Exceptions\InsufficientAllocationException;
 use App\Services\Ledger\Exceptions\InsufficientCreditAllocationException;
 use App\Services\Ledger\InventoryLedgerService;
@@ -30,6 +29,7 @@ use App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Ramsey\Uuid\Uuid;
 
 class SyncPushService
 {
@@ -72,6 +72,9 @@ class SyncPushService
         foreach ($operations as $op) {
             $opId = $op['operation_id'] ?? (string) Str::uuid();
             $type = strtoupper($op['type'] ?? $op['operation_type'] ?? '');
+            if ($type === 'CANCEL_SALE') {
+                $type = 'VOID_SALE';
+            }
             $deviceCreatedAt = isset($op['device_created_at'])
                 ? Carbon::parse($op['device_created_at'])
                 : Carbon::now();
@@ -99,7 +102,7 @@ class SyncPushService
                         'entity_id' => $resPayload['entity_id'] ?? null,
                         'error_code' => null,
                         'message' => 'Operatsiya avval bajarilgan (Idempotent replay).',
-                        'data' => $resPayload,
+                        'data' => $user->hasPermission('view_cost_price') ? $resPayload : $this->changeLogService->maskSensitiveFields($resPayload),
                     ];
 
                     continue;
@@ -160,6 +163,10 @@ class SyncPushService
                 if (! $user->hasPermission('offline_sales')) {
                     throw new OperationValidationException($opId, 'Offline savdoga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
                 }
+                $this->leaseService->validateOperationPermitted($device, 'offline_sales', $deviceCreatedAt);
+                if ($leaseToken && ! $device->offlineAuthorizations()->where('lease_token', $leaseToken)->where('user_id', $user->id)->exists()) {
+                    throw new OperationValidationException($opId, 'Qurilma lease tokeni mos kelmadi.', errorCode: 'INVALID_LEASE');
+                }
                 if ($type === 'CREATE_CUSTOMER') {
                     $res = $this->handleCreateCustomer($device, $user, $opId, $payload, $canonicalFingerprint, $deviceCreatedAt, $receivedAt);
                 } elseif ($type === 'CREATE_SALE') {
@@ -196,6 +203,7 @@ class SyncPushService
                     'CUSTOMER_NOT_FOUND',
                     'CUSTOMER_MAPPING_FAILED',
                     'LEASE_EXPIRED',
+                    'INVALID_LEASE',
                     'DEVICE_REVOKED',
                 ];
 
@@ -466,6 +474,9 @@ class SyncPushService
             if (! $variantId) {
                 throw new \InvalidArgumentException("Har bir qatorda variant_id yoki product_variant_id ko'rsatilishi shart!");
             }
+            if (! ($item['is_system_price'] ?? false) && ! $user->hasPermission('custom_sale_price')) {
+                throw new OperationValidationException($operationId, 'Kelishilgan narxda sotishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+            }
             $qty = $item['quantity'] ?? 0;
             $variant = ProductVariant::findOrFail($variantId);
 
@@ -592,7 +603,11 @@ class SyncPushService
             throw new \InvalidArgumentException("To'lov uchun mijoz ko'rsatilishi shart!");
         }
 
-        $amount = (int) ($payload['amount'] ?? 0);
+        $rawAmount = $payload['amount'] ?? 0;
+        if (! is_numeric($rawAmount) || $rawAmount != (int) $rawAmount || $rawAmount <= 0) {
+            throw new OperationValidationException($operationId, 'To‘lov musbat butun so‘m bo‘lishi shart.', errorCode: 'INVALID_PAYMENT_AMOUNT');
+        }
+        $amount = (int) $rawAmount;
         $cashAccountId = $payload['cash_account_id'] ?? null;
         $paymentMethod = strtoupper($payload['payment_method'] ?? 'CASH');
 
@@ -612,7 +627,8 @@ class SyncPushService
             userId: $user->id,
             notes: $payload['notes'] ?? 'Offline mijoz to\'lovi',
             confirmExcessAsAdvance: (bool) ($payload['confirm_excess_advance'] ?? false),
-            rawPayload: $payload
+            rawPayload: $payload,
+            deviceId: $device->id
         );
 
         return [
@@ -641,6 +657,9 @@ class SyncPushService
         Carbon $receivedAt
     ): array {
         $originalOpId = $payload['original_operation_id'] ?? null;
+        if (! $user->hasPermission('process_refund')) {
+            throw new OperationValidationException($operationId, 'Savdoni bekor qilishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+        }
         $reason = $payload['reason'] ?? 'Offline bekor qilindi';
 
         if (! $originalOpId) {
@@ -653,7 +672,11 @@ class SyncPushService
         }
 
         // Asl savdoni topish
-        $sale = Sale::where('operation_id', $originalOpId)->with('items')->first();
+        $sale = Sale::where('operation_id', $originalOpId)->with('items')->lockForUpdate()->first();
+
+        if ($sale && (int) $sale->created_by !== $user->id && ! $user->hasRole(['OWNER', 'ADMIN'])) {
+            throw new OperationValidationException($operationId, 'Boshqa xodim savdosini bekor qilishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+        }
 
         if (! $sale) {
             // Agar asl savdo serverda hali topilmasa:
@@ -710,59 +733,17 @@ class SyncPushService
             ];
         }
 
-        // Savdo posted bo'lgan: tovarlarni omborga qaytarish va ledgerni tuzatish
-        foreach ($sale->items as $item) {
-            $this->inventoryLedgerService->recordInflow(
-                productVariantId: $item->product_variant_id,
-                quantity: $item->quantity,
-                unitCost: (int) ($item->purchase_cost_snapshot ?? 0),
-                movementType: 'SALE_RETURN',
-                warehouseId: $sale->warehouse_id,
-                operationId: $operationId,
-                referenceType: Sale::class,
-                referenceId: $sale->id,
-                userId: $user->id
-            );
-        }
-
-        // Agar nasiya bo'lgan bo'lsa, mijoz qarzini kamaytirish
-        if ($sale->debt_amount > 0 && $sale->customer_id) {
-            $customer = Customer::find($sale->customer_id);
-            if ($customer) {
-                CustomerLedger::create([
-                    'customer_id' => $customer->id,
-                    'operation_id' => $operationId,
-                    'type' => 'SALE_CANCEL',
-                    'payment_method' => $sale->payment_method,
-                    'debit' => 0,
-                    'credit' => $sale->debt_amount,
-                    'balance_after' => $customer->current_debt - $sale->debt_amount,
-                    'notes' => "Savdo #{$sale->invoice_number} bekor qilindi: {$reason}",
-                    'created_at' => Carbon::now(),
-                ]);
-                $customer->decrement('current_debt', $sale->debt_amount);
-            }
-        }
-
-        // Agar naqd to'langan bo'lsa va kassa hisobi bo'lsa, kassa chiqimi (refund)
-        if ($sale->paid_amount > 0 && $sale->cash_account_id) {
-            $cashAccount = CashAccount::find($sale->cash_account_id);
-            if ($cashAccount) {
-                CashMovement::create([
-                    'cash_account_id' => $cashAccount->id,
-                    'operation_id' => $operationId,
-                    'type' => 'REFUND',
-                    'direction' => 'OUT',
-                    'debit' => 0,
-                    'credit' => $sale->paid_amount,
-                    'amount' => $sale->paid_amount,
-                    'balance_after' => $cashAccount->balance - $sale->paid_amount,
-                    'description' => "Savdo #{$sale->invoice_number} bekor qilindi (qaytarish): {$reason}",
-                    'created_at' => Carbon::now(),
-                ]);
-                $cashAccount->decrement('balance', $sale->paid_amount);
-            }
-        }
+        // Use the same stock, debt and cash correction path as online returns.
+        app(SaleReturnService::class)->createSaleReturn(
+            saleId: $sale->id,
+            items: $sale->items->map(fn ($item) => ['sale_item_id' => $item->id, 'quantity' => (int) $item->quantity])->all(),
+            reason: $reason,
+            operationId: (string) Uuid::uuid5($operationId, 'sale-return'),
+            refundAmount: (int) $sale->paid_amount,
+            cashAccountId: $sale->cash_account_id,
+            refundPaymentMethod: $sale->payment_method,
+            userId: $user->id
+        );
 
         $sale->update([
             'status' => 'CANCELLED',

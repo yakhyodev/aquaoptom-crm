@@ -13,6 +13,7 @@ use App\Models\Volume;
 use App\Models\Warehouse;
 use App\Services\Devices\OfflineLeaseService;
 use App\Services\Sales\CreateSaleService;
+use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -38,6 +39,7 @@ class PwaAutoSyncAndDisruptionTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleAndPermissionSeeder::class);
 
         $this->warehouse = Warehouse::create([
             'name' => 'Asosiy Ombor',
@@ -51,6 +53,7 @@ class PwaAutoSyncAndDisruptionTest extends TestCase
             'status' => 'ACTIVE',
             'is_active' => true,
         ]);
+        $this->cashier->givePermission('offline_sales');
 
         $this->cashAccount = CashAccount::create([
             'name' => 'Asosiy Naqd Kassa',
@@ -109,7 +112,7 @@ class PwaAutoSyncAndDisruptionTest extends TestCase
             'status' => 'ACTIVE',
             'is_active' => true,
             'assigned_warehouse_id' => $this->warehouse->id,
-            'current_user_id' => $this->cashier->id,
+            'assigned_user_id' => $this->cashier->id,
         ]);
 
         $leaseService = app(OfflineLeaseService::class);

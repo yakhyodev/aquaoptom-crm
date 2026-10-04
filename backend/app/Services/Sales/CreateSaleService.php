@@ -24,6 +24,7 @@ use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Operations\OperationContext;
 use App\Services\Operations\TransactionalOperationService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
@@ -137,6 +138,9 @@ class CreateSaleService
             }
             $qty = (int) $rawQty;
 
+            if (! $isSysPrice && ! $deviceId && ! $actor->hasPermission('custom_sale_price')) {
+                throw new OperationValidationException($operationId, 'Kelishilgan narxda sotishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+            }
             // Narxni aniqlash
             if ($isSysPrice) {
                 // Tizim narxi majburiy, agar yo'q bo'lsa tasodifiy default yo'q!
@@ -206,6 +210,10 @@ class CreateSaleService
             $paidAmount = $totalAmount;
         }
 
+        if ($paidAmount < $totalAmount && ! $actor->hasPermission('sell_on_credit')) {
+            throw new OperationValidationException($operationId, 'Nasiyaga sotishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+        }
+
         // "Guest tezkor savdo faqat to‘liq to‘lov; mijozsiz DEBT o‘tmaydi"
         $customer = null;
         if (! $customerId) {
@@ -263,7 +271,7 @@ class CreateSaleService
             operationId: $operationId,
             operationType: 'CREATE_SALE',
             payload: $operationPayload,
-            businessCallback: function () use (
+            businessCallback: function (OperationContext $context) use (
                 $operationId,
                 $customerId,
                 $customer,
@@ -280,7 +288,8 @@ class CreateSaleService
                 $userId,
                 $source,
                 $goodsPickedUpAt,
-                $deviceId
+                $deviceId,
+                $actor
             ) {
                 $actualWarehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
 
@@ -446,6 +455,9 @@ class CreateSaleService
 
                     $unitCost = (int) $outflow['unit_cost'];
                     $costTotal = (int) $outflow['total_cost'];
+                    if ($lineTotal < $costTotal && ! $actor->hasPermission('sell_below_cost')) {
+                        throw new OperationValidationException($operationId, 'Tannarxdan past sotishga ruxsat yo‘q.', errorCode: 'BELOW_COST_NOT_ALLOWED');
+                    }
                     $grossProfit = $lineTotal - $costTotal;
                     $saleTotalCost += $costTotal;
 
@@ -609,6 +621,8 @@ class CreateSaleService
                 ];
 
                 $sale->update(['receipt_data' => $receiptData]);
+                $context->logAudit('SALE_CREATED', Sale::class, $sale->id, newValues: $receiptData);
+                $context->enqueueEvent('SaleCreated', 'Sale', $sale->id, $receiptData);
 
                 // Send only after the outermost transaction has committed.
                 DB::afterCommit(function () use ($itemsRecorded, $customer, $totalAmount, $saleTotalCost, $netGrossProfit, $resolvedPaymentType, $source) {

@@ -4,6 +4,7 @@ namespace App\Services\Ledger;
 
 use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
+use App\Models\ProductVariant;
 use App\Models\Warehouse;
 use App\Services\Ledger\Exceptions\InsufficientStockException;
 use Carbon\Carbon;
@@ -26,7 +27,8 @@ class InventoryLedgerService
         ?string $operationId = null,
         ?string $referenceType = null,
         ?int $referenceId = null,
-        ?int $userId = null
+        ?int $userId = null,
+        ?int $totalCost = null
     ): array {
         if ($quantity <= 0 || $quantity > self::MAX_QUANTITY) {
             throw new \InvalidArgumentException('Kirim miqdori 0 dan katta butun son bo\'lishi shart.');
@@ -41,7 +43,13 @@ class InventoryLedgerService
         }
 
         $warehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
-        $inflowTotalValue = $quantity * $unitCost;
+        $inflowTotalValue = $totalCost ?? $quantity * $unitCost;
+        if ($inflowTotalValue < 0) {
+            throw new \InvalidArgumentException('Jami tannarx manfiy bo‘lishi mumkin emas.');
+        }
+
+        // A missing balance row cannot be locked; serialize its initial creation.
+        ProductVariant::whereKey($productVariantId)->lockForUpdate()->firstOrFail();
 
         // InventoryBalance qatorini lockForUpdate bilan bloklash
         $balance = InventoryBalance::where('product_variant_id', $productVariantId)
@@ -156,8 +164,7 @@ class InventoryLedgerService
             $newWac = 0;
         } else {
             // Split the product to preserve integer accuracy and avoid bigint overflow.
-            $outflowCost = $quantity * intdiv($oldTotalValue, $currentStock)
-                + $this->roundRatio($quantity * ($oldTotalValue % $currentStock), $currentStock);
+            $outflowCost = $this->proportionalCost($oldTotalValue, $quantity, $currentStock);
             $remainingValue = $oldTotalValue - $outflowCost;
             $newWac = $this->roundRatio($remainingValue, $remainingQuantity);
         }
@@ -250,6 +257,16 @@ class InventoryLedgerService
     {
         return intdiv($numerator, $denominator)
             + (($numerator % $denominator) >= intdiv($denominator, 2) + ($denominator % 2) ? 1 : 0);
+    }
+
+    public function proportionalCost(int $value, int $quantity, int $totalQuantity): int
+    {
+        if ($value < 0 || $quantity < 1 || $quantity > $totalQuantity || $totalQuantity > self::MAX_QUANTITY) {
+            throw new \InvalidArgumentException('Tannarx hisoblash miqdori yoki qiymati noto‘g‘ri.');
+        }
+
+        return $quantity * intdiv($value, $totalQuantity)
+            + $this->roundRatio($quantity * ($value % $totalQuantity), $totalQuantity);
     }
 
     protected function getDefaultWarehouseId(): int

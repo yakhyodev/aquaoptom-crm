@@ -22,14 +22,12 @@ class RecoveryReconciliationService
     /**
      * Zaxiradan tiklanishdan keyin mijoz/qurilma operatsiyalarini muvofiqlashtirish (Reconciliation)
      *
-     * @param Device $device
-     * @param User $user
-     * @param int $clientEpoch Mijoz bilgan recovery epoch
-     * @param array $retainedOperations Mijoz outbox/ACK tarixida saqlangan amallar
-     * @return array
+     * @param  int  $clientEpoch  Mijoz bilgan recovery epoch
+     * @param  array  $retainedOperations  Mijoz outbox/ACK tarixida saqlangan amallar
      */
     public function reconcileDevice(Device $device, User $user, int $clientEpoch, array $retainedOperations): array
     {
+        abort_unless($user->isActive() && ($device->assigned_user_id === $user->id || $user->hasRole(['OWNER', 'ADMIN'])), 403);
         $serverEpoch = (int) SystemSetting::get('system_recovery_epoch', 1);
         $watermark = SystemSetting::get('system_recovery_watermark', null);
         $watermarkTime = $watermark ? Carbon::parse($watermark) : null;
@@ -53,7 +51,8 @@ class RecoveryReconciliationService
             $existingOp = OperationResult::where('operation_id', $opId)->first();
 
             if ($existingOp) {
-                if ($existingOp->payload_fingerprint === $canonicalFingerprint) {
+                if ($existingOp->payload_fingerprint === $canonicalFingerprint && $existingOp->operation_type === $type
+                    && (int) $existingOp->actor_id === $user->id && (int) $existingOp->device_id === $device->id) {
                     $resPayload = $existingOp->result_payload ?: [];
                     $results[] = [
                         'operation_id' => $opId,
@@ -65,6 +64,7 @@ class RecoveryReconciliationService
                         'data' => $resPayload,
                     ];
                     $alreadyPersistedCount++;
+
                     continue;
                 } else {
                     $results[] = [
@@ -74,6 +74,7 @@ class RecoveryReconciliationService
                         'message' => 'Operatsiya payload fingerprint mos kelmadi.',
                     ];
                     $conflictsCount++;
+
                     continue;
                 }
             }
@@ -133,7 +134,7 @@ class RecoveryReconciliationService
             'restored_and_applied_count' => $restoredCount,
             'already_persisted_count' => $alreadyPersistedCount,
             'conflicts_count' => $conflictsCount,
-            'results' => $results,
+            'results' => $user->hasPermission('view_cost_price') ? $results : app(SyncChangeLogService::class)->maskSensitiveFields($results),
         ];
     }
 

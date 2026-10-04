@@ -175,7 +175,7 @@ class SyncBootstrapService
             ],
             'stock_allocations' => $stockAllocations,
             'credit_allocations' => $creditAllocations,
-            'cash_accounts' => CashAccount::select(['id', 'name', 'type', 'is_default', 'is_active'])->get()->toArray(),
+            'cash_accounts' => CashAccount::select(['id', 'name', 'type', 'is_default'])->get()->map(fn ($account) => [...$account->toArray(), 'is_active' => true])->all(),
             'catalog' => $catalog,
             'customers' => $customers,
             'current_cursor' => $latestCursor,

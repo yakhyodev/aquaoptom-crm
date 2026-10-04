@@ -7,12 +7,14 @@ use App\Models\OutboxEvent;
 use App\Models\Purchase;
 use App\Models\PurchaseReturn;
 use App\Models\PurchaseReturnItem;
+use App\Models\User;
 use App\Services\Ledger\Exceptions\CannotReturnMoreThanPurchasedException;
 use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Ledger\SupplierLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Operations\TransactionalOperationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -35,6 +37,35 @@ class SupplierReturnService
      * 4. Ombor chiqimi joriy WAC (Weighted Average Cost) bo'yicha hisoblanadi va farq qayd etiladi.
      */
     public function createSupplierReturn(
+        int $purchaseId,
+        array $items,
+        string $reason,
+        ?string $operationId = null,
+        ?int $userId = null,
+        ?string $notes = null
+    ): array {
+        $operationId ??= (string) Str::uuid();
+        $actor = $userId ? User::find($userId) : auth()->user();
+        if (! $actor || ! $actor->hasPermission('process_refund')) {
+            throw new OperationValidationException($operationId, 'Ruxsat mavjud emas.', errorCode: 'PERMISSION_DENIED');
+        }
+        $payload = compact('purchaseId', 'items', 'reason', 'notes');
+        $operations = app(TransactionalOperationService::class);
+        $isReplay = $operations->replay($operationId, 'SUPPLIER_RETURN', $payload, $actor->id) !== null;
+        $result = $operations->execute($operationId, 'SUPPLIER_RETURN', $payload, function () use ($purchaseId, $items, $reason, $operationId, $actor, $notes) {
+            $result = $this->postCreateSupplierReturn($purchaseId, $items, $reason, $operationId, $actor->id, $notes);
+            $result['document_id'] = $result['return']->id;
+            unset($result['return']);
+
+            return $result;
+        }, actorId: $actor->id);
+        $result['return'] = PurchaseReturn::with('items')->findOrFail($result['document_id']);
+        $result['is_replay'] = $isReplay;
+
+        return $result;
+    }
+
+    private function postCreateSupplierReturn(
         int $purchaseId,
         array $items,
         string $reason,
@@ -91,12 +122,17 @@ class SupplierReturnService
             $totalCreditAmount = 0;
             $totalCostAmount = 0;
 
+            $seenItems = [];
             // 3. Har bir tovar qatorini tekshirish va rezerv himoyasini tekshirish
             foreach ($items as $itemReq) {
                 $purchaseItemId = (int) ($itemReq['purchase_item_id'] ?? 0);
+                if (isset($seenItems[$purchaseItemId])) {
+                    throw new OperationValidationException($operationId, 'Takroriy qaytarish qatori.', errorCode: 'DUPLICATE_RETURN_ITEM');
+                }
+                $seenItems[$purchaseItemId] = true;
                 $quantity = (int) ($itemReq['quantity'] ?? 0);
 
-                if ($quantity <= 0) {
+                if (! is_numeric($itemReq['quantity'] ?? null) || $quantity != $itemReq['quantity'] || $quantity <= 0 || $quantity > InventoryLedgerService::MAX_QUANTITY) {
                     throw new OperationValidationException(
                         $operationId,
                         "Qaytariladigan tovar miqdori 0 dan katta butun son bo'lishi shart!",

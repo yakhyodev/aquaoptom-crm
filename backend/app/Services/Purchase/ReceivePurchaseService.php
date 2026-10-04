@@ -10,15 +10,18 @@ use App\Models\PurchaseItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Catalog\CatalogService;
 use App\Services\Ledger\CashAccountService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Ledger\SupplierLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationPermissionException;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Operations\OperationContext;
 use App\Services\Operations\TransactionalOperationService;
 use App\Services\TelegramService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Fluent;
 use Illuminate\Support\Str;
 
@@ -63,6 +66,17 @@ class ReceivePurchaseService
     ): Fluent {
         $operationId = $operationId ?: (string) Str::uuid();
         $supplierInvoiceNumber = $supplierInvoiceNumber ?? $invoiceNumber;
+        $actor = $userId ? User::find($userId) : auth()->user();
+        if ($actor && ! $actor->hasPermission('receive_stock')) {
+            throw new OperationPermissionException($operationId, 'Kirim qilishga ruxsat yo‘q.');
+        }
+        if ($userId && ! $actor) {
+            throw new OperationPermissionException($operationId, 'Mas’ul xodim topilmadi.');
+        }
+        $userId = $actor?->id ?? $userId;
+        if ($paidAmount < 0) {
+            throw new OperationValidationException($operationId, 'To‘lov manfiy bo‘lishi mumkin emas.', errorCode: 'INVALID_PAYMENT_AMOUNT');
+        }
 
         // 1. Validatsiyalar
         if (empty($items)) {
@@ -121,7 +135,7 @@ class ReceivePurchaseService
                 );
             }
 
-            if ($qty <= 0) {
+            if (! is_numeric($item['quantity'] ?? null) || $qty != $item['quantity'] || $qty <= 0 || $qty > InventoryLedgerService::MAX_QUANTITY) {
                 throw new OperationValidationException(
                     operationId: $operationId,
                     message: "Tovar miqdori 0 dan katta butun son bo'lishi shart! (Qator #".($index + 1).')',
@@ -129,7 +143,7 @@ class ReceivePurchaseService
                 );
             }
 
-            if ($unitCost < 0) {
+            if (! is_numeric($item['unit_cost'] ?? null) || $unitCost != $item['unit_cost'] || $unitCost < 0) {
                 throw new OperationValidationException(
                     operationId: $operationId,
                     message: "Kirim narxi manfiy bo'lishi mumkin emas! (Qator #".($index + 1).')',
@@ -137,7 +151,16 @@ class ReceivePurchaseService
                 );
             }
 
+            if ($unitCost > intdiv(PHP_INT_MAX - $totalAmount, $qty)) {
+                throw new OperationValidationException($operationId, 'Kirim summasi ruxsat etilgan chegaradan oshdi.', errorCode: 'AMOUNT_OVERFLOW');
+            }
             $totalAmount += ($qty * $unitCost);
+            if (isset($item['new_sale_price']) && (! is_numeric($item['new_sale_price']) || $item['new_sale_price'] != (int) $item['new_sale_price'] || $item['new_sale_price'] < 1)) {
+                throw new OperationValidationException($operationId, 'Narx musbat butun so‘m bo‘lishi shart.', errorCode: 'INVALID_SALE_PRICE');
+            }
+            if (! empty($item['new_sale_price']) && ! $actor?->hasPermission('manage_prices')) {
+                throw new OperationPermissionException($operationId, 'Narx o‘zgartirishga ruxsat yo‘q.');
+            }
         }
 
         if ($paidAmount > $totalAmount) {
@@ -156,6 +179,7 @@ class ReceivePurchaseService
             'cash_account_id' => $cashAccountId,
             'payment_method' => strtoupper($paymentMethod),
             'supplier_invoice_number' => $supplierInvoiceNumber,
+            'notes' => $notes,
             'warehouse_id' => $warehouseId,
             'source' => $source,
         ];
@@ -165,7 +189,7 @@ class ReceivePurchaseService
             operationId: $operationId,
             operationType: 'RECEIVE_PURCHASE',
             payload: $payload,
-            businessCallback: function () use (
+            businessCallback: function (OperationContext $context) use (
                 $supplier,
                 $supplierId,
                 $items,
@@ -236,10 +260,7 @@ class ReceivePurchaseService
                     if (! empty($item['new_sale_price']) && (int) $item['new_sale_price'] > 0) {
                         $variant = ProductVariant::find($variantId);
                         if ($variant) {
-                            $variant->update([
-                                'default_sale_price' => (int) $item['new_sale_price'],
-                                'version' => $variant->version + 1,
-                            ]);
+                            app(CatalogService::class)->updatePrice($variant, (int) $item['new_sale_price'], 'Kirimda narx yangilandi', $userId);
                         }
                     }
 
@@ -312,25 +333,29 @@ class ReceivePurchaseService
                     );
                 }
 
-                // 5. Telegram orqali xabarnoma (xato bo'lsa tranzaksiyani buzmasligi uchun try/catch)
-                try {
-                    $supplierName = Supplier::where('id', $supplierId)->value('name') ?: 'Noma\'lum';
-                    $firstItem = $items[0] ?? null;
-                    if ($firstItem) {
-                        $variant = ProductVariant::with(['product', 'volume'])->find($firstItem['variant_id']);
-                        if ($variant) {
-                            $this->telegram->notifyInward(
-                                productName: $variant->product->name.' ('.$supplierName.')',
-                                litres: $variant->volume->name ?? '0.5 L',
-                                qty: (int) $firstItem['quantity'],
-                                costPrice: (int) $firstItem['unit_cost'],
-                                source: $source
-                            );
+                $context->logAudit('PURCHASE_RECEIVED', Purchase::class, $purchase->id, newValues: ['total_amount' => $totalAmount, 'paid_amount' => $paidAmount]);
+                $context->enqueueEvent('PurchaseReceived', 'Purchase', $purchase->id, ['invoice_number' => $invoiceNumber, 'supplier_name' => $supplier->name, 'total_amount' => $totalAmount, 'paid_amount' => $paidAmount, 'debt_amount' => $debtAmount]);
+
+                DB::afterCommit(function () use ($supplierId, $items, $source) {
+                    try {
+                        $supplierName = Supplier::where('id', $supplierId)->value('name') ?: 'Noma\'lum';
+                        $firstItem = $items[0] ?? null;
+                        if ($firstItem) {
+                            $variant = ProductVariant::with(['product', 'volume'])->find($firstItem['variant_id']);
+                            if ($variant) {
+                                $this->telegram->notifyInward(
+                                    productName: $variant->product->name.' ('.$supplierName.')',
+                                    litres: $variant->volume->name ?? '0.5 L',
+                                    qty: (int) $firstItem['quantity'],
+                                    costPrice: (int) $firstItem['unit_cost'],
+                                    source: $source
+                                );
+                            }
                         }
+                    } catch (\Throwable $e) {
+                        // Telegram xatosi tranzaksiyaga ta'sir qilmaydi
                     }
-                } catch (\Throwable $e) {
-                    // Telegram xatosi tranzaksiyaga ta'sir qilmaydi
-                }
+                });
 
                 return [
                     'purchase_id' => $purchase->id,

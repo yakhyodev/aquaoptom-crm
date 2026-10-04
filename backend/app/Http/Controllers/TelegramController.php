@@ -7,6 +7,7 @@ use App\Services\Telegram\TelegramBotService;
 use App\Services\Telegram\TelegramClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TelegramController extends Controller
 {
@@ -17,6 +18,9 @@ class TelegramController extends Controller
     {
         // 1. Webhook Secret Token tekshiruvi (X-Telegram-Bot-Api-Secret-Token)
         $expectedSecret = (string) config('services.telegram.webhook_secret');
+        if ($expectedSecret === '' && app()->environment(['production', 'staging'])) {
+            return response()->json(['error' => 'Webhook secret is not configured'], 503);
+        }
         if ($expectedSecret !== '') {
             $receivedSecret = (string) $request->header('X-Telegram-Bot-Api-Secret-Token');
             if (! hash_equals($expectedSecret, $receivedSecret)) {
@@ -25,8 +29,13 @@ class TelegramController extends Controller
         }
 
         // 2. update_id deduplikatsiyasi (takroriy webhook so'rovlarini bir marta bajarish)
-        $updateId = $request->input('update_id');
-        if ($updateId !== null) {
+        $validated = $request->validate(['update_id' => 'required|integer|min:0']);
+        $updateId = $validated['update_id'];
+
+        return DB::transaction(function () use ($request, $botService, $updateId) {
+            if (DB::getDriverName() === 'pgsql') {
+                DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', ['telegram:'.$updateId]);
+            }
             $alreadyProcessed = TelegramUpdate::where('update_id', $updateId)->exists();
             if ($alreadyProcessed) {
                 return response()->json(['status' => 'already_processed']);
@@ -37,12 +46,12 @@ class TelegramController extends Controller
                 'update_id' => $updateId,
                 'chat_id' => $chatId,
             ]);
-        }
 
-        // 3. Bot xizmatiga yo'naltirish
-        $botService->handleUpdate($request->all());
+            // 3. Bot xizmatiga yo'naltirish
+            $botService->handleUpdate($request->all());
 
-        return response()->json(['status' => 'ok']);
+            return response()->json(['status' => 'ok']);
+        });
     }
 
     /**

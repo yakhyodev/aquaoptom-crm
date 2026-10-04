@@ -1,9 +1,9 @@
 # ==============================================================================
 # AquaOptom Wholesale Beverage CRM — Production Dockerfile
-# Multi-stage reproducible build for PHP-FPM 8.3 / PostgreSQL / Redis
+# Multi-stage build for PHP-FPM 8.5 / PostgreSQL / Redis
 # ==============================================================================
 
-FROM php:8.3-fpm-alpine AS base
+FROM php:8.5-fpm-alpine AS base
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     git \
     libpq-dev \
     libzip-dev \
+    libxml2-dev \
     icu-dev \
     oniguruma-dev \
     linux-headers \
@@ -20,6 +21,9 @@ RUN apk add --no-cache \
 
 # Install PHP extensions
 RUN docker-php-ext-install \
+    mbstring \
+    dom \
+    xml \
     pdo_pgsql \
     pgsql \
     bcmath \
@@ -59,7 +63,12 @@ RUN composer install \
 # ==============================================================================
 # Frontend Asset Builder Stage
 # ==============================================================================
-FROM node:22-alpine AS frontend
+FROM node:24-alpine AS frontend
+
+ARG VITE_REVERB_APP_KEY
+ARG VITE_REVERB_HOST
+ARG VITE_REVERB_PORT=443
+ARG VITE_REVERB_SCHEME=https
 
 WORKDIR /app
 COPY backend/package.json backend/package-lock.json ./
@@ -87,11 +96,14 @@ COPY --chown=aquaoptom:aquaoptom --from=frontend /app/public/build /var/www/html
 
 # Ensure proper storage permissions
 RUN mkdir -p /var/www/html/storage/app/private \
+    /var/www/html/bootstrap/cache \
     /var/www/html/storage/app/public \
     /var/www/html/storage/framework/cache \
     /var/www/html/storage/framework/sessions \
     /var/www/html/storage/framework/views \
     /var/www/html/storage/logs \
+    && ln -s /var/www/html/storage/app/public /var/www/html/public/storage \
+    && composer dump-autoload --no-dev --optimize --no-scripts \
     && chown -R aquaoptom:aquaoptom /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
@@ -100,3 +112,7 @@ USER aquaoptom
 EXPOSE 9000
 
 CMD ["php-fpm", "-F"]
+
+FROM nginx:alpine AS nginx
+COPY --from=production /var/www/html/public /var/www/html/public
+COPY docker/nginx.conf /etc/nginx/nginx.conf

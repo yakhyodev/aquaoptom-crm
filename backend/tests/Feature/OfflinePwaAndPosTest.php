@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Volume;
 use App\Models\Warehouse;
+use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -35,11 +36,13 @@ class OfflinePwaAndPosTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleAndPermissionSeeder::class);
 
         $this->cashier = User::factory()->create([
             'role' => 'CASHIER',
             'is_active' => true,
         ]);
+        $this->cashier->givePermission('offline_sales');
 
         $this->warehouse = Warehouse::firstOrCreate(
             ['name' => 'Asosiy Ombor'],
@@ -54,6 +57,7 @@ class OfflinePwaAndPosTest extends TestCase
             'status' => 'ACTIVE',
             'is_active' => true,
             'assigned_warehouse_id' => $this->warehouse->id,
+            'assigned_user_id' => $this->cashier->id,
             'current_lease_epoch' => 1,
             'allow_new_offline_customer_debt' => true,
             'new_customer_debt_budget' => 500000,

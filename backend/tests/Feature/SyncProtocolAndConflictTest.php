@@ -104,6 +104,12 @@ class SyncProtocolAndConflictTest extends TestCase
         $this->inventoryLedgerService = app(InventoryLedgerService::class);
         $this->allocationService = app(InventoryAllocationService::class);
         $this->leaseService = app(OfflineLeaseService::class);
+        Carbon::setTestNow(Carbon::now()->subDay());
+        try {
+            $this->leaseService->issueLease($this->device, $this->cashier, durationHours: 48);
+        } finally {
+            Carbon::setTestNow();
+        }
         $this->changeLogService = app(SyncChangeLogService::class);
         $this->pushService = app(SyncPushService::class);
     }
@@ -111,6 +117,18 @@ class SyncProtocolAndConflictTest extends TestCase
     /**
      * Test 1: Device Bootstrap Endpoint: Snapshot, Leases, Allocations, Initial Cursor
      */
+    public function test_audit_offline_payment_retry_posts_only_once(): void
+    {
+        $customer = Customer::create(['name' => 'Debt payer', 'current_debt' => 10000, 'debt_limit' => 10000, 'status' => 'ACTIVE']);
+        $op = ['operation_id' => (string) Str::uuid(), 'type' => 'CUSTOMER_PAYMENT', 'payload' => ['customer_id' => $customer->id, 'amount' => 2000, 'cash_account_id' => $this->cashAccount->id]];
+        $first = $this->pushService->pushBatch($this->device, $this->cashier, [$op]);
+        $second = $this->pushService->pushBatch($this->device, $this->cashier, [$op]);
+        $this->assertEquals('APPLIED', $first[0]['status']);
+        $this->assertEquals('RETRY_SUCCESS', $second[0]['status']);
+        $this->assertEquals(8000, $customer->fresh()->current_debt);
+        $this->assertEquals(2000, $this->cashAccount->fresh()->balance);
+    }
+
     public function test_audit_sync_cannot_use_another_sellers_device(): void
     {
         $other = User::factory()->salesManager()->create();

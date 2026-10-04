@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\Api\HealthController;
 use App\Models\CashAccount;
+use App\Models\CashSession;
 use App\Models\Customer;
 use App\Models\Device;
 use App\Models\InventoryAllocation;
@@ -17,8 +17,9 @@ use App\Models\SystemSetting;
 use App\Models\User;
 use App\Models\Volume;
 use App\Models\Warehouse;
-use App\Services\Backup\BackupService;
+use App\Services\Devices\OfflineLeaseService;
 use App\Services\Inventory\InventoryCalculatorService;
+use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Purchase\ReceivePurchaseService;
 use App\Services\Sales\CreateSaleService;
@@ -26,10 +27,8 @@ use App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException;
 use App\Services\Sync\RecoveryReconciliationService;
 use App\Services\Sync\SyncPushService;
 use Carbon\Carbon;
+use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -39,19 +38,29 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
     use RefreshDatabase;
 
     protected User $owner;
+
     protected User $cashier;
+
     protected User $seller;
+
     protected Warehouse $warehouse;
+
     protected CashAccount $cashAccount;
+
     protected ProductVariant $variantFanta05;
+
     protected Supplier $supplier;
+
     protected Customer $customer;
+
     protected Device $pcDevice;
+
     protected Device $mobDevice;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleAndPermissionSeeder::class);
 
         $ownerRole = Role::firstOrCreate(['name' => 'OWNER'], ['display_name' => 'Owner', 'permissions' => ['*']]);
         $cashierRole = Role::firstOrCreate(['name' => 'CASHIER'], ['display_name' => 'Cashier', 'permissions' => ['view_cash', 'manage_cash_sessions', 'view_debts', 'offline_sales', 'sell_on_credit']]);
@@ -60,6 +69,7 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
         $this->owner = User::create([
             'name' => 'Staging Owner',
             'email' => 'owner_stage@aquaoptom.test',
+            'is_active' => true,
             'password' => Hash::make('Secret123!'),
             'role' => 'OWNER',
             'role_id' => $ownerRole->id,
@@ -70,15 +80,18 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
         $this->cashier = User::create([
             'name' => 'Staging Cashier',
             'email' => 'cashier_stage@aquaoptom.test',
+            'is_active' => true,
             'password' => Hash::make('Secret123!'),
             'role' => 'CASHIER',
             'role_id' => $cashierRole->id,
             'status' => 'ACTIVE',
         ]);
+        $this->cashier->givePermission('offline_sales');
 
         $this->seller = User::create([
             'name' => 'Staging Seller',
             'email' => 'seller_stage@aquaoptom.test',
+            'is_active' => true,
             'password' => Hash::make('Secret123!'),
             'role' => 'SALES_MANAGER',
             'role_id' => $sellerRole->id,
@@ -106,6 +119,7 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
         $this->pcDevice = Device::create([
             'device_uuid' => 'PC-STAGING-01',
             'device_code' => 'PC-01',
+            'is_active' => true,
             'name' => 'PC POS',
             'device_type' => 'desktop',
             'status' => 'ACTIVE',
@@ -116,14 +130,17 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
         $this->mobDevice = Device::create([
             'device_uuid' => 'MOB-STAGING-02',
             'device_code' => 'MOB-02',
+            'is_active' => true,
             'name' => 'Mobile POS',
             'device_type' => 'mobile',
             'status' => 'ACTIVE',
             'assigned_user_id' => $this->seller->id,
             'registered_by' => $this->owner->id,
         ]);
+        app(OfflineLeaseService::class)->issueLease($this->pcDevice, $this->cashier);
+        app(OfflineLeaseService::class)->issueLease($this->mobDevice, $this->seller);
 
-        \App\Models\CashSession::create([
+        CashSession::create([
             'session_number' => 'CS-STAGE-001',
             'cash_account_id' => $this->cashAccount->id,
             'opened_by' => $this->cashier->id,
@@ -133,7 +150,7 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
         ]);
 
         $mobileCashAccount = CashAccount::create(['name' => 'Mobil Kassa', 'type' => 'CASH', 'balance' => 0]);
-        \App\Models\CashSession::create([
+        CashSession::create([
             'session_number' => 'CS-STAGE-002',
             'cash_account_id' => $mobileCashAccount->id,
             'opened_by' => $this->seller->id,
@@ -247,7 +264,7 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
     public function test_staging_offline_multi_device_and_overdraft_protection(): void
     {
         $syncPushService = app(SyncPushService::class);
-        $invService = app(\App\Services\Ledger\InventoryLedgerService::class);
+        $invService = app(InventoryLedgerService::class);
 
         // Seed initial 100 stock
         $invService->recordInflow(
@@ -294,8 +311,8 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
                     'cash_account_id' => $this->cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
-                ]
-            ]
+                ],
+            ],
         ];
 
         $mobOpId = (string) Str::uuid();
@@ -312,8 +329,8 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
                     'cash_account_id' => $this->cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
-                ]
-            ]
+                ],
+            ],
         ];
 
         // Push PC sale
@@ -338,8 +355,8 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
                     'cash_account_id' => $this->cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
-                ]
-            ]
+                ],
+            ],
         ];
         $resOverdraft = $syncPushService->pushBatch($this->mobDevice, $this->seller, $overdraftOps);
         $this->assertNotEquals('ACK', $resOverdraft[0]['status']);
@@ -376,8 +393,8 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
                 'payload' => [
                     'items' => [['variant_id' => $this->variantFanta05->id, 'quantity' => 5, 'sale_price' => 7000]],
                     'paid_amount' => 35000,
-                ]
-            ]
+                ],
+            ],
         ];
 
         // Normal push should be blocked with HTTP 428

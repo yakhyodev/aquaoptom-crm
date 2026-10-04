@@ -39,6 +39,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Authorization Gates: Owner has superuser access
         Gate::before(function ($user, $ability) {
+            if (! $user->isActive()) {
+                return false;
+            }
             if (method_exists($user, 'isOwner') && $user->isOwner()) {
                 return true;
             }

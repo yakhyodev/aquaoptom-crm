@@ -30,6 +30,8 @@ use App\Services\Ledger\Exceptions\InsufficientCashException;
 use App\Services\Ledger\Exceptions\ReservedStockProtectionException;
 use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
+use App\Services\Operations\Exceptions\OperationConflictException;
+use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Purchase\ReceivePurchaseService;
 use App\Services\Sales\CreateSaleService;
 use Database\Seeders\RoleAndPermissionSeeder;
@@ -98,6 +100,7 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
             'status' => 'ACTIVE',
             'is_active' => true,
         ]);
+        $this->actingAs($this->owner);
 
         $this->cashier = User::factory()->create([
             'role' => 'CASHIER',
@@ -420,6 +423,35 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
     /**
      * Test 7: Ta'minotchiga qaytarish xarid narxi bo'yicha commercial credit beradi va WAC chiqimini hisoblaydi.
      */
+    public function test_audit_supplier_return_rejects_duplicate_lines_atomically(): void
+    {
+        $purchase = $this->purchaseStock($this->variantA->id, 10, 6000);
+        $itemId = $purchase->items->first()->id;
+        $this->expectException(OperationValidationException::class);
+        try {
+            $this->supplierReturnService->createSupplierReturn($purchase->id, [['purchase_item_id' => $itemId, 'quantity' => 6], ['purchase_item_id' => $itemId, 'quantity' => 6]], 'duplicate');
+        } finally {
+            $this->assertEquals(10, InventoryBalance::where('product_variant_id', $this->variantA->id)->value('quantity'));
+            $this->assertEquals(60000, $this->supplier->fresh()->balance);
+        }
+    }
+
+    public function test_audit_damage_replay_rejects_changed_payload(): void
+    {
+        $this->purchaseStock($this->variantA->id, 10, 6000);
+        $id = (string) Str::uuid();
+        $rows = [['product_variant_id' => $this->variantA->id, 'quantity' => 2]];
+        $this->damageDisposalService->recordDamage($this->warehouse->id, $rows, 'damage', $id);
+        $replay = $this->damageDisposalService->recordDamage($this->warehouse->id, $rows, 'damage', $id);
+        $this->assertTrue($replay['is_replay']);
+        $this->expectException(OperationConflictException::class);
+        try {
+            $this->damageDisposalService->recordDamage($this->warehouse->id, [['product_variant_id' => $this->variantA->id, 'quantity' => 3]], 'damage', $id);
+        } finally {
+            $this->assertEquals(8, InventoryBalance::where('product_variant_id', $this->variantA->id)->value('quantity'));
+        }
+    }
+
     public function test_supplier_return_reduces_supplier_liability_at_purchase_price_and_outflow_at_wac(): void
     {
         // 1. Kirim: 10 dona x 6 000 so'm = 60 000 so'm qarzimiz

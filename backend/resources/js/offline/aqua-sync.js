@@ -146,6 +146,8 @@ export class AquaSync {
             'Accept': 'application/json',
             'X-Device-UUID': deviceUuid
         };
+        const csrfToken = globalThis.document?.querySelector('meta[name="csrf-token"]')?.content;
+        if (csrfToken) headers['X-CSRF-TOKEN'] = csrfToken;
         if (leaseToken) headers['X-Lease-Token'] = leaseToken;
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 

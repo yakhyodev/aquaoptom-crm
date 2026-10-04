@@ -1,20 +1,22 @@
-version: '3.8'
-
 services:
   # ============================================================================
   # Nginx Reverse Proxy
   # ============================================================================
   nginx:
-    image: nginx:alpine
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: nginx
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_nginx
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ../backend/public:/var/www/html/public:ro
-      - ../backend/storage/app/public:/var/www/html/storage/app/public:ro
+      - app_storage:/var/www/html/storage:ro
     depends_on:
       - app
       - reverb
@@ -29,10 +31,19 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_app
     restart: unless-stopped
     env_file:
       - ../backend/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
     volumes:
       - app_storage:/var/www/html/storage
     depends_on:
@@ -51,11 +62,20 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_worker
     restart: unless-stopped
     command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
     env_file:
       - ../backend/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
     volumes:
       - app_storage:/var/www/html/storage
     depends_on:
@@ -72,13 +92,22 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_reverb
     restart: unless-stopped
     command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
     env_file:
       - ../backend/.env
-    ports:
-      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    expose:
+      - "8080"
     depends_on:
       - redis
     networks:
@@ -92,11 +121,22 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_outbox
     restart: unless-stopped
-    command: ["php", "artisan", "app:process-outbox"]
+    command: ["php", "artisan", "app:process-outbox", "--watch"]
     env_file:
       - ../backend/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    volumes:
+      - app_storage:/var/www/html/storage
     depends_on:
       - app
     networks:
@@ -110,11 +150,22 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
       target: production
+      args:
+        VITE_REVERB_APP_KEY: ${REVERB_APP_KEY:?Set REVERB_APP_KEY}
+        VITE_REVERB_HOST: ${VITE_REVERB_HOST:?Set VITE_REVERB_HOST}
     container_name: aquaoptom_scheduler
     restart: unless-stopped
     command: ["php", "artisan", "schedule:work"]
     env_file:
       - ../backend/.env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      REVERB_HOST: reverb
+      REVERB_PORT: 8080
+      REVERB_SCHEME: http
+    volumes:
+      - app_storage:/var/www/html/storage
     depends_on:
       - app
     networks:
@@ -130,7 +181,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_DATABASE:-aquaoptom_prod}
       POSTGRES_USER: ${DB_USERNAME:-aquaoptom_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_db_password}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -148,11 +199,11 @@ services:
     image: redis:7-alpine
     container_name: aquaoptom_redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-secure_redis_password}"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-secure_redis_password}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -1,12 +1,23 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# AquaOptom Wholesale Beverage CRM — Atomic Zero-Downtime Deployment Script
+# AquaOptom Wholesale Beverage CRM — Maintenance Deployment Script
 # Usage: ./deploy/deploy.sh [--release=v1.0.0] [--skip-build]
 # ==============================================================================
 
 set -euo pipefail
 
-APP_DIR="/var/www/aquaoptom"
+APP_DIR="${APP_DIR:-/var/www/aquaoptom}"
+: "${READINESS_URL:?Set READINESS_URL to the HTTPS readiness endpoint before deployment}"
+[[ "$READINESS_URL" == https://* ]] || { echo "READINESS_URL must use HTTPS"; exit 1; }
+RELEASE_TAG=""
+SKIP_BUILD=false
+for argument in "$@"; do
+    case "$argument" in
+        --release=*) RELEASE_TAG="${argument#--release=}" ;;
+        --skip-build) SKIP_BUILD=true ;;
+        *) echo "Unknown argument: $argument"; exit 1 ;;
+    esac
+done
 PHP_BIN="php"
 COMPOSER_BIN="composer"
 NPM_BIN="npm"
@@ -14,21 +25,20 @@ NPM_BIN="npm"
 echo "=== AquaOptom CRM Deployment Starting ==="
 date -u +"%Y-%m-%d %H:%M:%S UTC"
 
-cd "$APP_DIR"
+cd "$APP_DIR/backend"
 
 # 1. Enable Maintenance Mode with retry header
 echo "[1/8] Entering maintenance mode..."
-$PHP_BIN artisan down --retry=60 --secret="aquaoptom-deploy-bypass-token" || true
+$PHP_BIN artisan down --retry=60
 
 # 2. Pull latest code or release tag
 echo "[2/8] Fetching git updates..."
 git fetch --tags origin
-if [[ "${1:-}" =~ --release=(.+) ]]; then
-    RELEASE_TAG="${BASH_REMATCH[1]}"
+if [[ -n "$RELEASE_TAG" ]]; then
     echo "Checking out release tag: $RELEASE_TAG"
     git checkout "$RELEASE_TAG"
 else
-    git pull origin main
+    git pull --ff-only origin master
 fi
 
 # 3. Install production PHP dependencies
@@ -41,7 +51,7 @@ $COMPOSER_BIN install \
 
 # 4. Compile frontend assets
 echo "[4/8] Building Vite frontend assets..."
-if [[ "${1:-}" != "--skip-build" ]]; then
+if [[ "$SKIP_BUILD" == false ]]; then
     $NPM_BIN ci --prefer-offline
     $NPM_BIN run build
 fi
@@ -60,13 +70,13 @@ $PHP_BIN artisan event:cache
 # 7. Restart Background Services
 echo "[7/8] Restarting queue workers, websockets, and background daemons..."
 if command -v supervisorctl &> /dev/null; then
-    supervisorctl restart aquaoptom-worker:* || true
-    supervisorctl restart aquaoptom-reverb || true
-    supervisorctl restart aquaoptom-outbox || true
+    supervisorctl restart aquaoptom-worker:*
+    supervisorctl restart aquaoptom-reverb
+    supervisorctl restart aquaoptom-outbox
 elif command -v systemctl &> /dev/null; then
-    sudo systemctl restart aquaoptom-worker || true
-    sudo systemctl restart aquaoptom-reverb || true
-    sudo systemctl restart aquaoptom-outbox || true
+    sudo systemctl restart aquaoptom-worker
+    sudo systemctl restart aquaoptom-reverb
+    sudo systemctl restart aquaoptom-outbox
 fi
 
 # 8. Disable Maintenance Mode
@@ -76,12 +86,14 @@ $PHP_BIN artisan up
 # 9. Verify Readiness Probe
 echo "Verifying application readiness probe..."
 sleep 2
-READY_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/api/health/ready || true)
+READY_HTTP_CODE=$(curl --fail --silent --show-error -o /dev/null -w "%{http_code}" "${READINESS_URL:?Set READINESS_URL to your HTTPS /api/health/ready endpoint}" || true)
 
 if [[ "$READY_HTTP_CODE" == "200" ]]; then
     echo "SUCCESS: Readiness probe passed (HTTP 200 OK)."
 else
-    echo "WARNING: Readiness probe returned HTTP $READY_HTTP_CODE. Please verify logs."
+    $PHP_BIN artisan down --retry=60
+    echo "FAILED: Readiness probe returned HTTP $READY_HTTP_CODE. Application remains in maintenance mode."
+    exit 1
 fi
 
 echo "=== Deployment Finished Successfully ==="

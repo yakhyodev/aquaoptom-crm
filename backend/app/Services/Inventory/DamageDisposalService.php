@@ -6,10 +6,12 @@ use App\Models\AuditLog;
 use App\Models\DamageItem;
 use App\Models\DamageRecord;
 use App\Models\OutboxEvent;
+use App\Models\User;
 use App\Services\Ledger\InventoryAllocationService;
 use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\DocumentNumberGenerator;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Operations\TransactionalOperationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -30,6 +32,35 @@ class DamageDisposalService
      * 3. posted hujjat o'chirilmaydi.
      */
     public function recordDamage(
+        int $warehouseId,
+        array $items,
+        string $reason,
+        ?string $operationId = null,
+        ?int $userId = null,
+        ?string $notes = null
+    ): array {
+        $operationId ??= (string) Str::uuid();
+        $actor = $userId ? User::find($userId) : auth()->user();
+        if (! $actor || ! $actor->hasPermission('stock_adjustment')) {
+            throw new OperationValidationException($operationId, 'Ruxsat mavjud emas.', errorCode: 'PERMISSION_DENIED');
+        }
+        $payload = compact('warehouseId', 'items', 'reason', 'notes');
+        $operations = app(TransactionalOperationService::class);
+        $isReplay = $operations->replay($operationId, 'DAMAGE_DISPOSAL', $payload, $actor->id) !== null;
+        $result = $operations->execute($operationId, 'DAMAGE_DISPOSAL', $payload, function () use ($warehouseId, $items, $reason, $operationId, $actor, $notes) {
+            $result = $this->postRecordDamage($warehouseId, $items, $reason, $operationId, $actor->id, $notes);
+            $result['document_id'] = $result['damage_record']->id;
+            unset($result['damage_record']);
+
+            return $result;
+        }, actorId: $actor->id);
+        $result['damage_record'] = DamageRecord::with('items')->findOrFail($result['document_id']);
+        $result['is_replay'] = $isReplay;
+
+        return $result;
+    }
+
+    private function postRecordDamage(
         int $warehouseId,
         array $items,
         string $reason,
@@ -69,12 +100,24 @@ class DamageDisposalService
                 ];
             }
 
+            $items = collect($items)->groupBy('product_variant_id')->map(function ($group, $variantId) use ($operationId) {
+                $quantity = 0;
+                foreach ($group as $row) {
+                    $raw = $row['quantity'] ?? 0;
+                    if (! is_numeric($raw) || $raw != (int) $raw || $raw <= 0 || $raw > InventoryLedgerService::MAX_QUANTITY - $quantity) {
+                        throw new OperationValidationException($operationId, 'Butun musbat dona talab qilinadi.', errorCode: 'INVALID_DAMAGE_QUANTITY');
+                    }
+                    $quantity += (int) $raw;
+                }
+
+                return ['product_variant_id' => (int) $variantId, 'quantity' => $quantity];
+            })->sortKeys()->values()->all();
             // 2. Tovar va rezerv tekshiruvi
             foreach ($items as $itemReq) {
                 $variantId = (int) ($itemReq['product_variant_id'] ?? 0);
                 $quantity = (int) ($itemReq['quantity'] ?? 0);
 
-                if ($quantity <= 0) {
+                if (! is_numeric($itemReq['quantity'] ?? null) || $quantity != $itemReq['quantity'] || $quantity <= 0 || $quantity > InventoryLedgerService::MAX_QUANTITY) {
                     throw new OperationValidationException(
                         $operationId,
                         "Brak miqdori 0 dan katta butun son bo'lishi shart!",

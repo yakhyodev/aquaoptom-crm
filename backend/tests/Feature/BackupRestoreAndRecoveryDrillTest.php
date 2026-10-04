@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\Volume;
 use App\Models\Warehouse;
 use App\Services\Backup\BackupService;
+use App\Services\Devices\OfflineLeaseService;
 use App\Services\Sync\RecoveryReconciliationService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,21 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
     protected Supplier $supplier;
 
     protected CashAccount $cashAccount;
+
+    public function test_audit_restore_rejects_path_traversal_before_database_restore(): void
+    {
+        $path = storage_path('app/unsafe-audit-'.Str::uuid().'.zip');
+        $zip = new ZipArchive;
+        $zip->open($path, ZipArchive::CREATE);
+        $zip->addFromString('../escape.txt', 'unsafe');
+        $zip->close();
+        $this->expectExceptionMessage('Unsafe backup archive path.');
+        try {
+            app(BackupService::class)->restoreBackup($path, ['target_db' => 'aquaoptom_test']);
+        } finally {
+            File::delete($path);
+        }
+    }
 
     protected function setUp(): void
     {
@@ -287,6 +303,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
      */
     public function test_recovery_epoch_pauses_normal_push_and_reconciles_retained_client_operations(): void
     {
+        app(OfflineLeaseService::class)->issueLease($this->device, $this->owner);
         // Allocation yaratamiz
         $allocation = InventoryAllocation::create([
             'warehouse_id' => $this->warehouse->id,

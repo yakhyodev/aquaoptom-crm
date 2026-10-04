@@ -20,6 +20,7 @@ use App\Services\Operations\Exceptions\OperationConflictException;
 use App\Services\Operations\Exceptions\OperationPermissionException;
 use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Purchase\ReceivePurchaseService;
+use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -44,6 +45,7 @@ class PurchaseReceivingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleAndPermissionSeeder::class);
 
         $this->owner = User::factory()->owner()->create();
         $this->warehouseManager = User::factory()->warehouseManager()->create();

@@ -180,6 +180,26 @@ class TelegramBotIntegrationTest extends TestCase
      * Test 2: Begona (ro'yxatdan o'tmagan) foydalanuvchiga ruxsat yo'q.
      * Moliyaviy va operativ ma'lumotlar sir saqlanadi.
      */
+    public function test_audit_stranger_cannot_link_an_owner_by_guessing_user_id(): void
+    {
+        $owner = User::factory()->owner()->create(['telegram_chat_id' => null]);
+        $this->postJson('/telegram/webhook', ['update_id' => 991337, 'message' => ['chat' => ['id' => 991337], 'text' => '/link '.$owner->id]],
+            ['X-Telegram-Bot-Api-Secret-Token' => $this->webhookSecret])->assertOk();
+        $this->assertNull($owner->fresh()->telegram_chat_id);
+    }
+
+    public function test_audit_telegram_production_webhook_requires_secret(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        config(['services.telegram.webhook_secret' => '']);
+        try {
+            $this->postJson('/telegram/webhook', ['update_id' => 991338])->assertStatus(503);
+            $this->assertDatabaseMissing('telegram_updates', ['update_id' => 991338]);
+        } finally {
+            $this->app->detectEnvironment(fn () => 'testing');
+        }
+    }
+
     public function test_stranger_access_is_denied(): void
     {
         TelegramClient::resetFake();
@@ -524,6 +544,23 @@ class TelegramBotIntegrationTest extends TestCase
      * Test 6: 20 ta tasdiq bir operatsiya (Idempotency Invariant).
      * 20 marta tasdiq tugmasi bosilganda ham yagona bir dona savdo hujjati saqlanadi.
      */
+    public function test_audit_bot_full_debt_does_not_create_cash_payment(): void
+    {
+        $id = (string) Str::uuid();
+        BotDraft::create(['user_id' => $this->salesUser->id, 'chat_id' => $this->salesUser->telegram_chat_id, 'type' => 'SALE', 'step' => 'CONFIRM', 'operation_id' => $id, 'payload' => [
+            'customer_id' => $this->customer->id, 'paid_amount' => 0,
+            'items' => [['variant_id' => $this->variantHydrolife->id, 'quantity' => 2, 'sale_price' => 5000, 'is_system_price' => true]],
+        ]]);
+        $cash = $this->cashAccount->fresh()->balance;
+        $debt = $this->customer->fresh()->current_debt;
+        $this->postJson('/telegram/webhook', ['update_id' => 61001, 'callback_query' => ['id' => 'debt', 'message' => ['chat' => ['id' => $this->salesUser->telegram_chat_id]], 'data' => "sale_confirm:{$id}"]], ['X-Telegram-Bot-Api-Secret-Token' => $this->webhookSecret])->assertOk();
+        $sale = Sale::where('operation_id', $id)->firstOrFail();
+        $this->assertEquals(0, $sale->paid_amount);
+        $this->assertEquals(10000, $sale->debt_amount);
+        $this->assertEquals($cash, $this->cashAccount->fresh()->balance);
+        $this->assertEquals($debt + 10000, $this->customer->fresh()->current_debt);
+    }
+
     public function test_twenty_duplicate_confirm_callbacks_produce_strictly_one_operation(): void
     {
         $chatId = $this->salesUser->telegram_chat_id;

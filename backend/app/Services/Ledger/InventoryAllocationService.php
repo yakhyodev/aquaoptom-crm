@@ -394,6 +394,7 @@ class InventoryAllocationService
 
         $balance = InventoryBalance::where('product_variant_id', $variantId)
             ->where('warehouse_id', $actualWarehouseId)
+            ->lockForUpdate()
             ->first();
 
         $totalOnHand = $balance ? (int) $balance->quantity : 0;

@@ -95,23 +95,25 @@ class ApiController extends Controller
             'litres' => 'nullable|numeric|min:0.1',
             'volume_ml' => 'nullable|integer|min:50',
             'variant_id' => 'nullable|exists:product_variants,id',
-            'package_name' => 'nullable|string|in:dona,blok,yashik',
-            'package_quantity' => 'nullable|numeric|min:0.1',
-            'quantity' => 'required|numeric|min:0.1',
-            'cost_price' => 'nullable|numeric|min:1',
-            'purchase_price' => 'nullable|numeric|min:1',
-            'supplier_name' => 'nullable|string',
+            'package_name' => 'nullable|string|in:dona',
+            'package_quantity' => 'nullable|integer|min:1',
+            'quantity' => 'required|integer|min:1|max:2147483647',
+            'cost_price' => 'required_without:purchase_price|integer|min:1',
+            'purchase_price' => 'required_without:cost_price|integer|min:1',
+            'supplier_name' => 'required_without:supplier_id|string|min:2',
+            'supplier_id' => 'required_without:supplier_name|integer|exists:suppliers,id',
+            'operation_id' => 'nullable|uuid',
             'invoice_number' => 'nullable|string',
         ]);
 
         try {
             $productName = trim($validated['product_name'] ?? $validated['name'] ?? '');
             $costPrice = (int) ($validated['purchase_price'] ?? $validated['cost_price'] ?? 0);
-            $inputQty = (float) $validated['quantity'];
+            $inputQty = (int) $validated['quantity'];
             $packageName = $validated['package_name'] ?? 'dona';
 
             // Supplier
-            $supplierId = null;
+            $supplierId = $validated['supplier_id'] ?? null;
             if (! empty($validated['supplier_name'])) {
                 $supplier = Supplier::firstOrCreate(['name' => trim($validated['supplier_name'])]);
                 $supplierId = $supplier->id;
@@ -142,10 +144,8 @@ class ApiController extends Controller
                 $variant->load(['packages', 'volume', 'product']);
             }
 
-            // Qadoq konversiyasi
-            $package = $variant->packages->firstWhere('name', $packageName);
-            $unitsPerPackage = $package ? $package->units_per_package : 1;
-            $totalUnits = (float) round($inputQty * $unitsPerPackage, 3);
+            $package = $variant->packages->firstWhere('name', 'dona');
+            $totalUnits = $inputQty;
 
             // Purchase items tayyorlash
             $items = [
@@ -163,7 +163,9 @@ class ApiController extends Controller
                 items: $items,
                 invoiceNumber: $validated['invoice_number'] ?? null,
                 warehouseId: null,
-                source: 'Flutter Mobile / API'
+                source: 'Flutter Mobile / API',
+                operationId: $validated['operation_id'] ?? null,
+                userId: $request->user()->id
             );
 
             return response()->json([

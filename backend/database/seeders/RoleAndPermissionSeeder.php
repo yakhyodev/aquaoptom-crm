@@ -205,6 +205,7 @@ class RoleAndPermissionSeeder extends Seeder
                 'description' => 'Tezkor va mijozli sotuv, offline savdo, savdo tarixi. Tannarx va umumiy foydani ko\'rmaydi.',
                 'permissions' => [
                     'sell_on_credit',
+                    'custom_sale_price',
                     'offline_sales',
                     'view_debts',
                 ],

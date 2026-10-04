@@ -45,7 +45,8 @@ class CustomerPaymentService
         ?string $notes = null,
         bool $confirmExcessAsAdvance = false,
         mixed $happenedAt = null,
-        ?array $rawPayload = null
+        ?array $rawPayload = null,
+        ?int $deviceId = null
     ): array {
         $operationId = $operationId ?: (string) Str::uuid();
 
@@ -76,6 +77,9 @@ class CustomerPaymentService
             'amount' => $amount,
             'cash_account_id' => $cashAccountId,
             'payment_method' => strtoupper($paymentMethod),
+            'notes' => $notes,
+            'confirm_excess_advance' => $confirmExcessAsAdvance,
+            'happened_at' => $happenedAt instanceof \DateTimeInterface ? $happenedAt->format(DATE_ATOM) : $happenedAt,
         ];
 
         $result = $this->operationService->execute(
@@ -229,7 +233,8 @@ class CustomerPaymentService
                     'created_at' => $eventTime->timezone('Asia/Tashkent')->format('Y-m-d H:i:s'),
                 ];
             },
-            actorId: $userId
+            actorId: $userId,
+            deviceId: $deviceId ? (string) $deviceId : null
         );
 
         if (isset($result['payment_id'])) {

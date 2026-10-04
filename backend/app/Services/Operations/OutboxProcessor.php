@@ -3,6 +3,7 @@
 namespace App\Services\Operations;
 
 use App\Models\OutboxEvent;
+use App\Services\Telegram\TelegramNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,7 @@ class OutboxProcessor
 
         return DB::transaction(function () use ($limit, &$processedCount) {
             $query = OutboxEvent::where('status', 'PENDING')
-                ->where('retry_count', '<', 5)
+                ->whereColumn('retry_count', '<', 'max_retries')
                 ->orderBy('id', 'asc')
                 ->limit($limit);
 
@@ -47,6 +48,8 @@ class OutboxProcessor
                         'payload' => $event->payload,
                     ]);
 
+                    app(TelegramNotificationService::class)->notifyOutboxEvent($event);
+
                     $event->update([
                         'status' => 'PUBLISHED',
                         'published_at' => now(),
@@ -60,10 +63,10 @@ class OutboxProcessor
                     $event->update([
                         'retry_count' => $retryCount,
                         'status' => $status,
-                        'last_error' => substr($e->getMessage(), 0, 1000),
+                        'last_error' => get_class($e),
                     ]);
 
-                    Log::error("Outbox hodisasini qayta ishlashda xatolik [{$event->event_id}]: ".$e->getMessage());
+                    Log::error('Outbox processing failed', ['event_id' => $event->event_id, 'exception_class' => get_class($e)]);
                 }
             }
 

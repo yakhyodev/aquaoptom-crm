@@ -145,6 +145,19 @@ class BackupService
     /**
      * Zaxira nusxani tiklash (Restore Drill / Recovery)
      */
+    protected function validateArchiveEntries(ZipArchive $zip): void
+    {
+        for ($index = 0; $index < $zip->numFiles; $index++) {
+            $name = str_replace('\\', '/', $zip->getNameIndex($index));
+            $opsys = 0;
+            $attributes = 0;
+            $zip->getExternalAttributesIndex($index, $opsys, $attributes);
+            if (str_starts_with($name, '/') || preg_match('/^[A-Za-z]:/', $name) || in_array('..', explode('/', $name), true) || (($attributes >> 16) & 0170000) === 0120000) {
+                throw new \RuntimeException('Unsafe backup archive path.');
+            }
+        }
+    }
+
     public function restoreBackup(string $archivePath, array $options = []): array
     {
         if (! File::exists($archivePath)) {
@@ -180,7 +193,10 @@ class BackupService
             if ($zip->open($zipPath) !== true) {
                 throw new \RuntimeException("Zaxira arxivini ochib bo'lmadi!");
             }
-            $zip->extractTo($tmpDir);
+            $this->validateArchiveEntries($zip);
+            if (! $zip->extractTo($tmpDir)) {
+                throw new \RuntimeException('Backup extraction failed.');
+            }
             $zip->close();
 
             // 4. Manifestni o'qish
@@ -199,6 +215,17 @@ class BackupService
                 throw new \RuntimeException('Zaxira paketida db_dump.sql topilmadi!');
             }
 
+            if (($options['restore_files'] ?? false) && File::exists($tmpDir.'/files.zip')) {
+                $preflight = new ZipArchive;
+                if ($preflight->open($tmpDir.'/files.zip') !== true) {
+                    throw new \RuntimeException('Invalid backup file archive.');
+                }
+                try {
+                    $this->validateArchiveEntries($preflight);
+                } finally {
+                    $preflight->close();
+                }
+            }
             $this->restoreDatabaseDump($dumpFile, $targetDb);
 
             // 6. Fayllarni tiklash (agar so'ralgan bo'lsa)
