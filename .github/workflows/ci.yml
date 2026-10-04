@@ -29,7 +29,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d aquaoptom_test"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -105,7 +105,7 @@ jobs:
       - name: Prepare isolated test environment
         run: |
           cp .env.example .env.testing
-          mkdir -p test-results
+          mkdir -p test-results bootstrap/cache storage/framework/{cache/data,sessions,views,testing} storage/logs storage/app/{private,public}
 
       - name: Validate and install Composer dependencies
         run: |
