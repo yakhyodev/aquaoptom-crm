@@ -6,6 +6,14 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'AquaOptom CRM — Optom Suv Do\'koni Boshqaruvi' }}</title>
 
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AquaOptom">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
     <!-- Local Built CSS & JS via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -217,5 +225,16 @@
     </script>
 
     @livewireScripts
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then((reg) => {
+                    console.log('AquaOptom SW registered:', reg.scope);
+                }).catch((err) => {
+                    console.warn('AquaOptom SW registration error:', err);
+                });
+            });
+        }
+    </script>
 </body>
 </html>

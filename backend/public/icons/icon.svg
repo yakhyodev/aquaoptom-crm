@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="drop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="#020617"/>
+  <rect x="24" y="24" width="464" height="464" rx="90" fill="url(#bg)"/>
+  <path d="M256 96 C256 96 144 240 144 320 C144 381.85 194.15 432 256 432 C317.85 432 368 381.85 368 320 C368 240 256 96 256 96 Z" fill="url(#drop)"/>
+  <ellipse cx="220" cy="300" rx="36" ry="64" transform="rotate(-30 220 300)" fill="#ffffff" opacity="0.35"/>
+  <text x="256" y="480" font-family="system-ui, sans-serif" font-size="32" font-weight="900" text-anchor="middle" fill="#38bdf8">AQUA POS</text>
+</svg>

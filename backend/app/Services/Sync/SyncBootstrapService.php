@@ -2,8 +2,10 @@
 
 namespace App\Services\Sync;
 
+use App\Models\Customer;
 use App\Models\Device;
 use App\Models\DeviceCursor;
+use App\Models\ProductVariant;
 use App\Models\SyncChangeLog;
 use App\Models\User;
 use App\Models\Warehouse;
@@ -114,6 +116,41 @@ class SyncBootstrapService
             'last_ip_address' => request()->ip(),
         ]);
 
+        // 7. Faol Katalog (Sezgir tannarxlar chiqarib tashlangan holda)
+        $catalog = ProductVariant::with(['product', 'volume'])
+            ->where('status', 'ACTIVE')
+            ->get()
+            ->map(function ($variant) {
+                return [
+                    'id' => $variant->id,
+                    'product_id' => $variant->product_id,
+                    'product_name' => $variant->product?->name,
+                    'volume_name' => $variant->volume?->name,
+                    'volume_litres' => $variant->volume ? (string) ($variant->volume->litres) : '1.000',
+                    'sku' => $variant->sku,
+                    'barcode' => $variant->barcode,
+                    'default_sale_price' => (int) $variant->default_sale_price,
+                    'version' => (int) $variant->version,
+                    'status' => $variant->status,
+                ];
+            })->values()->all();
+
+        // 8. Mijozlar ro'yxati
+        $customers = Customer::select(['id', 'uuid', 'name', 'phone', 'store_name', 'current_debt', 'debt_limit', 'is_strict_credit_limit'])
+            ->get()
+            ->map(function ($c) {
+                return [
+                    'id' => $c->id,
+                    'uuid' => $c->uuid,
+                    'name' => $c->name,
+                    'phone' => $c->phone,
+                    'store_name' => $c->store_name,
+                    'current_debt' => (int) $c->current_debt,
+                    'debt_limit' => (int) $c->debt_limit,
+                    'is_strict_credit_limit' => (bool) $c->is_strict_credit_limit,
+                ];
+            })->values()->all();
+
         return [
             'device' => [
                 'id' => $device->id,
@@ -134,6 +171,8 @@ class SyncBootstrapService
             ],
             'stock_allocations' => $stockAllocations,
             'credit_allocations' => $creditAllocations,
+            'catalog' => $catalog,
+            'customers' => $customers,
             'current_cursor' => $latestCursor,
             'server_time' => Carbon::now()->format('Y-m-d\TH:i:s\Z'),
         ];

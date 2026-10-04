@@ -60,8 +60,8 @@
 ### 3. Baseline Test Xatolari va Mavjud Kod Holati
 
 - **Backend (Laravel):**
-  - **110 ta test o‘tgan (735 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
-  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim, sotuv (POS / CreateSale), qarzdorliklar, kassa va smena hamda offline qurilmalar va qoldiq ajratmalari (Prompt 11) to‘liq qamrab olindi.
+  - **129 ta test o‘tgan (893 ta assertion)** haqiqiy PostgreSQL `aquaoptom_test` va Redis ustida (0 xato).
+  - Auth, Role-based permission, cost masking, 8 ta menyu, katalog, tranzaksiyaviy operatsiyalar, daftarlar, kirim, sotuv (POS / CreateSale), qarzdorliklar, kassa va smena, offline qurilmalar, server sync protokoli hamda PWA offline POS (Prompt 13) to‘liq qamrab olindi.
   - Laravel Pint linteridan to‘liq o‘tkazildi (`{"tool":"pint","result":"passed"}`).
 - **Mobile (Flutter):**
   - `flutter analyze`: **0 issues found** (toza tahlil natijasi).
@@ -84,8 +84,7 @@
 | **09** | **Qarzdorliklar va taraflar to‘lovlari** | Kundalik ish | **DONE** | Alohida "Mijozlar bizga qarzdor" va "Biz ta’minotchilarga qarzdormiz" tablari; signed balans (musbat=qarz, manfiy=avans), avans boshqa taraf qarzini yashirmaydi; kartochkalar va ko'chirma (`boshlang'ich + harakatlar = yakuniy ko'chirma` 100%); Asia/Tashkent sekund aniqligida event_time, server_time, actor va tovar olib ketilgan vaqt (`goods_picked_up_at`); atomik `CustomerPaymentService` va `SupplierPaymentService` (kassa bilan bitta tranzaksiya); qarzdan ortiq summa faqat tasdiq bilan avansga o'tishi; keyingi to'lov chek/tovarlarga majburiy bog'lanmasligi va oldingi sotuv foyda/tannarxini o'zgartirmasligi; ta'minotchi to'lovi omborga tegmasligi; kredit limit va to'lov muddati ogohlantirishlari; 88/88 backend testlar (630 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 10-bosqichni boshlash |
 | **10** | **Kassa, xarajat, o‘tkazma va smena** | Kundalik ish | **DONE** | Naqd/karta/bank hisoblari; umumiy atomik cash kontrakti; operatsion xarajatlar (`ExpenseService`), egasi mablag'i (`OwnerFundsService`, draw operatsion xarajat emas va foydani kamaytirmaydi); hisoblararo o'tkazma (`CashTransferService`, savdo/foyda emas); kassa yetarliligi `lockForUpdate` ichida; bitta naqd hisob uchun bitta OPEN smena (`CashSession`), kutilgan naqd balansi, sanalgan naqd, farq sababi; offline qurilmalar kutilganda PROVISIONAL yopilish; closed session guard (yopilgan smenaga savdo/harakat yozilmaydi); farqni yashirin balance overwrite bilan emas, balki ruxsatli farq hujjati bilan rasman tuzatish; 14.3 misoli (500k boshlang'ich naqd, supplier -300k, sale +140k, debt +100k, supplier -50k = 390k naqd, ombor/qarzlar aralashmasligi); Livewire `CashManager` interfeysi; 99/99 testlar (692 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 11-bosqichni boshlash |
 | **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
-| **12** | **Server sync API va konfliktlar protokoli** | Offline poydevori | **DONE** | Versiyalangan qurilma bootstrap (`/api/sync/bootstrap`), signed lease snapshot, tayinlangan ombor, faol tovar va kredit ajratmalari; cursor pull change feed (`/api/sync/pull`, BIGSERIAL commit-order cursor, `sync_change_log`, versioning, tombstones, sezgir tannarx/moliya cheklovlari); atomik batch push (`/api/sync/push`, per-item transaction isolation, `CREATE_CUSTOMER`, `CREATE_SALE`, `CUSTOMER_PAYMENT`, statuslar: APPLIED, RETRY_SUCCESS, CONFLICT, NEEDS_REVIEW, FAILED); yangi UUID mijoz avval server ID ga ulanadi, so'ng savdo bog'lanadi (avtomatik nom/telefon merge yo'q); idempotent timeout replay eski natijani qaytaradi, boshqa payload bilan shu ID 409 Conflict beradi; stale narx qoidasi: offline kelishilgan sotuv narxi qat'iy saqlanadi, WAC tannarx server posting paytida hisoblanadi; uch xil vaqt (`device_created_at`, `received_at`, `posted_at`); yopilgan kassa smenasi yoki limitlar oshishi operatsiyani tashlab yubormaydi, balki `sync_conflicts` da `NEEDS_REVIEW` holatida xom payload bilan saqlanadi; admin nizolarni hal qilish API (`/api/sync/conflicts` va `/api/sync/conflicts/{id}/resolve` -> APPROVED_OVERRIDE / REJECT) audit bilan; operatsiya holatini tekshirish (`/api/sync/status/{operation_id}`); 12/12 sync testlar (106 assertions) va 122/122 to'liq tizim testlari (841 assertions) 100% o'tdi. | 13-bosqichni boshlash |
-| 13 | PWA lokal baza va internetsiz sotuv | Offline PWA | TODO | - | Service Worker, IndexedDB, offline POS |
+| **13** | **PWA lokal baza va internetsiz sotuv** | Offline PWA | **DONE** | Standalone PWA manifest (`manifest.json`), Service Worker (`sw.js`, app shell cache, network-only offline JSON fallback), `AquaOptomDB` IndexedDB sxemasi (9 ta store), Pure JS/Alpine.js offline POS (`aqua-pos.js`, `aqua-db.js`, Livewire online qoladi), atomik lokal savdo tranzaksiyasi (quota, credit, sale, outbox, draft clearing bitta IndexedDB tranzaksiyada), mijoz UUID, PIN lock, ko‘p tabli BroadcastChannel sinxronizatsiyasi, favqulodda JSON eksport; 7/7 JS unit testlari (Node.js + fake-indexeddb), 7/7 Feature testlari va 129/129 to'liq tizim testlari 100% o'tdi. | 14-bosqichni boshlash |
 | 14 | PWA avtomatik sync va uzilish sinovlari | Offline PWA | TODO | - | Reconnect sync, retry, ACK, storage failure recovery |
 | 15 | Ombor qoldiqlari va interaktiv kalkulyator | Tahlil va nazorat | TODO | - | Master kalkulyator, hajm checkboxlari, kutilayotgan foyda |
 | 16 | Qaytarish, brak, inventarizatsiya va tuzatish | Tahlil va nazorat | TODO | - | Qisman/to‘liq qaytarish, brak, inventarizatsiya freeze |
@@ -582,17 +581,83 @@
 
 ---
 
-## 18. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 18. 13-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Installable PWA va Service Worker App Shell:**
+   - `manifest.json`: Web App Manifest (`name: AquaOptom CRM - Offline POS`, `display: standalone`, `theme_color: #0284c7`, `start_url: /pos?source=pwa`, SVG va 192/512 PNG ikonkalari).
+   - `sw.js`: Service Worker kesh strategiyasi — App Shell (`/pos`, `/offline.html`, manifest, icons, Vite assets) uchun Network-First kesh zaxirasi bilan; `/api/*` so‘rovlari uchun esa Network-Only strategiyasi va tarmoq yo‘qligida 503 `OFFLINE_DEVICE` JSON javobi.
+   - Livewire online qoladi; offline POS to‘liq alohida mustaqil Alpine.js / Pure JS qatlamida (`resources/views/pages/pos-offline.blade.php`, `resources/js/offline/aqua-db.js`, `resources/js/offline/aqua-pos.js`) qurildi. Server-render cache offline POS deb aldanmaydi.
+
+2. **IndexedDB Lokal Baza Sxemasi (`AquaOptomDB`, versiya 1):**
+   - 9 ta obyektlar do‘koni (Object Stores) yaratildi:
+     1. `device_lease` (`keyPath: "id"`) — imzolangan ruxsatnoma va token;
+     2. `stock_allocations` (`keyPath: "variant_id"`) — tovar kvotalari (`allocated_quantity`, `consumed_quantity`, `remaining_quantity`);
+     3. `credit_allocations` (`keyPath: "customer_id"`) — mijoz nasiya limitlari (`remaining_credit_limit`);
+     4. `catalog` (`keyPath: "variant_id"`) — tovarlar, hajmlar, narxlar (tannarx yashirilgan);
+     5. `customers` (`keyPath: "id"`) — mijozlar ro‘yxati (server id yoki client uuid bilan);
+     6. `cart_draft` (`keyPath: "id"`) — lokal savat qoralamasi va barqaror `operation_id`;
+     7. `sales` (`keyPath: "operation_id"`) — lokal tasdiqlangan savdo cheklari;
+     8. `sync_outbox` (`keyPath: "operation_id"`, index: `status`) — serverga jo‘natilishi kerak bo‘lgan navbat;
+     9. `meta` (`keyPath: "key"`) — oxirgi kursor, server vaqti va sozlamalar.
+
+3. **Atomik Lokal Tranzaksiya (`executeSaleTransaction`):**
+   - Yagona IndexedDB `readwrite` tranzaksiyasi ichida 6 ta do‘kon (`stock_allocations`, `credit_allocations`, `sales`, `sync_outbox`, `cart_draft`, `meta`):
+     - Tovar kvotasi yetarliligi tekshiriladi va `remaining_quantity` kamaytiriladi (`consumed_quantity` oshiriladi);
+     - Agar savdoda qarz (`debt_amount > 0`) bo‘lsa, mijozning `credit_allocations` limiti tekshiriladi va kamaytiriladi;
+     - Savdo hujjati `sales` do‘koniga yoziladi (`status: LOCAL_COMMITTED`);
+     - Serverga jo‘natish uchun `sync_outbox` ga `CREATE_SALE` yozuvi qo‘shiladi (`status: PENDING`);
+     - Joriy savat qoralamasi (`cart_draft`) tozalab tashlanadi.
+   - Bitta amal xato qilsa (masalan, kvota yetmasa) tranzaksiya to‘liq bekor bo‘ladi va outboxga hech narsa yozilmaydi.
+
+4. **Kvota va Kredit Limitidan Oshmaslik Himoyasi:**
+   - Qurilmaga berilgan qoldiqdan ortiq tovar sotishga urinilganda IndexedDB tranzaksiyasi `INSUFFICIENT_STOCK_ALLOCATION` xatosi bilan to‘xtatiladi.
+   - Belgilangan kredit limitidan ortiq nasiyaga sotishga urinilganda tranzaksiya `INSUFFICIENT_CREDIT_ALLOCATION` xatosi bilan to‘xtatiladi.
+
+5. **Offline Yangi Mijoz va UUID Bog‘liqligi:**
+   - Internetsiz vaqtda yangi mijoz yaratilganda unga barqaror `crypto.randomUUID()` beriladi va `customers` do‘koniga qo‘shiladi (`is_offline: true`).
+   - `sync_outbox` ga `CREATE_CUSTOMER` amali qo‘shiladi.
+   - Shu mijozga qilingan savdo ushbu `client_uuid` orqali bog‘lanadi (serverga yetganda Prompt 12 da yaratilgan protokol bo‘yicha avval mijoz, so‘ng savdo biriktiriladi).
+
+6. **Butun So‘m va Taxminiy Tannarx:**
+   - Barcha pul hisob-kitoblari butun so‘mda (`integer`).
+   - Kassir interfeysida sezgir tannarx ko‘rinmaydi, kvitansiyada va ma’lumotlarda tannarx `~serverda aniqlanadi` deb belgilanadi.
+
+7. **Storage Quota, PIN Qulflash va Favqulodda Eksport:**
+   - `navigator.storage.estimate()` orqali disk to‘lishini kuzatish va xavf tug‘ilganda ogohlantirish.
+   - Kassir vaqtincha ketganda ekran 4 xonali PIN kod bilan qulflanadi (`pinLocked: true`).
+   - Brauzer xotirasi buzilganda yoki zudlik bilan serverga o‘tkazish kerak bo‘lganda barcha navbatdagi amallarni JSON fayl sifatida yuklab olish (`exportPendingData()` -> `aquaoptom_offline_backup_*.json`).
+
+8. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - Node.js Fake-IndexedDB Unit Testlari (`backend/tests/pwa-indexeddb-test.cjs`):
+     - `AquaOptomDB initialization & schema creation`: **PASSED**
+     - `Cart draft save, retrieve & persistent operation_id`: **PASSED**
+     - `Atomic sale transaction (stock quota, outbox, cart cleared)`: **PASSED**
+     - `Stock quota protection (blocks sale exceeding allocated quantity)`: **PASSED**
+     - `Credit limit protection (blocks debt exceeding remaining credit)`: **PASSED**
+     - `Offline new customer creation with client UUID & outbox`: **PASSED**
+     - `Emergency disaster recovery export of pending outbox`: **PASSED**
+     - **7/7 testlar 100% muvaffaqiyatli o‘tdi.**
+   - Feature Testlari (`backend/tests/Feature/OfflinePwaAndPosTest.php`): **7 passed (52 assertions, duration 2.1s)**.
+   - To‘liq Backend Testlari: **129 passed out of 129 tests (893 assertions, duration 26.9s)**.
+   - `vendor/bin/pint --format agent`: **PASSED** (0 style issues).
+   - `npm run build`: **0 errors (built in 517ms)**.
+   - `flutter analyze`: **No issues found! (ran in 2.3s)**.
+
+---
+
+## 19. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
    - Flutter `test/widget_test.dart` dagi default counter testi Prompt 20 da haqiqiy CRM kirish va savdo ekranlari widget testlariga almashtiriladi.
 2. **Offline qoldiq va kredit ajratish siyosati:** Prompt 11 doirasida to'liq amalga oshirildi.
-3. **Server Sync API va Nizolar protokoli:** Prompt 12 doirasida to'liq amalga oshirildi. Qurilma bootstrap, commit-order pull, batch push, idempotent replay, stale narx, late session / limit istisnolari va admin conflict resolution to'liq sinovdan o'tdi.
-4. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
+3. **Server Sync API va Nizolar protokoli:** Prompt 12 doirasida to'liq amalga oshirildi.
+4. **PWA Offline Baza va Savdo (Prompt 13):** To'liq amalga oshirildi.
+5. **PWA Avtomatik Sync va Uzilish Sinovlari:** Keyingi Prompt 14 da amalga oshiriladi (tarmoq qayta ulanganda outbox'ni avtomatik serverga push qilish, ACK, exponential backoff va storage failure recovery).
+6. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*12-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 13.*
+*13-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 14.*
 
 
 

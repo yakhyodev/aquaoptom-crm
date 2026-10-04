@@ -65,9 +65,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/users/{user}/toggle-status', [AdminController::class, 'toggleUserStatus'])->name('users.toggle-status');
     });
 
-    // Backward compatibility redirects for prototype URLs
+    // PWA Offline POS — Kassa
+    Route::get('/pos', fn () => view('pages.pos-offline'))->name('pos.pwa');
     Route::get('/inward', fn () => redirect()->route('inventory.index'));
-    Route::get('/pos', fn () => redirect()->route('sales.pos'));
     Route::get('/calculator', fn () => redirect()->route('inventory.index'));
     Route::get('/catalog', fn () => redirect()->route('inventory.index'));
     Route::get('/finance', fn () => redirect()->route('cash.index'));
