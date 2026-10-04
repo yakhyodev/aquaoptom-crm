@@ -234,6 +234,9 @@ export class AquaDB {
         notes = '',
         receiptData = {}
     }) {
+        if ((await this.get('meta', 'recovery_hold'))?.value) {
+            throw new Error('Recovery muvofiqlashtirish tugamaguncha yangi savdo to‘xtatilgan.');
+        }
         const totals = items.map(item => Number(item.quantity) * Number(item.sale_price));
         if (items.some(item => !Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) <= 0
             || !Number.isSafeInteger(Number(item.sale_price)) || Number(item.sale_price) <= 0)
@@ -815,21 +818,24 @@ export class AquaDB {
             const metaStore = tx.objectStore('meta');
 
             for (const ev of (events || [])) {
-                const type = (ev.aggregate_type || '').toUpperCase();
+                const type = (ev.entity_type || ev.aggregate_type || '').toUpperCase();
                 const action = (ev.action || '').toUpperCase();
-                const data = ev.payload || {};
+                const data = {...(ev.payload || {})};
+                data.id ??= Number(ev.entity_id) || ev.entity_id;
 
-                if (type === 'PRODUCT' || type === 'VARIANT') {
+                if (type === 'PRODUCT_VARIANT' || type === 'VARIANT') {
                     if (action === 'DELETED' || ev.is_tombstone) {
                         if (data.id) catalogStore.delete(data.id);
                     } else if (data.id) {
-                        catalogStore.put(data);
+                        const existing = catalogStore.get(data.id);
+                        existing.onsuccess = () => catalogStore.put({...existing.result, ...data});
                     }
                 } else if (type === 'CUSTOMER') {
                     if (action === 'DELETED' || ev.is_tombstone) {
                         if (data.id) customerStore.delete(data.id);
                     } else if (data.id) {
-                        customerStore.put(data);
+                        const existing = customerStore.get(data.id);
+                        existing.onsuccess = () => customerStore.put({...existing.result, ...data});
                     }
                 }
             }

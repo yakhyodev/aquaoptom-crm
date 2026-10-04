@@ -309,6 +309,146 @@ class OfflineSyncService extends ChangeNotifier {
     return data;
   }
 
+  Future<int> reconcileRecovery(int serverEpoch) async {
+    final user = SessionService().currentUser;
+    if (user == null) {
+      throw const UnauthorizedException('Login talab qilinadi.');
+    }
+    final db = await _appDb.database;
+    await db.insert('app_meta', {
+      'key': 'recovery_hold',
+      'value': 'true',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    final rows = await db.query(
+      'sync_queue',
+      where: 'user_id = ?',
+      whereArgs: [user.id],
+      orderBy: 'device_created_at ASC',
+    );
+    final retained = rows.map(SyncQueueItem.fromDbMap).toList();
+    final uuid = retained.isNotEmpty
+        ? retained.first.deviceUuid
+        : (_deviceUuid ?? '');
+    if (retained.any((item) => item.deviceUuid != uuid)) {
+      throw const ServerException(
+        'Turli qurilma yozuvlari ajratib tekshirilishi kerak.',
+      );
+    }
+    if (uuid.isEmpty) {
+      throw const ServerException(
+        'Recovery uchun qurilma identifikatori kerak.',
+      );
+    }
+    final epochs = await db.query(
+      'app_meta',
+      where: 'key = ?',
+      whereArgs: ['recovery_epoch'],
+    );
+    final epoch = epochs.isEmpty
+        ? 1
+        : int.tryParse(epochs.first['value'] as String) ?? 1;
+    var count = 0;
+    for (var offset = 0; offset < max(1, retained.length); offset += 100) {
+      final batch = retained
+          .skip(offset)
+          .take(100)
+          .map((item) => item.toPushOperation())
+          .toList();
+      final response = await _client
+          .post(
+            Uri.parse('${AppConfig.apiBaseUrl}/sync/reconcile-recovery'),
+            headers: {..._buildHeaders(), 'X-Device-UUID': uuid},
+            body: json.encode({
+              'device_uuid': uuid,
+              'client_epoch': epoch,
+              'operations': batch,
+            }),
+          )
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) {
+        throw const ServerException(
+          'Recovery bajarilmadi; barcha lokal yozuvlar saqlandi.',
+        );
+      }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      final results = (data['results'] as List<dynamic>?) ?? [];
+      await db.transaction((txn) async {
+        for (final raw in results) {
+          final result = raw as Map<String, dynamic>;
+          final status = result['status'];
+          final acknowledged = [
+            'ALREADY_PERSISTED',
+            'RESTORED_AND_APPLIED',
+            'APPLIED',
+            'RETRY_SUCCESS',
+          ].contains(status);
+          await txn.update(
+            'sync_queue',
+            {
+              'status': acknowledged
+                  ? 'ACKNOWLEDGED'
+                  : status == 'CONFLICT_MISMATCH'
+                  ? 'CONFLICT'
+                  : 'NEEDS_REVIEW',
+              'ack_payload': acknowledged ? json.encode(result) : null,
+              'server_document_id': result['server_document_id'],
+              'server_document_number': result['server_document_number'],
+              'error_code': acknowledged
+                  ? null
+                  : result['error_code'] ?? 'RECOVERY_REVIEW_REQUIRED',
+              'error_message': result['message'],
+              'worker_id': null,
+              'locked_until': null,
+            },
+            where: 'operation_id = ? AND user_id = ?',
+            whereArgs: [result['operation_id'], user.id],
+          );
+          count++;
+        }
+      });
+    }
+    await db.insert('app_meta', {
+      'key': 'recovery_epoch',
+      'value': serverEpoch.toString(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('sync_cursor', {
+      'id': 1,
+      'cursor_pos': 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    return count;
+  }
+
+  Future<bool> _checkRecoveryState() async {
+    final response = await _client
+        .get(
+          Uri.parse('${AppConfig.apiBaseUrl}/sync/health'),
+          headers: _buildHeaders(),
+        )
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw const ServerException('Sync holatini tekshirish bajarilmadi.');
+    }
+    final state = json.decode(response.body) as Map<String, dynamic>;
+    if (state['recovery_status'] == 'RECONCILIATION_REQUIRED') {
+      await reconcileRecovery((state['recovery_epoch'] as num?)?.toInt() ?? 1);
+      return true;
+    }
+    final db = await _appDb.database;
+    final hold = await db.query(
+      'app_meta',
+      where: 'key = ?',
+      whereArgs: ['recovery_hold'],
+    );
+    if (hold.isNotEmpty && hold.first['value'] == 'true') {
+      await bootstrap();
+      await db.insert('app_meta', {
+        'key': 'recovery_hold',
+        'value': 'false',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    return false;
+  }
+
   /// Kutilayotgan operatsiyalarni serverga yuborish (Push Pending Operations)
   Future<int> pushPendingOperations({
     String? specificWorkerId,
@@ -369,7 +509,7 @@ class OfflineSyncService extends ChangeNotifier {
         .toList();
     final firstLeaseToken = lockedItems.first.leaseToken;
 
-    final headers = _buildHeaders();
+    final headers = {..._buildHeaders(), 'X-Device-UUID': effectiveDeviceUuid};
     if (firstLeaseToken != null) {
       headers['X-Lease-Token'] = firstLeaseToken;
     }
@@ -387,6 +527,13 @@ class OfflineSyncService extends ChangeNotifier {
           )
           .timeout(const Duration(seconds: 20));
 
+      if (response.statusCode == 428) {
+        await _releaseLocks(workerId);
+        final hold = json.decode(response.body) as Map<String, dynamic>;
+        return await reconcileRecovery(
+          (hold['recovery_epoch'] as num?)?.toInt() ?? 1,
+        );
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final resData = json.decode(response.body) as Map<String, dynamic>;
         final results = (resData['results'] as List<dynamic>?) ?? [];
@@ -513,53 +660,130 @@ class OfflineSyncService extends ChangeNotifier {
 
     final data =
         (json.decode(response.body)['data'] as Map<String, dynamic>?) ?? {};
-    final newCursor = (data['cursor'] as num?)?.toInt() ?? curPos;
-    final changes = (data['changes'] as List<dynamic>?) ?? [];
+    final newCursor = (data['next_cursor'] as num?)?.toInt() ?? curPos;
+    final changes = (data['items'] as List<dynamic>?) ?? [];
 
     if (changes.isNotEmpty) {
       await db.transaction((txn) async {
         for (final item in changes) {
           final ch = item as Map<String, dynamic>;
-          final entity = ch['entity_type'] as String?;
+          final entity = (ch['entity_type'] as String?)?.toUpperCase();
           final payload = ch['payload'] as Map<String, dynamic>? ?? {};
 
-          if (entity == 'product_variant') {
-            final vId =
-                (ch['entity_id'] as num?)?.toInt() ??
-                (payload['id'] as num?)?.toInt();
-            if (vId != null) {
-              await txn.rawUpdate(
-                '''
-                UPDATE product_variants 
-                SET stock_qty = ?, retail_price = ?, default_sale_price = ?, updated_at = ? 
-                WHERE id = ?
-              ''',
-                [
-                  payload['stock_qty'] ?? 0,
-                  payload['retail_price'] ?? 0,
-                  payload['default_sale_price'] ?? 0,
-                  DateTime.now().toIso8601String(),
-                  vId,
-                ],
+          final id = int.tryParse('${ch['entity_id'] ?? payload['id']}');
+          if (id == null) continue;
+          if (entity == 'PRODUCT') {
+            if (ch['is_tombstone'] == true) {
+              await txn.update(
+                'products',
+                {'is_active': 0},
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+            } else if (payload['name'] != null) {
+              await txn.insert('products', {
+                'id': id,
+                'name': payload['name'],
+                'code': payload['code'],
+                'is_active': payload['status'] == 'ARCHIVED' ? 0 : 1,
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+          } else if (entity == 'PRODUCT_VARIANT') {
+            if (ch['is_tombstone'] == true) {
+              await txn.delete(
+                'product_variants',
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+              continue;
+            }
+            final update = <String, Object?>{
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            for (final field in [
+              'stock_qty',
+              'retail_price',
+              'default_sale_price',
+              'sku',
+              'product_id',
+            ]) {
+              if (payload.containsKey(field)) update[field] = payload[field];
+            }
+            final existing = await txn.query(
+              'product_variants',
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+            if (existing.isEmpty && payload['product_id'] != null) {
+              await txn.insert('product_variants', {'id': id, ...update});
+            } else {
+              await txn.update(
+                'product_variants',
+                update,
+                where: 'id = ?',
+                whereArgs: [id],
               );
             }
-          } else if (entity == 'customer') {
-            final cId =
-                (ch['entity_id'] as num?)?.toInt() ??
-                (payload['id'] as num?)?.toInt();
-            if (cId != null) {
-              await txn.rawUpdate(
-                '''
-                UPDATE customers 
-                SET current_debt = ?, debt_limit = ?, updated_at = ? 
-                WHERE id = ?
-              ''',
-                [
-                  payload['current_debt'] ?? 0,
-                  payload['debt_limit'] ?? 0,
-                  DateTime.now().toIso8601String(),
-                  cId,
-                ],
+          } else if (entity == 'CUSTOMER') {
+            final update = <String, Object?>{
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+            for (final field in [
+              'name',
+              'phone',
+              'store_name',
+              'address',
+              'debt_limit',
+              'current_debt',
+            ]) {
+              if (payload.containsKey(field)) update[field] = payload[field];
+            }
+            if (payload.containsKey('current_debt')) {
+              var pendingDebt = 0;
+              final pending = await txn.query(
+                'sync_queue',
+                where: "user_id = ? AND status != 'ACKNOWLEDGED'",
+                whereArgs: [user.id],
+              );
+              for (final row in pending) {
+                final operation = SyncQueueItem.fromDbMap(row);
+                if (operation.payload['customer_id'] != id) continue;
+                if (operation.type == 'CREATE_SALE') {
+                  final items =
+                      (operation.payload['items'] as List<dynamic>?) ?? [];
+                  final total = items.fold<int>(
+                    0,
+                    (sum, item) =>
+                        sum +
+                        ((item['quantity'] as num?)?.toInt() ?? 0) *
+                            ((item['sale_price'] as num?)?.toInt() ?? 0),
+                  );
+                  pendingDebt +=
+                      total -
+                      ((operation.payload['paid_amount'] as num?)?.toInt() ??
+                          0);
+                } else if (operation.type == 'CUSTOMER_PAYMENT') {
+                  pendingDebt -=
+                      (operation.payload['amount'] as num?)?.toInt() ?? 0;
+                }
+              }
+              update['current_debt'] =
+                  ((payload['current_debt'] as num?)?.toInt() ?? 0) +
+                  pendingDebt;
+            }
+            final existing = await txn.query(
+              'customers',
+              where: 'id = ?',
+              whereArgs: [id],
+            );
+            if (existing.isEmpty && payload['name'] != null) {
+              await txn.insert('customers', {'id': id, ...update});
+            } else {
+              await txn.update(
+                'customers',
+                update,
+                where: 'id = ?',
+                whereArgs: [id],
               );
             }
           }
@@ -575,6 +799,9 @@ class OfflineSyncService extends ChangeNotifier {
 
     _lastSyncedAt = DateTime.now();
     notifyListeners();
+    if (data['has_more'] == true && newCursor > curPos) {
+      return changes.length + await pullDeltaChanges();
+    }
     return changes.length;
   }
 
@@ -592,7 +819,15 @@ class OfflineSyncService extends ChangeNotifier {
         return;
       }
 
+      if (await _checkRecoveryState()) return;
       await pushPendingOperations();
+      final db = await _appDb.database;
+      final hold = await db.query(
+        'app_meta',
+        where: 'key = ?',
+        whereArgs: ['recovery_hold'],
+      );
+      if (hold.isNotEmpty && hold.first['value'] == 'true') return;
       await pullDeltaChanges();
     } catch (e) {
       _lastError = e.toString();

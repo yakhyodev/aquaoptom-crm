@@ -175,111 +175,7 @@ void main() {
         inMemoryDatabasePath,
         options: OpenDatabaseOptions(
           version: 2,
-          onCreate: (database, version) async {
-            // Jadvallarni yaratish
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS products (
-                id INTEGER PRIMARY KEY,
-                name TEXT NOT NULL,
-                code TEXT,
-                is_active INTEGER DEFAULT 1,
-                updated_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS product_variants (
-                id INTEGER PRIMARY KEY,
-                product_id INTEGER NOT NULL,
-                sku TEXT,
-                litres REAL,
-                volume_ml INTEGER,
-                display_volume TEXT,
-                stock_qty INTEGER DEFAULT 0,
-                cost_price INTEGER,
-                retail_price INTEGER DEFAULT 0,
-                default_sale_price INTEGER DEFAULT 0,
-                updated_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS customers (
-                id INTEGER PRIMARY KEY,
-                uuid TEXT UNIQUE,
-                name TEXT NOT NULL,
-                phone TEXT,
-                store_name TEXT,
-                address TEXT,
-                debt_limit INTEGER DEFAULT 0,
-                current_debt INTEGER DEFAULT 0,
-                is_active INTEGER DEFAULT 1,
-                created_offline INTEGER DEFAULT 0,
-                updated_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS offline_leases (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                device_uuid TEXT NOT NULL,
-                user_id INTEGER NOT NULL,
-                lease_token TEXT NOT NULL,
-                valid_from TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                permissions TEXT NOT NULL,
-                epoch INTEGER DEFAULT 1,
-                signature TEXT,
-                is_active INTEGER DEFAULT 1,
-                created_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS stock_allocations (
-                id INTEGER PRIMARY KEY,
-                variant_id INTEGER UNIQUE NOT NULL,
-                sku TEXT,
-                product_name TEXT,
-                volume_name TEXT,
-                allocated_quantity INTEGER NOT NULL,
-                consumed_quantity INTEGER DEFAULT 0,
-                returned_quantity INTEGER DEFAULT 0,
-                available_quantity INTEGER NOT NULL,
-                updated_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS credit_allocations (
-                id INTEGER PRIMARY KEY,
-                customer_id INTEGER UNIQUE NOT NULL,
-                customer_name TEXT,
-                allocated_amount INTEGER NOT NULL,
-                consumed_amount INTEGER DEFAULT 0,
-                returned_amount INTEGER DEFAULT 0,
-                available_amount INTEGER NOT NULL,
-                updated_at TEXT
-              )
-            ''');
-            await database.execute('''
-              CREATE TABLE IF NOT EXISTS sync_queue (
-                operation_id TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                device_uuid TEXT NOT NULL,
-                type TEXT NOT NULL,
-                payload TEXT NOT NULL,
-                payload_fingerprint TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'PENDING',
-                retry_count INTEGER DEFAULT 0,
-                error_code TEXT,
-                error_message TEXT,
-                server_document_id INTEGER,
-                server_document_number TEXT,
-                ack_payload TEXT,
-                device_created_at TEXT NOT NULL,
-                processed_at TEXT,
-                lease_token TEXT,
-                locked_until TEXT,
-                worker_id TEXT
-              )
-            ''');
-          },
+          onCreate: AppDatabase.createSchema,
         ),
       );
       AppDatabase.setTestDatabase(db);
@@ -1005,6 +901,147 @@ void main() {
           8,
         );
         expect((await db.query('sync_queue')).single['status'], 'PENDING');
+      } finally {
+        AppDatabase.setTestDatabase(null);
+        SessionService().clearSession();
+        await db.close();
+        client.close();
+      }
+    },
+  );
+  test(
+    'Audit: paginated real delta and retained ACK recovery preserve data',
+    () async {
+      final db = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: AppDatabase.createSchema,
+        ),
+      );
+      AppDatabase.setTestDatabase(db);
+      SessionService().setSession(user: testUserA, token: 'test');
+      await db.insert('products', {'id': 1, 'name': 'Fanta'});
+      await db.insert('product_variants', {
+        'id': 101,
+        'product_id': 1,
+        'stock_qty': 9,
+        'default_sale_price': 6500,
+      });
+      await db.insert('customers', {
+        'id': 1,
+        'name': 'Ali',
+        'debt_limit': 50000,
+        'current_debt': 0,
+      });
+      final originalPayload = json.encode({
+        'customer_id': 1,
+        'items': [
+          {'variant_id': 101, 'quantity': 1, 'sale_price': 1000},
+        ],
+        'paid_amount': 0,
+      });
+      for (final entry in {
+        'pending': 'PENDING',
+        'retained': 'ACKNOWLEDGED',
+      }.entries) {
+        await db.insert('sync_queue', {
+          'operation_id': entry.key,
+          'user_id': 1,
+          'device_uuid': 'audit-device',
+          'type': 'CREATE_SALE',
+          'payload': originalPayload,
+          'payload_fingerprint': 'test',
+          'status': entry.value,
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+      }
+      var page = 0;
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/reconcile-recovery')) {
+          final body = json.decode(request.body) as Map<String, dynamic>;
+          final operations = body['operations'] as List<dynamic>;
+          expect(operations.length, 2);
+          expect(operations.map((op) => op['operation_id']).toSet(), {
+            'pending',
+            'retained',
+          });
+          return http.Response(
+            json.encode({
+              'results': operations
+                  .map(
+                    (op) => {
+                      'operation_id': op['operation_id'],
+                      'status': 'ALREADY_PERSISTED',
+                    },
+                  )
+                  .toList(),
+            }),
+            200,
+          );
+        }
+        final data = page++ == 0
+            ? {
+                'items': [
+                  {
+                    'entity_type': 'PRODUCT_VARIANT',
+                    'entity_id': '101',
+                    'payload': {'default_sale_price': 7000},
+                  },
+                ],
+                'next_cursor': 43,
+                'has_more': true,
+              }
+            : {
+                'items': [
+                  {
+                    'entity_type': 'CUSTOMER',
+                    'entity_id': '1',
+                    'payload': {'current_debt': 2000},
+                  },
+                ],
+                'next_cursor': 44,
+                'has_more': false,
+              };
+        return http.Response(json.encode({'data': data}), 200);
+      });
+      try {
+        final service = OfflineSyncService(
+          appDb: AppDatabase(),
+          client: client,
+        );
+        service.setDeviceUuid('audit-device');
+        expect(await service.pullDeltaChanges(), 2);
+        final variant = (await db.query('product_variants')).single;
+        expect(variant['stock_qty'], 9);
+        expect(variant['default_sale_price'], 7000);
+        final customer = (await db.query('customers')).single;
+        expect(customer['current_debt'], 3000);
+        expect(customer['debt_limit'], 50000);
+        expect((await db.query('sync_cursor')).single['cursor_pos'], 44);
+        expect(await service.reconcileRecovery(2), 2);
+        final retained = await db.query('sync_queue');
+        expect(
+          retained.every(
+            (row) =>
+                row['status'] == 'ACKNOWLEDGED' &&
+                row['payload'] == originalPayload,
+          ),
+          true,
+        );
+        expect((await db.query('sync_cursor')).single['cursor_pos'], 0);
+        expect(
+          (await db.query(
+            'app_meta',
+            where: 'key = ?',
+            whereArgs: ['recovery_hold'],
+          )).single['value'],
+          'true',
+        );
+        await expectLater(
+          OfflineSalesService(appDb: AppDatabase()).getActiveLease(),
+          throwsA(isA<ForbiddenException>()),
+        );
       } finally {
         AppDatabase.setTestDatabase(null);
         SessionService().clearSession();

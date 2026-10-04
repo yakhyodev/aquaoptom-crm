@@ -35,6 +35,16 @@ class OfflineSalesService {
   /// Qurilmaning faol lease ruxsatnomasini tekshirish
   Future<OfflineLeaseModel> getActiveLease({int? userId}) async {
     final db = await _appDb.database;
+    final hold = await db.query(
+      'app_meta',
+      where: 'key = ?',
+      whereArgs: ['recovery_hold'],
+    );
+    if (hold.isNotEmpty && hold.first['value'] == 'true') {
+      throw const ForbiddenException(
+        'Recovery tekshiruvi tugamaguncha yangi savdo to‘xtatilgan.',
+      );
+    }
     final currentUserId = userId ?? SessionService().currentUser?.id ?? 0;
 
     final rows = await db.query(
@@ -75,9 +85,7 @@ class OfflineSalesService {
     }
 
     if (!lease.canSell) {
-      throw const ForbiddenException(
-        "Sizda offline savdo qilish huquqi yo'q!",
-      );
+      throw const ForbiddenException("Sizda offline savdo qilish huquqi yo'q!");
     }
 
     return lease;
@@ -119,7 +127,8 @@ class OfflineSalesService {
       for (final item in items) {
         final variantId = (item['variant_id'] as num).toInt();
         final qty = (item['quantity'] as num).toInt();
-        final unitPrice = ((item['sale_price'] ?? item['unit_price']) as num).toInt();
+        final unitPrice = ((item['sale_price'] ?? item['unit_price']) as num)
+            .toInt();
         final lineTotal = qty * unitPrice;
         calculatedTotal += lineTotal;
 
@@ -162,7 +171,8 @@ class OfflineSalesService {
 
         receiptItems.add({
           'variant_id': variantId,
-          'product_name': alloc['product_name'] ?? item['product_name'] ?? 'Tovar',
+          'product_name':
+              alloc['product_name'] ?? item['product_name'] ?? 'Tovar',
           'volume_name': alloc['volume_name'] ?? '',
           'quantity': qty,
           'unit_price': unitPrice,
@@ -180,7 +190,9 @@ class OfflineSalesService {
       int finalPaid = 0;
       int finalDebt = 0;
 
-      if (paymentType == 'FULL' || paymentType == 'CASH' || paymentType == 'CARD') {
+      if (paymentType == 'FULL' ||
+          paymentType == 'CASH' ||
+          paymentType == 'CARD') {
         finalPaid = calculatedTotal;
         finalDebt = 0;
       } else if (paymentType == 'DEBT') {
@@ -195,7 +207,8 @@ class OfflineSalesService {
 
       // Nasiya tekshiruvi
       if (finalDebt > 0) {
-        if (customerId == null && (customerUuid == null || customerUuid.isEmpty)) {
+        if (customerId == null &&
+            (customerUuid == null || customerUuid.isEmpty)) {
           throw ValidationException(
             "Nasiya yoki qisman to'lov uchun xaridorni tanlash shart!",
           );
@@ -219,7 +232,8 @@ class OfflineSalesService {
             }
 
             // Kredit ajratmasini mahalliy kamaytirish
-            final newConsumed = (custAlloc['consumed_amount'] as num).toInt() + finalDebt;
+            final newConsumed =
+                (custAlloc['consumed_amount'] as num).toInt() + finalDebt;
             final newAvail = availCredit - finalDebt;
             await txn.update(
               'credit_allocations',
@@ -241,7 +255,8 @@ class OfflineSalesService {
             limit: 1,
           );
           if (custRows.isNotEmpty) {
-            final curDebt = (custRows.first['current_debt'] as num?)?.toInt() ?? 0;
+            final curDebt =
+                (custRows.first['current_debt'] as num?)?.toInt() ?? 0;
             await txn.update(
               'customers',
               {'current_debt': curDebt + finalDebt},
@@ -253,7 +268,8 @@ class OfflineSalesService {
       }
 
       // 3. Vaqtinchalik mahalliy chek raqami
-      final tempInvoiceNumber = '#OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+      final tempInvoiceNumber =
+          '#OFF-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
 
       // 4. Barqaror Payload va Kanonik Fingerprint
       final payload = <String, dynamic>{
@@ -291,8 +307,11 @@ class OfflineSalesService {
         'lease_token': lease.leaseToken,
       };
 
-      await txn.insert('sync_queue', queueMap,
-          conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.insert(
+        'sync_queue',
+        queueMap,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
 
       final receipt = {
         'store_name': 'AquaOptom CRM (Offline)',
@@ -415,11 +434,14 @@ class OfflineSalesService {
       );
 
       if (rows.isEmpty) {
-        throw ValidationException("Asl savdo (#$originalOperationId) topilmadi!");
+        throw ValidationException(
+          "Asl savdo (#$originalOperationId) topilmadi!",
+        );
       }
 
       final origRow = rows.first;
-      final origPayload = json.decode(origRow['payload'] as String) as Map<String, dynamic>;
+      final origPayload =
+          json.decode(origRow['payload'] as String) as Map<String, dynamic>;
       final origItems = (origPayload['items'] as List<dynamic>?) ?? [];
 
       // Tovarlar ajratmasini orqaga qaytarish (Re-credit stock allocation)
@@ -427,8 +449,12 @@ class OfflineSalesService {
         final vId = (it['variant_id'] as num).toInt();
         final qty = (it['quantity'] as num).toInt();
 
-        final allocs = await txn.query('stock_allocations',
-            where: 'variant_id = ?', whereArgs: [vId], limit: 1);
+        final allocs = await txn.query(
+          'stock_allocations',
+          where: 'variant_id = ?',
+          whereArgs: [vId],
+          limit: 1,
+        );
         if (allocs.isNotEmpty) {
           final alloc = allocs.first;
           final curConsumed = (alloc['consumed_quantity'] as num).toInt();
@@ -449,8 +475,12 @@ class OfflineSalesService {
       final origDebt = (origPayload['debt_amount'] as num?)?.toInt() ?? 0;
       final custId = (origPayload['customer_id'] as num?)?.toInt();
       if (origDebt > 0 && custId != null) {
-        final custAllocs = await txn.query('credit_allocations',
-            where: 'customer_id = ?', whereArgs: [custId], limit: 1);
+        final custAllocs = await txn.query(
+          'credit_allocations',
+          where: 'customer_id = ?',
+          whereArgs: [custId],
+          limit: 1,
+        );
         if (custAllocs.isNotEmpty) {
           final alloc = custAllocs.first;
           final curConsumed = (alloc['consumed_amount'] as num).toInt();

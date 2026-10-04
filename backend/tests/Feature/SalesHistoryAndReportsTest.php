@@ -228,6 +228,7 @@ class SalesHistoryAndReportsTest extends TestCase
             'created_at' => $septemberDateUtc,
             'notes' => 'Savdo #INV-SEP-001',
         ]);
+        $this->customer->update(['current_debt' => 100000]);
 
         // 2. Oktabrda mijoz qarzini to'laydi (2-oktabr 2026):
         // 100 000 so'm naqd to'lov

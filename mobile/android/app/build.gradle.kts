@@ -67,3 +67,12 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+// Reject unsigned release artifacts rather than reporting them as signed.
+gradle.taskGraph.whenReady {
+    val releaseRequested = allTasks.any { it.name.endsWith("Release") }
+    val releaseSigning = android.signingConfigs.getByName("release")
+    if (releaseRequested && (releaseSigning.storeFile == null || !releaseSigning.storeFile!!.exists() || releaseSigning.keyPassword.isNullOrBlank() || releaseSigning.storePassword.isNullOrBlank())) {
+        throw GradleException("Signed release requires private key.properties or AQUAOPTOM signing environment variables.")
+    }
+}

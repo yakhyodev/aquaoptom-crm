@@ -16,7 +16,6 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Backup\BackupService;
 use App\Services\Inventory\InventoryCalculatorService;
-use App\Services\Ledger\Exceptions\InsufficientAllocationException;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Purchase\ReceivePurchaseService;
 use App\Services\Sales\CreateSaleService;
@@ -28,13 +27,12 @@ use Illuminate\Console\Command;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 
 class StagingAcceptanceCommand extends Command
 {
     protected $signature = 'app:staging-acceptance {--report-path=docs/STAGING_ACCEPTANCE_REPORT.md}';
+
     protected $description = 'Execute full Staging deployment verification, pilot acceptance drills, resilience, and generate GO/NO-GO report (Prompt 24)';
 
     public function handle(
@@ -47,9 +45,9 @@ class StagingAcceptanceCommand extends Command
         BackupService $backupService
     ): int {
         $startTime = microtime(true);
-        $this->info("================================================================================");
-        $this->info("   AQUAOPTOM CRM — STAGING ACCEPTANCE & PILOT REHEARSAL DRILL (PROMPT 24)");
-        $this->info("================================================================================");
+        $this->info('================================================================================');
+        $this->info('   AQUAOPTOM CRM — STAGING ACCEPTANCE & PILOT REHEARSAL DRILL (PROMPT 24)');
+        $this->info('================================================================================');
 
         $results = [];
         $timings = [];
@@ -66,11 +64,12 @@ class StagingAcceptanceCommand extends Command
         $t0 = microtime(true);
         $activeDb = DB::connection()->getDatabaseName();
         $this->info("  - Faol ma'lumotlar bazasi: {$activeDb}");
-        
+
         $tableCount = DB::selectOne("SELECT count(*) as cnt FROM information_schema.tables WHERE table_schema = 'public'")->cnt;
         $this->info("  - Jadvallar soni: {$tableCount} ta (Kutilgan: 62)");
         if ($tableCount < 62) {
             $this->error("  XATOLIK: Staging bazasida to'liq migratsiya qilinmagan!");
+
             return 1;
         }
 
@@ -80,12 +79,12 @@ class StagingAcceptanceCommand extends Command
         // Health probes
         $healthController = app(HealthController::class);
         $livenessResp = $healthController->liveness();
-        $readinessResp = $healthController->readiness(new Request());
+        $readinessResp = $healthController->readiness(new Request);
         $isLive = $livenessResp->getStatusCode() === 200;
         $isReady = $readinessResp->getStatusCode() === 200;
-        $this->info("  - Liveness probe: " . ($isLive ? "HTTP 200 LIVE" : "FAIL"));
-        $this->info("  - Readiness probe: " . ($isReady ? "HTTP 200 READY" : "FAIL"));
-        
+        $this->info('  - Liveness probe: '.($isLive ? 'HTTP 200 LIVE' : 'FAIL'));
+        $this->info('  - Readiness probe: '.($isReady ? 'HTTP 200 READY' : 'FAIL'));
+
         $timings['env_topology_ms'] = round((microtime(true) - $t0) * 1000, 2);
         $results['env_topology'] = $isLive && $isReady && $tableCount >= 62;
 
@@ -101,12 +100,13 @@ class StagingAcceptanceCommand extends Command
         $warehouse = Warehouse::first();
         $cashAccount = CashAccount::where('type', 'CASH')->first();
 
-        $fanta05 = ProductVariant::whereHas('product', fn($q) => $q->where('name', 'Fanta'))
-            ->whereHas('volume', fn($q) => $q->where('value_ml', 500))
+        $fanta05 = ProductVariant::whereHas('product', fn ($q) => $q->where('name', 'Fanta'))
+            ->whereHas('volume', fn ($q) => $q->where('value_ml', 500))
             ->first();
 
         if (! $fanta05) {
-            $this->error("  XATOLIK: Fanta 0.5L katalog varianti topilmadi!");
+            $this->error('  XATOLIK: Fanta 0.5L katalog varianti topilmadi!');
+
             return 1;
         }
 
@@ -120,7 +120,7 @@ class StagingAcceptanceCommand extends Command
         $purchase = $purchaseService->execute(
             supplierId: $supplier->id,
             items: [
-                ['variant_id' => $fanta05->id, 'quantity' => 200, 'unit_cost' => 5000, 'new_sale_price' => 7000]
+                ['variant_id' => $fanta05->id, 'quantity' => 200, 'unit_cost' => 5000, 'new_sale_price' => 7000],
             ],
             operationId: $kirimOpId,
             paidAmount: 0,
@@ -136,7 +136,7 @@ class StagingAcceptanceCommand extends Command
         $quickSale = $saleService->execute(
             customerId: null,
             items: [
-                ['variant_id' => $fanta05->id, 'quantity' => 10, 'sale_price' => 7000, 'is_system_price' => true]
+                ['variant_id' => $fanta05->id, 'quantity' => 10, 'sale_price' => 7000, 'is_system_price' => true],
             ],
             operationId: $sale1OpId,
             paidAmount: 70000,
@@ -154,7 +154,7 @@ class StagingAcceptanceCommand extends Command
         $creditSale = $saleService->execute(
             customerId: $customer->id,
             items: [
-                ['variant_id' => $fanta05->id, 'quantity' => 20, 'sale_price' => 7000, 'is_system_price' => true]
+                ['variant_id' => $fanta05->id, 'quantity' => 20, 'sale_price' => 7000, 'is_system_price' => true],
             ],
             operationId: $sale2OpId,
             paidAmount: 40000,
@@ -187,7 +187,7 @@ class StagingAcceptanceCommand extends Command
             canViewCost: true
         );
         $expectedStock = $stockBefore + 200 - 10 - 20; // +170 dona
-        $this->info("  - Ombor kalkulyatori: Mavjud dona: {$calcResult['total_quantity_units']} (Kutilgan: {$expectedStock}), Kutilgan yalpi foyda: " . number_format($calcResult['expected_gross_profit'] ?? 0) . " so'm");
+        $this->info("  - Ombor kalkulyatori: Mavjud dona: {$calcResult['total_quantity_units']} (Kutilgan: {$expectedStock}), Kutilgan yalpi foyda: ".number_format($calcResult['expected_gross_profit'] ?? 0)." so'm");
 
         $timings['pilot_workflows_ms'] = round((microtime(true) - $t0) * 1000, 2);
         $results['pilot_workflows'] = ($calcResult['total_quantity_units'] === $expectedStock);
@@ -223,16 +223,16 @@ class StagingAcceptanceCommand extends Command
                 'payload' => [
                     'customer_id' => null,
                     'items' => [
-                        ['variant_id' => $fanta05->id, 'quantity' => 30, 'sale_price' => 7000, 'is_system_price' => true]
+                        ['variant_id' => $fanta05->id, 'quantity' => 30, 'sale_price' => 7000, 'is_system_price' => true],
                     ],
                     'paid_amount' => 210000,
                     'cash_account_id' => $cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
                     'notes' => 'Offline PC PWA Sale Drill',
-                    'source' => 'web_offline'
-                ]
-            ]
+                    'source' => 'web_offline',
+                ],
+            ],
         ];
 
         // 3.2 Device 2 (Android) offline sale: 40 dona
@@ -246,16 +246,16 @@ class StagingAcceptanceCommand extends Command
                 'payload' => [
                     'customer_id' => null,
                     'items' => [
-                        ['variant_id' => $fanta05->id, 'quantity' => 40, 'sale_price' => 7000, 'is_system_price' => true]
+                        ['variant_id' => $fanta05->id, 'quantity' => 40, 'sale_price' => 7000, 'is_system_price' => true],
                     ],
                     'paid_amount' => 280000,
                     'cash_account_id' => $cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
                     'notes' => 'Offline Android Mobile Sale Drill',
-                    'source' => 'mobile_offline'
-                ]
-            ]
+                    'source' => 'mobile_offline',
+                ],
+            ],
         ];
 
         // 3.3 Overdraft sinovi: Android qurilmasi yana 20 dona sotmoqchi (ajratmadan 10 dona qolgan)
@@ -269,16 +269,16 @@ class StagingAcceptanceCommand extends Command
                 'payload' => [
                     'customer_id' => null,
                     'items' => [
-                        ['variant_id' => $fanta05->id, 'quantity' => 20, 'sale_price' => 7000, 'is_system_price' => true]
+                        ['variant_id' => $fanta05->id, 'quantity' => 20, 'sale_price' => 7000, 'is_system_price' => true],
                     ],
                     'paid_amount' => 140000,
                     'cash_account_id' => $cashAccount->id,
                     'payment_type' => 'FULL',
                     'payment_method' => 'CASH',
                     'notes' => 'Overdraft attempt exceeding allocation',
-                    'source' => 'mobile_offline'
-                ]
-            ]
+                    'source' => 'mobile_offline',
+                ],
+            ],
         ];
 
         // Reconnect and push PC operations
@@ -327,7 +327,7 @@ class StagingAcceptanceCommand extends Command
         $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
 
         // V1 schema: sync_queue table with pending records
-        $pdo->exec("
+        $pdo->exec('
             CREATE TABLE sync_queue (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 operation_id TEXT UNIQUE NOT NULL,
@@ -336,10 +336,10 @@ class StagingAcceptanceCommand extends Command
                 status TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
-        ");
+        ');
 
         $pendingOp1 = (string) Str::uuid();
-        $stmt = $pdo->prepare("INSERT INTO sync_queue (operation_id, operation_type, payload, status, created_at) VALUES (?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare('INSERT INTO sync_queue (operation_id, operation_type, payload, status, created_at) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute([$pendingOp1, 'CREATE_SALE', json_encode(['total' => 140000]), 'PENDING', Carbon::now()->toIso8601String()]);
 
         // Simulate APK upgrade: App executes migrations on existing DB (e.g. adding client_sequence and device_uuid)
@@ -375,15 +375,15 @@ class StagingAcceptanceCommand extends Command
 
         $configuredBotToken = config('services.telegram.bot_token', env('TELEGRAM_BOT_TOKEN'));
         $stagingChatId = config('services.telegram.receiver_chat_id', env('TELEGRAM_RECEIVER_CHAT_ID', '123456789'));
-        
+
         // 5.1 Unregistered stranger access guard
         $strangerChatId = 999999999;
         $strangerUser = User::findByTelegramChatId($strangerChatId);
-        $this->info("  - Ruxsatsiz begona Telegram ID ({$strangerChatId}) tekshiruvi: " . ($strangerUser === null ? "BLOKLANGAN (Ruxsat yo'q)" : "XATO"));
+        $this->info("  - Ruxsatsiz begona Telegram ID ({$strangerChatId}) tekshiruvi: ".($strangerUser === null ? "BLOKLANGAN (Ruxsat yo'q)" : 'XATO'));
 
         // 5.2 Registered staging user access
         $stagingUser = User::findByTelegramChatId($stagingChatId);
-        $this->info("  - Biriktirilgan Staging Telegram ID ({$stagingChatId}) tekshiruvi: " . ($stagingUser ? "ANIQLANDI ({$stagingUser->name})" : "TEST USER"));
+        $this->info("  - Biriktirilgan Staging Telegram ID ({$stagingChatId}) tekshiruvi: ".($stagingUser ? "ANIQLANDI ({$stagingUser->name})" : 'TEST USER'));
 
         // 5.3 Privacy guard: verify no production customers exist or receive test notifications
         $prodCustomerNotifications = DB::table('outbox_events')
@@ -429,15 +429,15 @@ class StagingAcceptanceCommand extends Command
         $sourceTables = (int) DB::selectOne("SELECT count(*) as cnt FROM pg_tables WHERE schemaname = 'public'")->cnt;
         $restoredTables = (int) $isolatedPdo->query("SELECT count(*) as cnt FROM pg_tables WHERE schemaname = 'public'")->fetch(\PDO::FETCH_OBJ)->cnt;
         $sourceUsers = (int) DB::table('users')->count();
-        $restoredUsers = (int) $isolatedPdo->query("SELECT count(*) as cnt FROM users")->fetch(\PDO::FETCH_OBJ)->cnt;
+        $restoredUsers = (int) $isolatedPdo->query('SELECT count(*) as cnt FROM users')->fetch(\PDO::FETCH_OBJ)->cnt;
         $sourceCash = (int) DB::table('cash_accounts')->sum('balance');
-        $restoredCash = (int) $isolatedPdo->query("SELECT COALESCE(SUM(balance), 0) as sm FROM cash_accounts")->fetch(\PDO::FETCH_OBJ)->sm;
+        $restoredCash = (int) $isolatedPdo->query('SELECT COALESCE(SUM(balance), 0) as sm FROM cash_accounts')->fetch(\PDO::FETCH_OBJ)->sm;
 
         $isParityMatch = ($sourceTables === $restoredTables) && ($sourceUsers === $restoredUsers) && ($sourceCash === $restoredCash);
         unset($isolatedPdo);
         DB::statement("DROP DATABASE IF EXISTS \"{$isolatedDb}\";");
 
-        $this->info("  - Tiklash sinovi (Restore Drill): Tables: {$restoredTables}/{$sourceTables}, Cash: {$restoredCash}/{$sourceCash} (" . ($isParityMatch ? "100% MATCH" : "MISMATCH") . ", {$restoreDuration}s, RTO < 2h)");
+        $this->info("  - Tiklash sinovi (Restore Drill): Tables: {$restoredTables}/{$sourceTables}, Cash: {$restoredCash}/{$sourceCash} (".($isParityMatch ? '100% MATCH' : 'MISMATCH').", {$restoreDuration}s, RTO < 2h)");
 
         // 6.3 Recovery Epoch & Offline Reconciliation Drill
         // Set recovery state to RECONCILIATION_REQUIRED
@@ -452,7 +452,7 @@ class StagingAcceptanceCommand extends Command
         } catch (RecoveryReconciliationRequiredException $e) {
             $isPushBlocked = true;
         }
-        $this->info("  - Tiklanish davrida oddiy push to'xtatilishi: " . ($isPushBlocked ? "MUVAFFAQIYATLI (HTTP 428 RECONCILIATION_REQUIRED)" : "XATO"));
+        $this->info("  - Tiklanish davrida oddiy push to'xtatilishi: ".($isPushBlocked ? 'MUVAFFAQIYATLI (HTTP 428 RECONCILIATION_REQUIRED)' : 'XATO'));
 
         // Reconcile via RecoveryReconciliationService
         $reconciliationResult = $recoveryService->reconcileDevice(
@@ -461,10 +461,10 @@ class StagingAcceptanceCommand extends Command
             clientEpoch: 1,
             retainedOperations: $pcOperations
         );
-        $this->info("  - Recovery Reconciliation bajarildi: " . count($reconciliationResult) . " ta amal muvofiqlashtirildi (Ma'lumotlar yo'qotilmadi)");
+        $this->info('  - Recovery Reconciliation bajarildi: '.count($reconciliationResult)." ta amal muvofiqlashtirildi (Ma'lumotlar yo'qotilmadi)");
 
         // Return system to NORMAL
-        $recoveryService->markRecoveryCompleted();
+        $recoveryService->markRecoveryCompleted(User::where('role', 'OWNER')->firstOrFail()->id, Device::where('is_active', true)->where('status', 'ACTIVE')->pluck('id')->all());
         $normalStatus = SystemSetting::get('system_recovery_status');
         $this->info("  - Tizim normal holatga qaytarildi: {$normalStatus}");
 
@@ -479,7 +479,7 @@ class StagingAcceptanceCommand extends Command
         $this->line("\n[7/7] Release-Readiness GO / NO-GO Xulosasini Shakllantirish...");
         $totalDuration = round(microtime(true) - $startTime, 2);
 
-        $allPassed = !in_array(false, $results, true);
+        $allPassed = ! in_array(false, $results, true);
 
         // Hardware / External connection audit:
         // Physical Android USB/WiFi device and Live Production Bot Token are nonblocking staging criteria
@@ -496,7 +496,7 @@ class StagingAcceptanceCommand extends Command
             ]
         );
 
-        $goStatus = $allPassed ? "GO" : "NO-GO";
+        $goStatus = $allPassed ? 'GO' : 'NO-GO';
         $this->info("\n>>> UMUMIY STAGING STATUS: [ {$goStatus} ] (Jami vaqt: {$totalDuration}s) <<<");
 
         // Write report
@@ -512,6 +512,7 @@ class StagingAcceptanceCommand extends Command
     protected function generateReportContent(string $status, string $version, string $db, array $timings, array $results, float $totalSec): string
     {
         $now = Carbon::now('Asia/Tashkent')->format('Y-m-d H:i:s');
+
         return <<<MARKDOWN
 # AQUAOPTOM CRM — STAGING QABUL VA RELIZGA TAYYORLIK HISOBOTI (PROMPT 24)
 

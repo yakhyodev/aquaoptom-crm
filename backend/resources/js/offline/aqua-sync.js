@@ -67,8 +67,31 @@ export class AquaSync {
                 return { status: 'OFFLINE', message: "Server bilan aloqa yo'q. Sinxronlash kechiktirildi." };
             }
 
+            const lease = await this.db.get('device_lease', 'current');
+            if (lease?.device_uuid) {
+                const headers = {Accept: 'application/json'};
+                if (lease.api_token) headers.Authorization = `Bearer ${lease.api_token}`;
+                const response = await fetch(`${this.apiBase}/sync/health`, {headers});
+                if (response.ok) {
+                    const state = await response.json();
+                    if (state.recovery_status === 'RECONCILIATION_REQUIRED') {
+                        return await this.reconcileRecovery(state.recovery_epoch, lease);
+                    }
+                    if ((await this.db.get('meta', 'recovery_hold'))?.value) {
+                        const csrf = globalThis.document?.querySelector('meta[name="csrf-token"]')?.content;
+                        if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+                        headers['Content-Type'] = 'application/json';
+                        const snapshot = await fetch(`${this.apiBase}/sync/bootstrap`, {method: 'POST', headers, body: JSON.stringify({device_uuid: lease.device_uuid})});
+                        if (!snapshot.ok) throw new Error('Recoverydan keyin bootstrap kerak.');
+                        await this.db.applyBootstrap((await snapshot.json()).data);
+                        await this.db.put('meta', {key: 'recovery_hold', value: false});
+                    }
+                }
+            }
+
             // C. 1-bosqich: Pending amallarni Push qilish
             const pushResult = await this.pushPendingQueue();
+            if (pushResult.recoveryHold) return pushResult;
 
             // D. 2-bosqich: Kursor bo'yicha yangi o'zgarishlarni Pull qilish
             const pullResult = await this.pullServerChanges();
@@ -107,6 +130,29 @@ export class AquaSync {
     /**
      * 3. Pending navbatni serverga yuborish (Batch Push)
      */
+    async reconcileRecovery(serverEpoch, lease = null) {
+        lease ||= await this.db.get('device_lease', 'current');
+        if (!lease?.device_uuid) throw new Error('Recovery uchun qurilma kerak.');
+        await this.db.put('meta', {key: 'recovery_hold', value: true});
+        const retained = (await this.db.getAll('sync_outbox')).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Device-UUID': lease.device_uuid};
+        const csrf = globalThis.document?.querySelector('meta[name="csrf-token"]')?.content;
+        if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+        if (lease.api_token) headers.Authorization = `Bearer ${lease.api_token}`;
+        for (let offset = 0; offset < Math.max(1, retained.length); offset += 100) {
+            const response = await fetch(`${this.apiBase}/sync/reconcile-recovery`, {method: 'POST', headers, signal: AbortSignal.timeout(20000), body: JSON.stringify({device_uuid: lease.device_uuid,
+                client_epoch: (await this.db.get('meta', 'recovery_epoch'))?.value || 1,
+                operations: retained.slice(offset, offset + 100).map(row => ({operation_id: row.operation_id, type: row.type, device_created_at: row.device_created_at || row.created_at, payload: row.payload}))})});
+            if (!response.ok) throw new Error('Recovery muvofiqlashtirish bajarilmadi; yozuvlar saqlandi.');
+            const data = await response.json();
+            const results = (data.results || []).map(row => ({...row, status: row.status === 'ALREADY_PERSISTED' ? 'RETRY_SUCCESS' : row.status === 'RESTORED_AND_APPLIED' ? 'APPLIED' : row.status === 'CONFLICT_MISMATCH' ? 'CONFLICT' : row.status}));
+            await this.db.applyPushResults(results);
+        }
+        await this.db.put('meta', {key: 'recovery_epoch', value: serverEpoch});
+        await this.db.put('meta', {key: 'last_cursor', value: 0});
+        return {recoveryHold: true, message: 'Recovery yozuvlari yuborildi. Admin tekshiruvi kutilmoqda.'};
+    }
+
     async pushPendingQueue() {
         const outbox = await this.db.getAll('sync_outbox');
         const pendingItems = outbox
@@ -178,6 +224,9 @@ export class AquaSync {
 
         if (!response.ok) {
             const errJson = await response.json().catch(() => ({}));
+            if (response.status === 428 && errJson.error_code === 'RECOVERY_RECONCILIATION_REQUIRED') {
+                return await this.reconcileRecovery(errJson.recovery_epoch, lease);
+            }
             throw new Error(errJson.message || `Server xatosi (#${response.status})`);
         }
 
@@ -229,7 +278,7 @@ export class AquaSync {
 
         const json = await res.json();
         const feed = json.data || {};
-        const events = feed.events || [];
+        const events = feed.items || feed.events || [];
         const nextCursor = feed.next_cursor || cursor;
 
         if (events.length > 0) {
@@ -238,6 +287,10 @@ export class AquaSync {
             await this.db.put('meta', { key: 'last_cursor', value: nextCursor });
         }
 
+        if (feed.has_more && nextCursor > cursor) {
+            const rest = await this.pullServerChanges();
+            return {...rest, pulledCount: events.length + rest.pulledCount};
+        }
         return {
             pulledCount: events.length,
             cursor,

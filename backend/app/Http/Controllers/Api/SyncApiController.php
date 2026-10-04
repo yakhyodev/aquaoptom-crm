@@ -173,6 +173,15 @@ class SyncApiController extends Controller
      */
     public function reconcileRecovery(Request $request): JsonResponse
     {
+        $request->validate([
+            'client_epoch' => ['required', 'integer', 'min:1'],
+            'operations' => ['present', 'array', 'max:100'],
+            'operations.*.operation_id' => ['required', 'uuid', 'distinct'],
+            'operations.*.type' => ['required', 'string', 'in:CREATE_CUSTOMER,CREATE_SALE,VOID_SALE,CANCEL_SALE,CUSTOMER_PAYMENT'],
+            'operations.*.device_created_at' => ['required', 'date'],
+            'operations.*.payload' => ['required', 'array'],
+        ]);
+
         $user = $request->user();
         $deviceUuid = $request->header('X-Device-UUID') ?: $request->input('device_uuid');
         $clientEpoch = (int) $request->input('client_epoch', 1);

@@ -380,6 +380,13 @@ class SyncPushService
         Carbon $deviceCreatedAt,
         Carbon $receivedAt
     ): array {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', [$operationId]);
+        }
+        if (OperationResult::where('operation_type', 'VOID_SALE')->where('result_payload->original_operation_id', $operationId)->where('actor_id', $user->id)->where('device_id', $device->id)->exists()) {
+            throw new OperationValidationException($operationId, 'Savdo serverga yozilishidan oldin bekor qilingan.', errorCode: 'CANCELLED_BEFORE_POSTING');
+        }
+
         // 1. Mijoz bog'liqligini aniqlash (Customer Dependency)
         $customerId = null;
         if (! empty($payload['customer_client_uuid']) || ! empty($payload['customer_uuid'])) {
@@ -675,6 +682,9 @@ class SyncPushService
             );
         }
 
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('SELECT pg_advisory_xact_lock(hashtext(?))', [$originalOpId]);
+        }
         // Asl savdoni topish
         $sale = Sale::where('operation_id', $originalOpId)->with('items')->lockForUpdate()->first();
 

@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Device;
 use App\Models\InventoryAllocation;
 use App\Models\OperationResult;
+use App\Models\SyncConflict;
 use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\Operations\PayloadFingerprint;
@@ -40,6 +41,9 @@ class RecoveryReconciliationService
         foreach ($retainedOperations as $op) {
             $opId = $op['operation_id'] ?? (string) Str::uuid();
             $type = strtoupper($op['type'] ?? $op['operation_type'] ?? '');
+            if ($type === 'CANCEL_SALE') {
+                $type = 'VOID_SALE';
+            }
             $payload = $op['payload'] ?? [];
             $deviceCreatedAt = isset($op['device_created_at'])
                 ? Carbon::parse($op['device_created_at'])
@@ -101,7 +105,8 @@ class RecoveryReconciliationService
                 $results[] = [
                     'operation_id' => $opId,
                     'status' => 'RESTORE_FAILED',
-                    'error' => $e->getMessage(),
+                    'error_code' => 'RECOVERY_FAILED',
+                    'message' => 'Recovery tekshiruvi bajarilmadi. Yozuvni admin tekshirishi kerak.',
                 ];
                 $conflictsCount++;
             }
@@ -161,8 +166,17 @@ class RecoveryReconciliationService
     /**
      * Barcha qurilmalar muvofiqlashtirilgach, tizim holatini NORMAL ga o'tkazish
      */
-    public function markRecoveryCompleted(?int $userId = null): void
+    public function markRecoveryCompleted(?int $userId = null, array $reviewedDeviceIds = []): void
     {
+        $owner = User::find($userId);
+        abort_unless($owner && $owner->isActive() && $owner->hasRole('OWNER'), 403);
+        $activeIds = Device::where('is_active', true)->where('status', 'ACTIVE')->pluck('id')->map(fn ($id) => (int) $id)->all();
+        if (array_diff($activeIds, array_map('intval', $reviewedDeviceIds))) {
+            throw new \RuntimeException('Barcha faol qurilmalar retained ACK tarixi bo‘yicha egasi tomonidan tekshirilishi kerak.');
+        }
+        if (SyncConflict::whereIn('status', ['OPEN', 'NEEDS_REVIEW', 'CONFLICT'])->exists()) {
+            throw new \RuntimeException('Hal qilinmagan sync konfliktlari bor. Recovery yakunlanmadi.');
+        }
         SystemSetting::set('system_recovery_status', 'NORMAL', $userId, 'Recovery reconciliation completed');
 
         AuditLog::create([

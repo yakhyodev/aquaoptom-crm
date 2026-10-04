@@ -62,6 +62,17 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
         }
     }
 
+    public function test_audit_recovery_cannot_resume_without_all_device_review(): void
+    {
+        SystemSetting::set('system_recovery_status', 'RECONCILIATION_REQUIRED');
+        try {
+            app(RecoveryReconciliationService::class)->markRecoveryCompleted($this->owner->id);
+            $this->fail('Unreviewed device must block recovery completion');
+        } catch (\RuntimeException $error) {
+            $this->assertSame('RECONCILIATION_REQUIRED', SystemSetting::get('system_recovery_status'));
+        }
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -418,7 +429,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
 
         // 3. Muvofiqlashtirish yakunlanib, tizim NORMAL holatga o'tishi
         $reconciliationService = app(RecoveryReconciliationService::class);
-        $reconciliationService->markRecoveryCompleted($this->owner->id);
+        $reconciliationService->markRecoveryCompleted($this->owner->id, [$this->device->id]);
 
         $this->assertEquals('NORMAL', SystemSetting::get('system_recovery_status'));
 

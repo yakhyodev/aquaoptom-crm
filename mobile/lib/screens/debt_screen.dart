@@ -283,8 +283,9 @@ class _DebtScreenState extends State<DebtScreen>
                             _loadData();
                           }
                         } catch (e) {
-                          if (ctx.mounted)
+                          if (ctx.mounted) {
                             setDlgState(() => submitting = false);
+                          }
                           if (ctx.mounted) {
                             ScaffoldMessenger.of(ctx).showSnackBar(
                               SnackBar(

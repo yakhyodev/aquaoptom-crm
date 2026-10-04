@@ -3,6 +3,8 @@
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\RequirePermission;
 use App\Http\Middleware\RequireRole;
+use App\Services\Telegram\TelegramNotificationService;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -32,6 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', [
             EnsureUserIsActive::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('app:backup-create')->everyFifteenMinutes()->withoutOverlapping(30)->onOneServer();
+        $schedule->call(fn () => app(TelegramNotificationService::class)->retryFailedDeliveries())->everyMinute()->withoutOverlapping()->onOneServer();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

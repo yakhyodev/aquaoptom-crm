@@ -117,6 +117,18 @@ class SyncProtocolAndConflictTest extends TestCase
     /**
      * Test 1: Device Bootstrap Endpoint: Snapshot, Leases, Allocations, Initial Cursor
      */
+    public function test_audit_cancellation_before_create_blocks_late_sale(): void
+    {
+        $this->cashier->givePermission('process_refund');
+        $originalId = (string) Str::uuid();
+        $first = $this->pushService->pushBatch($this->device, $this->cashier, [['operation_id' => (string) Str::uuid(), 'type' => 'VOID_SALE', 'payload' => ['original_operation_id' => $originalId, 'reason' => 'Cancelled offline']]]);
+        $this->assertSame('APPLIED', $first[0]['status']);
+        $late = $this->pushService->pushBatch($this->device, $this->cashier, [['operation_id' => $originalId, 'type' => 'CREATE_SALE', 'payload' => ['items' => [['variant_id' => $this->variant->id, 'quantity' => 1, 'sale_price' => 6500]], 'paid_amount' => 6500]]]);
+        $this->assertSame('CANCELLED_BEFORE_POSTING', $late[0]['error_code']);
+        $this->assertDatabaseCount('sales', 0);
+        $this->assertDatabaseCount('cash_movements', 0);
+    }
+
     public function test_audit_offline_payment_retry_posts_only_once(): void
     {
         $customer = Customer::create(['name' => 'Debt payer', 'current_debt' => 10000, 'debt_limit' => 10000, 'status' => 'ACTIVE']);

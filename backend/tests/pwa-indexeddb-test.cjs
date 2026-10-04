@@ -235,6 +235,36 @@ async function runTests() {
     await assert.rejects(bootstrapDb.applyBootstrap(snapshot));
     assert.strictEqual((await bootstrapDb.get('stock_allocations', 101)).consumed_quantity, 2);
     assert.strictEqual((await bootstrapDb.getAll('sales')).length, 1);
+    const { AquaSync } = await import('../resources/js/offline/aqua-sync.js');
+    const sync = new AquaSync(bootstrapDb);
+    const savedFetch = global.fetch;
+    const original = await bootstrapDb.getAll('sync_outbox');
+    await bootstrapDb.put('sync_outbox', {...original[0], operation_id: 'audit-retained-ack', status: 'APPLIED'});
+    const retained = await bootstrapDb.getAll('sync_outbox');
+    try {
+        global.fetch = async (url, options) => {
+            const request = JSON.parse(options.body);
+            assert.deepStrictEqual(request.operations.map(row => row.operation_id).sort(), retained.map(row => row.operation_id).sort());
+            assert.deepStrictEqual(request.operations[0].payload, retained.find(row => row.operation_id === request.operations[0].operation_id).payload);
+            return {ok: true, json: async () => ({results: request.operations.map(row => ({operation_id: row.operation_id, status: 'ALREADY_PERSISTED'}))})};
+        };
+        await sync.reconcileRecovery(2);
+        assert.strictEqual((await bootstrapDb.getAll('sync_outbox')).length, retained.length);
+        assert.strictEqual((await bootstrapDb.get('meta', 'recovery_hold')).value, true);
+        assert.strictEqual((await bootstrapDb.get('meta', 'last_cursor')).value, 0);
+        await assert.rejects(bootstrapDb.executeSaleTransaction({...saleArgs, operationId: 'blocked-during-recovery'}));
+        assert.strictEqual((await bootstrapDb.get('stock_allocations', 101)).consumed_quantity, 2);
+        let page = 0;
+        global.fetch = async () => ({ok: true, json: async () => ({data: {
+            items: [{entity_type: 'PRODUCT_VARIANT', entity_id: '101', payload: page === 0 ? {default_sale_price: 7000} : {sku: 'FANTA-05'}}],
+            next_cursor: ++page, has_more: page < 2,
+        }})});
+        const pull = await sync.pullServerChanges();
+        assert.strictEqual(pull.pulledCount, 2);
+        assert.strictEqual((await bootstrapDb.get('catalog', 101)).default_sale_price, 7000);
+        assert.strictEqual((await bootstrapDb.get('catalog', 101)).sku, 'FANTA-05');
+        assert.strictEqual((await bootstrapDb.get('meta', 'last_cursor')).value, 2);
+    } finally { global.fetch = savedFetch; }
     console.log("\n🎉 ALL AQUADB TESTS PASSED (7 scenarios + bootstrap/duplicate-line/pending regressions)!\n");
 }
 
