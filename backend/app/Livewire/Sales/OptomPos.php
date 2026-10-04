@@ -6,6 +6,7 @@ use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\ProductVariant;
 use App\Services\Operations\Exceptions\OperationValidationException;
+use App\Services\Parties\CustomerService;
 use App\Services\Sales\CreateSaleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -15,6 +16,8 @@ use Livewire\Component;
 class OptomPos extends Component
 {
     public string $operationId = '';
+
+    public string $customerSearch = '';
 
     public ?int $selectedCustomerId = null;
 
@@ -117,7 +120,7 @@ class OptomPos extends Component
             return;
         }
 
-        $customer = Customer::find($customerId);
+        $customer = Customer::where('status', 'active')->find($customerId);
         if ($customer) {
             $this->selectedCustomerId = $customer->id;
             $this->selectedCustomerName = $customer->display_name;
@@ -298,10 +301,14 @@ class OptomPos extends Component
             ->latest()
             ->take(8)
             ->get();
+        $customerResults = trim($this->customerSearch) !== ''
+            ? app(CustomerService::class)->search($this->customerSearch)
+            : collect();
         $cashAccounts = CashAccount::all();
 
         return view('livewire.sales.optom-pos', [
             'recentCustomers' => $recentCustomers,
+            'customerResults' => $customerResults,
             'recentVariants' => $recentVariants,
             'cashAccounts' => $cashAccounts,
             'totalAmount' => $this->getTotalAmount(),

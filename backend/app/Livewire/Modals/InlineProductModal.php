@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Modals;
 
+use App\Models\Volume;
 use App\Services\Catalog\CatalogService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -81,6 +82,8 @@ class InlineProductModal extends Component
 
     public function render()
     {
-        return view('livewire.modals.inline-product-modal');
+        return view('livewire.modals.inline-product-modal', [
+            'volumes' => Volume::where('status', 'active')->orderBy('value_ml')->get(),
+        ]);
     }
 }

@@ -6,7 +6,7 @@
     <!-- Tab tugmalari -->
     <div class="flex items-center space-x-2 border-b border-slate-800 pb-3">
         <button wire:click="$set('activeTab', 'receiving')" class="px-4 py-2 text-xs font-semibold rounded-xl transition-all {{ $activeTab === 'receiving' ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' }}">
-            📥 Tovar Kirimi Qoralamasi
+            📥 Kirim qilish
         </button>
         <button wire:click="$set('activeTab', 'catalog')" class="px-4 py-2 text-xs font-semibold rounded-xl transition-all {{ $activeTab === 'catalog' ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800' }}">
             📦 Mahsulotlar va Tizim Narxlari
@@ -22,7 +22,7 @@
     @elseif ($activeTab === 'suppliers')
         <livewire:parties.supplier-manager />
     @elseif ($activeTab === 'receiving')
-        <!-- Tovar Kirimi Qoralamasi -->
+        <!-- Kirim qilish -->
         <div class="space-y-5">
             <!-- Muvaffaqiyatli kirim cheki (Receipt Card) -->
             @if ($successPurchase)
@@ -31,7 +31,7 @@
                         <div class="flex items-center gap-2">
                             <span class="p-2 rounded-xl bg-emerald-900/80 text-emerald-400">✓</span>
                             <div>
-                                <h3 class="text-sm font-bold text-white">Kirim hujjati muvaffaqiyatli POST qilindi!</h3>
+                                <h3 class="text-sm font-bold text-white">Tovar omborga qabul qilindi!</h3>
                                 <p class="text-xs text-emerald-300 font-mono">Hujjat raqami: {{ $successPurchase['invoice_number'] }}</p>
                             </div>
                         </div>
@@ -121,8 +121,8 @@
             <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-white tracking-tight">2. Kirim Tovarlari Qatorlari</h3>
-                        <p class="text-xs text-slate-400">Mavjud katalogdan tanlang yoki yangi mahsulot qo‘shing.</p>
+                        <h3 class="text-sm font-semibold text-white tracking-tight">2. Kirim qilinadigan mahsulotlar</h3>
+                        <p class="text-xs text-slate-400">Mahsulot va hajmni tanlab qator qo‘shing. Yangi litr uchun «Yangi Mahsulot» oynasida «Boshqa hajm» ni tanlang.</p>
                     </div>
 
                     <div class="flex items-center gap-2">
@@ -291,7 +291,7 @@
                                 <button type="button" wire:click="clearDraft" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition">
                                     Qoralamani tozalash
                                 </button>
-                                <button type="button" wire:click="postPurchase" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold shadow-md transition flex items-center gap-1.5">
+                                <button type="button" wire:click="postPurchase" wire:loading.attr="disabled" wire:target="postPurchase" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold shadow-md transition flex items-center gap-1.5">
                                     <span>📥</span>
                                     <span>Kirimni tasdiqlash va qabul qilish</span>
                                 </button>

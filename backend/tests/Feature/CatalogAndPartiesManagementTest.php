@@ -555,4 +555,78 @@ class CatalogAndPartiesManagementTest extends TestCase
         $this->assertCount(2, $posTest->get('items'));
         $this->assertEquals(11500, $posTest->instance()->getTotalAmount());
     }
+
+    public function test_inline_product_lists_saved_custom_volumes_and_reuses_them(): void
+    {
+        $this->actingAs($this->owner);
+        $volume = VolumeNormalizer::findOrCreate('0.75 L');
+        $archived = VolumeNormalizer::findOrCreate('3 L');
+        $archived->update(['status' => 'archived']);
+
+        Livewire::test(InlineProductModal::class)
+            ->call('open')
+            ->assertSee('0.75 L (750 ml)')
+            ->assertDontSee('3 L (3000 ml)')
+            ->set('productName', 'Fanta')
+            ->set('volumeInput', 'custom')
+            ->set('customVolumeInput', '750 ml')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('isOpen', false)
+            ->assertDispatched('product-created');
+
+        $this->assertDatabaseHas('product_variants', ['volume_id' => $volume->id]);
+        $this->assertEquals(1, Volume::where('value_ml', 750)->count());
+    }
+
+    public function test_pos_can_search_an_older_customer_and_preserve_cart_when_selecting(): void
+    {
+        $this->actingAs($this->owner);
+        $service = new CustomerService;
+        $older = $service->createCustomer([
+            'name' => 'Old Customer', 'phone' => '+998901234567',
+            'store_name' => 'Older Market', 'address' => 'Old Street',
+        ]);
+        $older->update(['created_at' => now()->subYear()]);
+        for ($i = 0; $i < 7; $i++) {
+            $service->createCustomer(['name' => 'Recent '.$i, 'store_name' => 'Recent Market']);
+        }
+        $archived = $service->createCustomer(['name' => 'Old Archived', 'store_name' => 'Older Market']);
+        $archived->update(['status' => 'archived']);
+        $variant = (new CatalogService)->createVariant('Fanta', '0.5 L', 7000);
+        $pos = Livewire::test(OptomPos::class)
+            ->call('onProductCreated', [
+                'variant_id' => $variant->id, 'display_name' => 'Fanta 0.5 L', 'sale_price' => 7000,
+            ]);
+
+        foreach (['Old Customer', '1234567', 'Older Market', 'Old Street'] as $term) {
+            $pos->set('customerSearch', $term)
+                ->assertViewHas('customerResults', fn ($results) => $results->contains('id', $older->id)
+                    && ! $results->contains('id', $archived->id));
+        }
+        $draft = $pos->get('items');
+        $pos->call('selectExistingCustomer', $older->id)
+            ->assertSet('selectedCustomerId', $older->id)
+            ->assertSet('selectedCustomerName', $older->display_name)
+            ->assertSet('items', $draft);
+        $pos->call('selectExistingCustomer', $archived->id)
+            ->assertSet('selectedCustomerId', $older->id);
+    }
+
+    public function test_inline_customer_save_retry_does_not_create_a_duplicate(): void
+    {
+        $this->actingAs($this->owner);
+        $modal = Livewire::test(InlineCustomerModal::class)
+            ->call('open')
+            ->set('name', 'Repeat Customer')
+            ->set('phone', '+998900001122')
+            ->set('storeName', 'Repeat Market')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('customer-created');
+        $uuid = $modal->get('customerUuid');
+        $modal->call('save')->assertHasNoErrors();
+        $this->assertEquals(1, Customer::where('uuid', $uuid)->count());
+        $this->assertEquals(1, Customer::where('phone', '+998900001122')->count());
+    }
 }

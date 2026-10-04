@@ -7,3 +7,16 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+@layer base {
+    /* Light cards must not inherit the dark shell's foreground. */
+    :where(.bg-white, .bg-slate-50, .bg-slate-100) {
+        color: var(--color-slate-900);
+        color-scheme: light;
+    }
+
+    :where(.bg-white, .bg-slate-50, .bg-slate-100) :where(input, textarea)::placeholder {
+        color: var(--color-slate-500);
+        opacity: 1;
+    }
+}

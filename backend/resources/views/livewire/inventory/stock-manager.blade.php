@@ -1,44 +1,44 @@
 <div class="space-y-6">
     <!-- Header & Tabs -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+    <div class="sticky top-16 z-20 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Ombor & Zaxiralar Boshqaruvi</h1>
-                <p class="text-sm text-slate-500 mt-1">Tovar qoldiqlari, manba hujjatli harakatlar tarixi va interaktiv rentabellik kalkulyatori</p>
+                <p class="text-sm text-slate-500 mt-1">Yangi tovar qabul qilish uchun «Kirim qilish» tugmasini bosing. Qoldiqlar va kalkulyator alohida oynalarda.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button 
-                    wire:click="$set('activeTab', 'balances')" 
+                <button
+                    wire:click="$set('activeTab', 'inward')"
+                    class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    + Kirim qilish
+                </button>
+                <button
+                    wire:click="$set('activeTab', 'balances')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'balances' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     Ombor Qoldiqlari
                 </button>
-                <button 
-                    wire:click="$set('activeTab', 'calculator')" 
+                <button
+                    wire:click="$set('activeTab', 'calculator')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'calculator' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     Interaktiv Kalkulyator
                 </button>
-                <button 
-                    wire:click="$set('activeTab', 'inward')" 
-                    class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'inward' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    Tovar Kirimi
-                </button>
-                <button 
-                    wire:click="$set('activeTab', 'returns')" 
+                <button
+                    wire:click="$set('activeTab', 'returns')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'returns' ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
                     Qaytarishlar
                 </button>
-                <button 
-                    wire:click="$set('activeTab', 'damages')" 
+                <button
+                    wire:click="$set('activeTab', 'damages')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'damages' ? 'bg-rose-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     Brak & Yaroqsiz
                 </button>
-                <button 
-                    wire:click="$set('activeTab', 'audits')" 
+                <button
+                    wire:click="$set('activeTab', 'audits')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'audits' ? 'bg-purple-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                     Inventarizatsiya
@@ -121,10 +121,10 @@
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-slate-600 mb-1">Qidiruv (Nom, kod, SKU, shtrix-kod, hajm)</label>
                         <div class="relative">
-                            <input 
-                                type="text" 
-                                wire:model.live.debounce.300ms="search" 
-                                placeholder="Masalan: Fanta, PRD-0001, 1L, FANTA-1000..." 
+                            <input
+                                type="text"
+                                wire:model.live.debounce.300ms="search"
+                                placeholder="Masalan: Fanta, PRD-0001, 1L, FANTA-1000..."
                                 class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         </div>
@@ -310,8 +310,8 @@
                                         {{ $item->has_price ? number_format($item->total_sale_value) : '-' }}
                                     </td>
                                     <td class="p-3 text-center">
-                                        <button 
-                                            wire:click="openVariantDetail({{ $item->id }})" 
+                                        <button
+                                            wire:click="openVariantDetail({{ $item->id }})"
                                             class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
                                             Tafsilot
                                         </button>
@@ -468,7 +468,7 @@
                     <div class="mt-4 p-3 bg-amber-950/60 border border-amber-700/60 rounded-lg text-amber-200 text-xs flex items-center gap-2">
                         <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                         <div>
-                            <strong>Diqqat:</strong> {{ $calcResults['missing_price_count'] }} ta variant uchun tizim sotuv narxi belgilanmagan (jami {{ number_format($calcResults['missing_price_units']) }} dona). 
+                            <strong>Diqqat:</strong> {{ $calcResults['missing_price_count'] }} ta variant uchun tizim sotuv narxi belgilanmagan (jami {{ number_format($calcResults['missing_price_units']) }} dona).
                             Kutilayotgan sotuv qiymati va yalpi foyda faqat narxi mavjud qism bo'yicha hisoblandi (to'liq emas). Ushbu tovarlar nol narxga tenglashtirilmadi!
                         </div>
                     </div>
@@ -536,9 +536,9 @@
                                         {{ $item['system_sale_price'] > 0 ? number_format($item['system_sale_price']) : '-' }}
                                     </td>
                                     <td class="p-3 text-center">
-                                        <input 
-                                            type="number" 
-                                            placeholder="{{ $item['system_sale_price'] > 0 ? $item['system_sale_price'] : 'Narx kiritish' }}" 
+                                        <input
+                                            type="number"
+                                            placeholder="{{ $item['system_sale_price'] > 0 ? $item['system_sale_price'] : 'Narx kiritish' }}"
                                             value="{{ $simulationPrices[$item['variant_id']] ?? '' }}"
                                             wire:change="setSimulationPrice({{ $item['variant_id'] }}, $event.target.value)"
                                             class="w-32 px-2.5 py-1 text-xs border rounded text-right font-mono focus:ring-1 focus:ring-blue-500 {{ isset($simulationPrices[$item['variant_id']]) ? 'border-indigo-500 bg-indigo-50/50 font-bold' : 'border-slate-300' }}">
@@ -900,9 +900,9 @@
                                         <td class="p-3 text-right font-mono font-semibold text-slate-700">{{ number_format($exp) }}</td>
                                         <td class="p-3 text-right">
                                             @if($selectedAudit->status !== 'COMPLETED')
-                                                <input 
-                                                    type="number" 
-                                                    wire:model="auditCountInputs.{{ $aItem->product_variant_id }}" 
+                                                <input
+                                                    type="number"
+                                                    wire:model="auditCountInputs.{{ $aItem->product_variant_id }}"
                                                     class="w-24 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-purple-500 focus:border-purple-500"
                                                 >
                                             @else
@@ -918,9 +918,9 @@
                                         </td>
                                         <td class="p-3">
                                             @if($selectedAudit->status !== 'COMPLETED')
-                                                <input 
-                                                    type="text" 
-                                                    wire:model="auditItemReasons.{{ $aItem->product_variant_id }}" 
+                                                <input
+                                                    type="text"
+                                                    wire:model="auditItemReasons.{{ $aItem->product_variant_id }}"
                                                     placeholder="Izoh..."
                                                     class="w-full px-2 py-1 text-xs border rounded-lg focus:ring-purple-500 focus:border-purple-500"
                                                 >
@@ -1036,11 +1036,11 @@
                                         <input type="checkbox" wire:model="saleReturnDamaged.{{ $item->id }}" class="rounded text-rose-600">
                                         Brak / Yaroqsiz
                                     </label>
-                                    <input 
-                                        type="number" 
-                                        min="0" 
+                                    <input
+                                        type="number"
+                                        min="0"
                                         max="{{ $available }}"
-                                        wire:model="saleReturnQuantities.{{ $item->id }}" 
+                                        wire:model="saleReturnQuantities.{{ $item->id }}"
                                         class="w-20 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-amber-500"
                                     >
                                 </div>
@@ -1092,11 +1092,11 @@
                                     <div class="font-bold text-slate-800">{{ $item->variant->product->name ?? 'Mahsulot' }} ({{ $item->variant->volume->name ?? '' }})</div>
                                     <div class="text-slate-500 text-[11px]">Kirim: {{ (int)$item->quantity }} dona | Qaytarishga mavjud: {{ $available }} dona | Xarid narxi: {{ number_format($item->unit_cost) }} so'm</div>
                                 </div>
-                                <input 
-                                    type="number" 
-                                    min="0" 
+                                <input
+                                    type="number"
+                                    min="0"
                                     max="{{ $available }}"
-                                    wire:model="supplierReturnQuantities.{{ $item->id }}" 
+                                    wire:model="supplierReturnQuantities.{{ $item->id }}"
                                     class="w-24 px-2 py-1 text-right font-mono font-bold border rounded-lg focus:ring-blue-500"
                                 >
                             </div>
@@ -1337,14 +1337,14 @@
                             <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
                                 <span>Sahifa: {{ $movements->currentPage() }} / {{ $movements->lastPage() }}</span>
                                 <div class="space-x-1">
-                                    <button 
-                                        wire:click="setMovementsPage({{ $movements->currentPage() - 1 }})" 
+                                    <button
+                                        wire:click="setMovementsPage({{ $movements->currentPage() - 1 }})"
                                         @disabled($movements->onFirstPage())
                                         class="px-2.5 py-1 border rounded disabled:opacity-40 hover:bg-slate-100">
                                         Oldingi
                                     </button>
-                                    <button 
-                                        wire:click="setMovementsPage({{ $movements->currentPage() + 1 }})" 
+                                    <button
+                                        wire:click="setMovementsPage({{ $movements->currentPage() + 1 }})"
                                         @disabled(!$movements->hasMorePages())
                                         class="px-2.5 py-1 border rounded disabled:opacity-40 hover:bg-slate-100">
                                         Keyingi

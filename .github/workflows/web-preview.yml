@@ -10,11 +10,18 @@ on:
         default: '120'
         required: true
 
+      preview_slot:
+        description: Use review to keep the existing main preview available
+        type: choice
+        options: ['main', 'review']
+        default: 'main'
+        required: true
+
 permissions:
   contents: read
 
 concurrency:
-  group: temporary-web-preview
+  group: temporary-web-preview-${{ inputs.preview_slot || 'main' }}
   cancel-in-progress: false
 
 jobs:

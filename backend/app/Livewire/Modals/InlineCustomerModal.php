@@ -4,12 +4,17 @@ namespace App\Livewire\Modals;
 
 use App\Services\Parties\CustomerService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class InlineCustomerModal extends Component
 {
+    #[Locked]
+    public string $customerUuid = '';
+
     public bool $isOpen = false;
 
     public string $name = '';
@@ -24,9 +29,15 @@ class InlineCustomerModal extends Component
 
     public ?string $errorMessage = null;
 
+    public function mount(): void
+    {
+        $this->customerUuid = (string) Str::uuid();
+    }
+
     #[On('open-inline-customer-modal')]
     public function open(): void
     {
+        $this->customerUuid = (string) Str::uuid();
         $this->resetErrorBag();
         $this->errorMessage = null;
         $this->phoneWarning = null;
@@ -61,6 +72,7 @@ class InlineCustomerModal extends Component
 
         try {
             $customer = $customerService->createCustomer([
+                'uuid' => $this->customerUuid,
                 'name' => $this->name,
                 'phone' => $this->phone,
                 'store_name' => $this->storeName,

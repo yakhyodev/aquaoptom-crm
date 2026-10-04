@@ -104,13 +104,29 @@
                     </div>
                 </div>
 
+                <div class="space-y-2">
+                    <label for="pos-customer-search" class="block text-sm font-semibold text-slate-700">Mavjud mijozni qidirish</label>
+                    <input id="pos-customer-search" type="search" wire:model.live.debounce.300ms="customerSearch" placeholder="Ism, telefon, do‘kon nomi yoki manzil" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-blue-500 focus:outline-none">
+                    @if (trim($customerSearch) !== '')
+                        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+                            @forelse ($customerResults as $customer)
+                                <button type="button" wire:key="customer-result-{{ $customer->id }}" wire:click="selectExistingCustomer({{ $customer->id }})" class="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-blue-50">
+                                    {{ $customer->display_name }}
+                                </button>
+                            @empty
+                                <p class="px-3 py-2 text-sm text-slate-600">Mijoz topilmadi. «+ Yangi Mijoz» orqali qo‘shing.</p>
+                            @endforelse
+                        </div>
+                    @endif
+                </div>
+
                 <!-- Tezkor mijozlar ro'yxati -->
                 @if (empty($selectedCustomerId) && count($recentCustomers) > 0)
                     <div class="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
                         <span class="text-[11px] text-slate-400 font-medium py-1">Tezkor tanlash:</span>
                         @foreach ($recentCustomers as $rc)
                             <button type="button" wire:click="selectExistingCustomer({{ $rc->id }})" class="px-2.5 py-1 rounded-lg text-xs bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border border-slate-200 font-medium transition-colors">
-                                {{ $rc->name }}
+                                {{ $rc->display_name }}
                             </button>
                         @endforeach
                     </div>
