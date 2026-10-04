@@ -214,7 +214,8 @@ class OfflineLeaseService
     public function validateOperationPermitted(
         Device $device,
         string $permission,
-        ?Carbon $operationTime = null
+        ?Carbon $operationTime = null,
+        ?int $userId = null
     ): void {
         $opTime = $operationTime ?: Carbon::now();
 
@@ -226,6 +227,7 @@ class OfflineLeaseService
 
         // Qurilmaning opTime vaqtidagi eng so'nggi leaseni qidirish
         $auth = OfflineAuthorization::where('device_id', $device->id)
+            ->when($userId, fn ($query) => $query->where('user_id', $userId))
             ->where('valid_from', '<=', $opTime)
             ->latest('id')
             ->first();

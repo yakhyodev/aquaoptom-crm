@@ -80,6 +80,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
             'role_id' => $ownerRole->id,
             'password' => Hash::make('Password123!'),
             'status' => 'ACTIVE',
+            'is_active' => true,
         ]);
 
         $this->warehouse = Warehouse::create([
@@ -150,6 +151,7 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
             'name' => 'Drill Test Device',
             'device_type' => 'MOBILE',
             'status' => 'ACTIVE',
+            'is_active' => true,
         ]);
     }
 

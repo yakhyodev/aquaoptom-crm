@@ -118,6 +118,13 @@ class SyncApiController extends Controller
         $user = $request->user();
         $deviceUuid = $request->header('X-Device-UUID') ?: $request->input('device_uuid');
         $leaseToken = $request->header('X-Lease-Token') ?: $request->input('lease_token');
+        $request->validate([
+            'operations' => 'present|array|max:100',
+            'operations.*' => 'required|array',
+            'operations.*.operation_id' => 'required|uuid',
+            'operations.*.payload' => 'required|array',
+            'operations.*.device_created_at' => 'nullable|date',
+        ]);
         $operations = $request->input('operations', []);
 
         if (! $deviceUuid) {

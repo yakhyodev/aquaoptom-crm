@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import '../utils/operation_id.dart';
 import '../models/product_model.dart';
 import '../models/supplier_model.dart';
 import '../services/api_service.dart';
@@ -30,7 +30,7 @@ class _InwardScreenState extends State<InwardScreen> {
   final _costPriceController = TextEditingController();
   final _invoiceNumberController = TextEditingController();
   String _selectedPackage = 'dona';
-  final String _operationId = const Uuid().v4();
+  final String _operationId = OperationId.generate();
 
   @override
   void initState() {

@@ -87,6 +87,8 @@ class StagingDeploymentAndAcceptanceTest extends TestCase
             'status' => 'ACTIVE',
         ]);
         $this->cashier->givePermission('offline_sales');
+        $this->cashier->givePermission('custom_sale_price');
+        $this->cashier->givePermission('sell_on_credit');
 
         $this->seller = User::create([
             'name' => 'Staging Seller',

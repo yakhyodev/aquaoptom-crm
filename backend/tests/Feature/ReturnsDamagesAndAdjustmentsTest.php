@@ -107,6 +107,8 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
             'status' => 'ACTIVE',
             'is_active' => true,
         ]);
+        $this->cashier->givePermission('custom_sale_price');
+        $this->cashier->givePermission('sell_on_credit');
 
         $this->cashAccount = CashAccount::create([
             'name' => 'Asosiy Kassa',

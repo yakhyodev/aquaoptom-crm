@@ -143,35 +143,19 @@ class RecoveryReconciliationService
      */
     public function reconcileDeviceAllocations(Device $device): void
     {
-        $allocations = InventoryAllocation::where('device_id', $device->id)
-            ->where('status', 'ACTIVE')
-            ->get();
-
-        foreach ($allocations as $allocation) {
-            // Ushbu qurilma va variant uchun tasdiqlangan barcha sotuvlar donasi
-            $actualSold = (int) DB::table('sales')
-                ->join('sale_items', 'sales.id', '=', 'sale_items.sale_id')
-                ->where('sales.device_id', $device->id)
-                ->where('sales.status', 'COMPLETED')
-                ->where('sale_items.product_variant_id', $allocation->product_variant_id)
-                ->sum('sale_items.quantity');
-
-            // Qaytarishlar donasi (sale_returns.sale_id orqali device_id ga bog'lanadi)
-            $actualReturned = (int) DB::table('sale_returns')
-                ->join('sale_return_items', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
-                ->join('sales', 'sale_returns.sale_id', '=', 'sales.id')
-                ->where('sales.device_id', $device->id)
-                ->where('sale_returns.status', 'COMPLETED')
-                ->where('sale_return_items.product_variant_id', $allocation->product_variant_id)
-                ->sum('sale_return_items.quantity');
-
-            $consumedNet = max(0, $actualSold - $actualReturned);
-
-            if ($allocation->consumed_quantity !== $consumedNet) {
-                $allocation->consumed_quantity = $consumedNet;
-                $allocation->save();
+        DB::transaction(function () use ($device) {
+            $allocations = InventoryAllocation::where('device_id', $device->id)->where('status', 'ACTIVE')->lockForUpdate()->get();
+            foreach ($allocations as $allocation) {
+                // Allocation movement rows bind consumption to this exact allocation,
+                // warehouse and epoch. All-time sale totals can re-grant old quotas.
+                $consumed = (int) $allocation->movements()->where('movement_type', 'CONSUME')->sum('quantity');
+                $returned = (int) $allocation->movements()->whereIn('movement_type', ['RETURN', 'RECONCILE'])->sum('quantity');
+                if ($consumed + $returned > $allocation->allocated_quantity) {
+                    throw new \RuntimeException('Recovery allocation ledger exceeds its grant. Manual reconciliation required.');
+                }
+                $allocation->update(['consumed_quantity' => $consumed, 'returned_quantity' => $returned]);
             }
-        }
+        });
     }
 
     /**

@@ -54,6 +54,8 @@ class PwaAutoSyncAndDisruptionTest extends TestCase
             'is_active' => true,
         ]);
         $this->cashier->givePermission('offline_sales');
+        $this->cashier->givePermission('custom_sale_price');
+        $this->cashier->givePermission('sell_on_credit');
 
         $this->cashAccount = CashAccount::create([
             'name' => 'Asosiy Naqd Kassa',

@@ -12,6 +12,7 @@ RUN apk add --no-cache \
     libpq-dev \
     libzip-dev \
     libxml2-dev \
+    lexbor-dev \
     icu-dev \
     oniguruma-dev \
     linux-headers \

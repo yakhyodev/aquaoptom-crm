@@ -124,7 +124,7 @@ class SyncPushService
             }
 
             // 2. Qurilma va Lease huquqlarini tekshirish
-            if ($device->isRevoked() && $deviceCreatedAt->gte($device->updated_at)) {
+            if ($device->isRevoked()) {
                 $conflict = SyncConflict::create([
                     'device_id' => $device->id,
                     'user_id' => $user->id,
@@ -163,7 +163,7 @@ class SyncPushService
                 if (! $user->hasPermission('offline_sales')) {
                     throw new OperationValidationException($opId, 'Offline savdoga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
                 }
-                $this->leaseService->validateOperationPermitted($device, 'offline_sales', $deviceCreatedAt);
+                $this->leaseService->validateOperationPermitted($device, 'offline_sales', $deviceCreatedAt, $user->id);
                 if ($leaseToken && ! $device->offlineAuthorizations()->where('lease_token', $leaseToken)->where('user_id', $user->id)->exists()) {
                     throw new OperationValidationException($opId, 'Qurilma lease tokeni mos kelmadi.', errorCode: 'INVALID_LEASE');
                 }
@@ -407,7 +407,11 @@ class SyncPushService
             $customerId = $cust->id;
         }
 
-        $paidAmount = (int) ($payload['paid_amount'] ?? 0);
+        $rawPaid = $payload['paid_amount'] ?? 0;
+        if (! is_numeric($rawPaid) || $rawPaid != (int) $rawPaid || $rawPaid < 0) {
+            throw new OperationValidationException($operationId, 'To‘lov butun so‘m bo‘lishi shart.', errorCode: 'INVALID_PAYMENT_AMOUNT');
+        }
+        $paidAmount = (int) $rawPaid;
         $cashAccountId = $payload['cash_account_id'] ?? null;
         $paymentMethod = strtoupper($payload['payment_method'] ?? 'CASH');
 

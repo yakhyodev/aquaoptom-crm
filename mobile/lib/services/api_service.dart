@@ -211,7 +211,7 @@ class ApiService {
     final body = <String, dynamic>{
       'quantity': quantity,
       'package_name': packageName,
-      if (operationId != null) 'operation_id': operationId,
+      'operation_id': ?operationId,
     };
 
     if (variantId != null) body['variant_id'] = variantId;
