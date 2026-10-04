@@ -1,148 +1,79 @@
-# AQUAOPTOM CRM — PRODUCTION TOPSHIRISH VA ISHGA TUSHIRISH HUJJATI (PROMPT 25)
+# AQUAOPTOM CRM — PRODUCTION HANDOVER
 
-**Loyiha:** AquaOptom Wholesale Beverage CRM (Suv va ichimliklar ulgurji savdosi CRM tizimi)  
-**Reliz Versiyasi:** `v1.0.0+build.20261004.25`  
-**Git Commit Revision:** `de63f1a`  
-**Sana:** 2026-10-04 (Asia/Tashkent)  
-**Holati:** **PRODUCTION RELEASE ARTIFACT VERIFIED & READY FOR HANDOVER**  
+Sana: 2026-10-04. **Holat: NO-GO — live deploy hali bajarilmagan.**
 
----
+Bu hujjat eski “production verified / signed APK / zero-downtime / 100% DONE” topshirish bayonotlarini almashtiradi. [Audit](PRODUCTION_AUDIT.md) va commitga bog‘langan [GitHub Actions](https://github.com/yakhyodev/aquaoptom-crm/actions) natijalari asosiy dalildir. Local `aquaoptom_prod` nomli baza serverda ishga tushirilgan productionni anglatmaydi.
 
-## 1. Reliz Artefaktlari va Xavfsizlik Nazorati
+## Hozir tayyor bo‘lganlar
 
-| Komponent | Fayl Yo'li | Hajmi / Holati | Yaxlitlik Checksumi (SHA-256) |
-|---|---|---|---|
-| **Backend & Web Package** | `backend/` | Laravel 11 + Livewire 4 | Revision: `de63f1a` |
-| **Signed Android App** | `mobile/build/app/outputs/flutter-apk/app-release.apk` | 55.47 MB | `7cd20467e56dde2ad4acaa826d348e7a63800ade86f0f73d4168a5bdb6c9b8c2` |
-| **Production DB (Clean)** | PostgreSQL 16 (`aquaoptom_prod`) | 62 ta jadval | 0 ta mock data, toza boshlang'ich holat |
-| **Production Env Shablon** | `backend/.env.production.example` | Standart shablon | To'liq parametrlar |
-| **Deploy & Systemd Paketi** | `deploy/` & `docker/` | Avtomatlashtirilgan | Zero-downtime skript |
+Laravel13/Livewire4 backend, PWA IndexedDB, Flutter SQLite, Telegram server kontraktlari; actor/device-bound idempotency; atomik kirim/sotuv/to‘lov/qaytarish/audit; Docker PHP/Nginx build; Redis/Reverb konfiguratsiyasi; backup/restore va recovery hold. Kodni to‘liq suite GitHub Actions’da tekshiradi. [7425c82 source uchun yakuniy CI](https://github.com/yakhyodev/aquaoptom-crm/actions/runs/37199142828) PASS:244backend/1536assertions,21Flutter,3/3jobs.
 
----
+Mavjud APK checksum mos bo‘lsa ham **signature FAIL**. Yangi private signing key va server endpoint konfiguratsiyasisiz signed reliz topshirilgan hisoblanmaydi.
 
-## 2. Server Topologiyasi va Jarayonlar Boshqaruvi
+## Server tayyorlash va acceptance
 
-Production muhitida quyidagi mustaqil jarayonlar ishlashi shart:
+1. Server, real domen va HTTPS tanlansin. `backend/.env.production.example`dan private env yaratilsin; real APP_KEY, DB/Redis/backup keys va Reverb secret env orqali berilsin. Secretlar Gitga kiritilmasin.
+2. PostgreSQL16/Redis7, PHP web, Nginx, queue worker, scheduler, Reverb va doimiy outbox ishga tushsin. `docker/` va `deploy/` konfiguratsiyalari shu loyiha uchun tayyor; skript maintenance oynasidan foydalanadi.
+3. `APP_ENV=production`, `APP_DEBUG=false`, real `APP_URL=https://...`, secure session cookies, trusted origins, private broadcast channel auth tekshirilsin.
+4. Health live/ready, login/RBAC, real WebSocket/TLS, worker restart, writable storage va backup offsite nusxasi tekshirilsin.
+5. Izolyatsiyalangan stagingda haqiqiy kompyuter va Android orqali offline/restart/duplicate tap/navbat/restore sinovlari o‘tsin. Simulation command physical device acceptance o‘rnini bosmaydi.
 
-```
-[ Nginx Reverse Proxy (HTTPS / SSL TLS 1.3) ]
-       │
-       ├──> [ PHP-FPM Web / API ] (:8000 / unix socket)
-       ├──> [ Reverb WebSockets ] (:8080 - Real-time hodisalar)
-       ├──> [ Queue Worker ] (`php artisan queue:work --tries=3 --sleep=3`)
-       ├──> [ Scheduler Worker ] (`php artisan schedule:work`)
-       └──> [ Outbox Processor ] (`php artisan app:process-outbox`)
+Production jarayonlari:
+
+```text
+PHP-FPM + Nginx HTTPS
+php artisan queue:work --tries=3 --sleep=3
+php artisan reverb:start
+php artisan schedule:work
+php artisan app:process-outbox --watch
 ```
 
-- **Xususiy fayllar himoyasi:** `/storage/app/private/` va `/storage/backups/` yo'llariga bevosita veb murojaat Nginx darajasida `deny all; return 403;` orqali to'liq yopilgan.
-- **Health Probelari:**
-  - Liveness: `GET /api/health/live` (HTTP 200 `LIVE`)
-  - Readiness: `GET /api/health/ready` (HTTP 200 `READY` - PostgreSQL, Redis, Disk holati)
+Scheduler uchun `schedule:work` yoki har daqiqalik `schedule:run` cronning bittasi ishlasin. Kod backupni har15daqiqada rejalashtiradi; shared Redis `onOneServer/withoutOverlapping` locklarini ta’minlaydi. Real RPO nusxa yaratish sekundlari bilan o‘lchanmaydi: eng yangi tiklanadigan offsite nusxaning yoshi va ma’lumot yo‘qotish oynasi o‘lchanadi. Alert, retention, offsite credentials va backup-key recovery amalda tekshirilsin.
 
----
+## OWNER va haqiqiy boshlang‘ich ma’lumot
 
-## 3. Do'kon Egasini (OWNER) Xavfsiz Yaratish (1-Qadam)
-
-Hech qanday default yoki xavfsiz bo'lmagan parollar ishlatilmaydi:
+Quyidagi amallar **production acceptance va fresh backupdan keyin** bajariladi. Audit davomida ular real production bazada bajarilmadi.
 
 ```bash
-cd /var/www/aquaoptom/backend
-php artisan app:bootstrap-owner \
-    --name="Do'kon Egasi Ismi" \
-    --email="owner@aquaoptom.uz" \
-    --phone="+998901234567" \
-    --password="XavfsizParol123!" \
-    --env=production
-```
-
-*(Agar `--password` berilmasa, tizim o'zi tasodifiy 16 xonali kriptografik kuchli parol generatsiya qilib konsolda ko'rsatadi).*
-
----
-
-## 4. Haqiqiy Boshlang'ich Qoldiqlarni Kiritish / Import (2-Qadam)
-
-Do'kon egasi taqdim etgan haqiqiy ombor tovarlari, kassa pullari, mijozlar va ta'minotchilar qarzdorligi quyidagi tartibda kiritiladi:
-
-### A) Namuna Shablonni Olish:
-```bash
+cd backend
+php artisan app:bootstrap-owner --name="Do‘kon egasi" --email="REAL_OWNER_EMAIL" --env=production
 php artisan app:import-opening-balances --generate-template --env=production
 ```
-Bu buyruq `storage/app/opening_balances_template.json` faylini yaratadi.
 
-### B) Sinov Rejimida Tekshirish (Dry-Run):
+Generatsiya qilingan JSONga haqiqiy mahsulot, litr, miqdor, cost, kassalar, mijoz/ta’minotchi signed balanslari yozilsin. `import_id` bir marta yaratilgan UUID bo‘lsin; retryda o‘zgarmasin. O‘zgargan fayl shu ID bilan yuborilsa konflikt qaytadi.
+
 ```bash
-php artisan app:import-opening-balances \
-    --file=storage/app/opening_balances_template.json \
-    --dry-run \
-    --env=production
+php artisan app:import-opening-balances --file=storage/app/opening_balances_template.json --dry-run --env=production
+php artisan app:import-opening-balances --file=storage/app/opening_balances_template.json --env=production
+php artisan app:production-verify --env=production
 ```
-Bazaga hech narsa yozilmaydi; qatorlar, dona butunligi, narxlar va jami summalar jadval ko'rinishida chiqariladi.
 
-### C) Rasmiy Idempotent Import:
+Summalar ownerning haqiqiy hisoblari bilan solishtirilsin. `--expect-empty` faqat ilk importdan oldin qo‘llanadi. ProductionVerify lokal profil tekshiruvi; HTTPS/server, APK signature va physical acceptance sertifikati emas. Parollarni buyruq/log/Gitga yozmasdan private tarzda boshqaring.
+
+## PWA va Android topshirish
+
+Har xodim o‘z akkaunti bilan kiradi; qurilma aynan shu userga biriktiriladi. Offline ruxsat, lease, dona va kredit ajratmasi admin tomonidan beriladi. Pending navbat bo‘lsa bootstrap ajratmani almashtirmaydi; outbox/ACK tarixi o‘chirilmasin.
+
+Android uchun private `key.properties`/keystore yoki AQUAOPTOM signing env qo‘llanadi. Yangi APK tested source va real API URL bilan build qilinib, `apksigner verify --print-certs`dan o‘tishi kerak. Oldingi APKni yangi release o‘rnida tarqatmang. Haqiqiy Androidda install/update, login, airplane mode, app kill/restart va ACK saqlanishi tekshirilsin. Signing key backupini egasi boshqarsin.
+
+## Telegram
+
+Haqiqiy BotFather tokeni, bot username va webhook secret private envga yoziladi. HTTPS webhook secret header bilan o‘rnatiladi. Public `/link USER_ID` bilan account linking yopilgan; foydalanuvchini autentifikatsiyalangan admin bog‘laydi. Begona/guruh chat, takror update, nasiya va confirmation oqimlari real private chatda sinovdan o‘tsin. Avtomatik testlar haqiqiy Telegram delivery dalili emas.
+
+## Backup, restore va recovery
+
+Backup yaratish: `php artisan app:backup-create --env=production`. Nusxa AES256-CBC + HMAC bilan himoyalangan. Backup-key va offsite nusxa ajratilgan joyda saqlansin. Restore command parametrlarini `php artisan app:backup-restore --help` orqali tekshiring; avval izolyatsiyalangan bazada restore va ledger/cash/stock/customer/supplier parity tekshirilsin.
+
+Restore tizimni `RECONCILIATION_REQUIRED` holatiga o‘tkazadi. PWA/Flutter eski UUID/payload va retained ACK tarixini 100qatorli batch bilan qayta solishtiradi, lokal recovery hold yangi savdoni bloklaydi. Hech bir qurilma outboxini tozalab yubormang. Barcha faol qurilmalar navbati, retained history, mapping va konfliktlar egasi tomonidan tekshirilsin.
+
+Tekshiruv tugagach active OWNER ID va ko‘rib chiqilgan **barcha faol device IDlari** bilan:
+
 ```bash
-php artisan app:import-opening-balances \
-    --file=storage/app/opening_balances_template.json \
-    --env=production
+php artisan app:recovery-complete --owner-id=REAL_OWNER_ID --reviewed-devices=REVIEWED_DEVICE_IDS --env=production
 ```
-- Har bir qator o'zining deterministic UUID `operation_id` siga ega bo'lib, takroriy chaqirilganda ham dublikat hosil qilmaydi;
-- Kirim qilingan tovarlar ombor balansiga yoziladi;
-- Mijozlar qarzi (musbat) yoki avansi (manfiy) `customer_ledger` ga yoziladi;
-- Ta'minotchi majburiyati `supplier_ledger` ga yoziladi;
-- Boshlang'ich kassa pullari `cash_movements` orqali kassa hisoblariga o'tkaziladi.
 
----
+Bu ownerning aniq tasdiqlash buyrug‘i; qurilmalar haqiqatan tekshirilmasdan ro‘yxatni to‘ldirish mumkin emas. User/ruxsat, review ro‘yxati yoki ochiq konflikt bo‘lsa recovery yopilmaydi. Clients fresh bootstrapdan keyin savdoni davom ettiradi.
 
-## 5. Qurilmalarni Ulash va Offline Savdo (3-Qadam)
+## Yakuniy topshirish mezonlari
 
-1. **Kompyuter (PC PWA):**
-   - Brauzerda tizim domeniga kiriladi (`https://crm.aquaoptom.uz`);
-   - Manzil satridan "Ilovani o'rnatish (PWA)" bosiladi;
-   - Kassir o'z akkounti bilan kiradi.
-2. **Smartfon (Flutter Android):**
-   - `mobile/build/app/outputs/flutter-apk/app-release.apk` fayli xodimlarning Android qurilmasiga o'rnatiladi;
-   - Ilova ochilgach server URL manzili (`https://crm.aquaoptom.uz/api`) kiritiladi;
-   - Sotuvchi/haydovchi o'z login-paroli bilan tizimga kiradi;
-   - Qurilmaga oflayn savdo uchun sotish mumkin bo'lgan dona ajratmasi (rezerv) beriladi;
-   - Aloqa uzilganda ham savdo to'xtamaydi; internet qaytganda amallar avtomatik serverga sinxronlanadi.
-
----
-
-## 6. Telegram Botni Faollashtirish (4-Qadam)
-
-1. Telegramda `@BotFather` ga kirib yangi bot yaratiladi va token olinadi;
-2. `.env.production` fayliga quyidagi qatorlar kiritiladi:
-   ```ini
-   TELEGRAM_BOT_TOKEN="haqiqiy_bot_tokeni"
-   TELEGRAM_WEBHOOK_SECRET="kriptografik_maxfiy_soz"
-   TELEGRAM_NOTIFICATION_ENABLED=true
-   ```
-3. Webhook ro'yxatdan o'tkaziladi:
-   ```bash
-   curl -F "url=https://crm.aquaoptom.uz/api/telegram/webhook" \
-        -F "secret_token=kriptografik_maxfiy_soz" \
-        https://api.telegram.org/bot<TOKEN>/setWebhook
-   ```
-4. Do'kon egasi botga kirib `/start` bosadi va tizim admin panelida uning Telegram ID si xodim profiliga biriktiriladi.
-
----
-
-## 7. Zaxiralash va Favqulodda Tiklash (Disaster Recovery)
-
-- **Avtomatik kunlik zaxira (Cron):** Har kuni tunda `php artisan app:backup-create --env=production` ishga tushadi;
-- **Qo'lda zaxira olish:**
-  ```bash
-  php artisan app:backup-create --env=production
-  ```
-- **Favqulodda tiklash:**
-  ```bash
-  php artisan app:backup-restore /path/to/backup_archive.zip.enc --env=production
-  ```
-- **Recovery Epoch & Klientlarni Muvofiqlashtirish:**
-  Eski zaxiradan qaytilganda server `system_recovery_epoch` ni oshiradi va oddiy pushni to'xtatib turadi (`HTTP 428`). Xodimlar ilovasi `/api/sync/reconcile-recovery` orqali saqlangan amallarni bazaga kiritadi va ma'lumotlar yo'qolishining oldi olinadi.
-
----
-
-## 8. Yakuniy Qabul Holati va Mas'uliyat Chegaralari
-
-1. **Dasturiy Ta'minot va Arxitektura:** **100% DONE** (Barcha 25 bosqich arxitektura qoidalari, 216 ta avtomatlashtirilgan backend testlari, 14 ta PWA testlari, 19 ta Flutter mobil testlari va xavfsizlik auditlari to'liq o'tdi).
-2. **Jonli Server va Domen:** Buyurtmachi tomonidan tashqi hosting (domen, SSL, VPS server) va jonli Telegram Bot tokeni taqdim etilishi bilan yuqoridagi 1-4 qadamlar bo'yicha 5-10 daqiqa ichida tizim to'liq jonli ishga tushadi.
+Prompt24: haqiqiy staging, PC/Android va Telegram pilot dalili. Prompt25: real HTTPS deploy, current signed APK, owner opening reconciliation, backup/offsite restore mashqi, worker va monitoring dalili. Shu dalillarsiz “100% production DONE” deb belgilash mumkin emas.

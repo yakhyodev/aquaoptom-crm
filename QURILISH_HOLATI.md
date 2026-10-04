@@ -1,5 +1,16 @@
 # QURILISH HOLATI — AQUAOPTOM CRM (SUV VA ICHIMLIKLAR DO‘KONI)
 
+> **2026-10-04 AUDIT OVERRIDE — amaldagi holat: NOT READY FOR PRODUCTION.**
+> Quyidagi eski DONE/GO yozuvlari tarixiy build hisobotlari; haqiqiy live acceptance isboti emas.
+> Tasdiqlangan security, ledger, replay, import, offline bootstrap/delta/recovery, inventory audit va deployment nuqsonlari tuzatildi.
+> **Yakuniy tested source7425c82: [GitHub run37199142828](https://github.com/yakhyodev/aquaoptom-crm/actions/runs/37199142828) SUCCESS —244backend/1536assertions/0errors/0failures/0skipped,21Flutter/analyze0issues,3/3jobs.**
+> [Production audit](docs/PRODUCTION_AUDIT.md), [yangilangan handover](docs/PRODUCTION_HANDOVER.md) va commitga bog‘langan [GitHub CI](https://github.com/yakhyodev/aquaoptom-crm/actions) asosiy dalil.
+> **Prompt24: NOT DONE. Prompt25: NOT DONE.** Server/domen yo‘q; mavjud APK signature FAIL; haqiqiy PC/Android/bot acceptance hamda offsite RPO/RTO dalili yo‘q.
+> Lokal PG16.4/62tables/0businessdata — faqat lokal profil. 15business migration +4base/auth =19applied. Redis7 CI/compose; local registry Redis5.
+> RPO backup davomiyligi emas: eng yangi tiklanadigan nusxa yoshi va yo‘qotish oynasi. Haqiqiy import acceptance gate tugagach boshlanadi.
+
+
+
 **Sana:** 2026-10-03  
 **Hujjat vazifasi:** Loyihaning 25 bosqichli qurilish holati, muhit inventarizatsiyasi, arxitektura qarorlari, test dalillari va cheklovlar reyestri.  
 **Asosiy arxitektura manbasi:** [`SUV_DOKONI_CRM_ARXITEKTURA_V2.md`](SUV_DOKONI_CRM_ARXITEKTURA_V2.md) va [`QURISH_PROMPTLARI_25.md`](QURISH_PROMPTLARI_25.md).

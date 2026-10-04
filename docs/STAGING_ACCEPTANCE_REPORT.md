@@ -1,3 +1,8 @@
+> **2026-10-04 AUDIT OVERRIDE: LIVE STAGING NOT VERIFIED / PRODUCTION NO-GO.**
+> Quyidagi hisobot tarixiy lokal/simulation mashq natijasidir. Uning GO, signed APK, real qurilma yoki production readiness da’volari live acceptance dalili hisoblanmaydi.
+> Server/domen mavjud emas; eski APK signature tekshiruvi FAIL. Prompt24 va25 amalda yakunlanmagan.
+> Amaldagi dalillar: [production audit](PRODUCTION_AUDIT.md), [handover](PRODUCTION_HANDOVER.md), [qolgan ishlar](AUDIT_HANDOFF.md).
+
 # AQUAOPTOM CRM — STAGING QABUL VA RELIZGA TAYYORLIK HISOBOTI (PROMPT 24)
 
 **Sana:** 2026-10-04 12:39:34 (Asia/Tashkent)  
