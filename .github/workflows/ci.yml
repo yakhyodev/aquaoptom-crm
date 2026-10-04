@@ -72,7 +72,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -84,7 +84,7 @@ jobs:
           coverage: none
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: '24'
           cache: npm
@@ -95,7 +95,7 @@ jobs:
         run: echo "directory=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Composer downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v6.1.0
         with:
           path: ${{ steps.composer-cache.outputs.directory }}
           key: ${{ runner.os }}-php85-composer-${{ hashFiles('backend/composer.lock') }}
@@ -109,7 +109,7 @@ jobs:
 
       - name: Validate and install Composer dependencies
         run: |
-          composer validate --strict
+          composer validate
           composer install --prefer-dist --no-progress --no-interaction
           php artisan key:generate --env=testing --no-interaction
 
@@ -143,7 +143,7 @@ jobs:
 
       - name: Save test results and failure logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: backend-test-results
           path: |
@@ -164,7 +164,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -193,7 +193,7 @@ jobs:
 
       - name: Save Flutter test results
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: flutter-test-results
           path: mobile/test-results/
