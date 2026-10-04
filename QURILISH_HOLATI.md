@@ -1694,6 +1694,97 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 - Keyingi bosqich: **Prompt 25 — Productionga chiqarish va yakuniy topshirish** (Group: Ishga chiqarish).
 
 ---
-*24-bosqich muvaffaqiyatli yakunlandi. Keyingi prompt avtomatik boshlanmaydi.*
+*24-bosqich muvaffaqiyatli yakunlandi.*
+
+---
+
+## 25-Bosqich: Productionga Chiqarish va Yakuniy Topshirish (Ishga Chiqarish)
+
+**Guruh:** Ishga chiqarish  
+**Status:** **DONE** (Production Release Artifact Verified, Clean DB Provisioned, Handover Package Ready)  
+**Sana:** 2026-10-04  
+**Reliz Versiyasi:** `v1.0.0+build.20261004.25`  
+**Production Baza:** `aquaoptom_prod`  
+
+### 1. Bajarilgan Asosiy Ishlar:
+1. **Production Muhiti va Topologiyasi:**
+   - **PostgreSQL Production DB:** `aquaoptom_prod` rasmiy bazasi yaratildi va barcha 15 ta migratsiya (62 ta jadval) to'liq o'rnatildi;
+   - **Redis 7:** Kesh, navbat va sessiyalar uchun Redis DB 0 konfiguratsiya qilindi;
+   - **Konfiguratsiya:** `backend/.env.production` fayli shakllantirildi (`APP_DEBUG=false`, `APP_ENV=production`, `APP_VERSION=v1.0.0+build.20261004.25`, xavfsiz AES-256 zaxira kaliti);
+   - **Health Probelari:** `GET /api/health/live` (HTTP 200 `LIVE`) va `GET /api/health/ready` (HTTP 200 `READY`) production bazasi, Redis va disk holatini to'liq tasdiqladi.
+2. **Toza Baza Intizomi (Zero Mock Data Guarantee):**
+   - Arxitektura qoidalariga qat'iy binoan, ishlab chiqarish bazasiga hech qanday soxta savdo, sun'iy qoldiqlar, default parollar yoki o'ylab topilgan mijozlar yozilmadi;
+   - `sales`: 0 ta, `customers`: 0 ta, `products`: 0 ta, `customer_ledger`: 0 ta, `cash_movements`: 0 ta;
+   - Faqat rasmiy ma'lumotnomalar (`ProductionReferenceSeeder`): 5 ta tizim roli, 21 ta huquq, 8 ta standart hajm, 3 ta rasmiy kassa hisobi va 1 ta asosiy ombor kiritildi.
+3. **Owner Boshlang'ich Qoldiqlarini Idempotent Import Qilish Tizimi:**
+   - `ImportOpeningBalancesCommand` (`php artisan app:import-opening-balances`):
+     - `--generate-template`: Do'kon egasi uchun rasmiy JSON namuna shablonini generatsiya qiladi (`storage/app/opening_balances_template.json`);
+     - `--dry-run`: Bazaga yozmasdan oldin xatoliklarni, manfiy qiymatlarni, dublikatlarni tekshiradi va kutilayotgan umumiy summalar xulosasini ko'rsatadi;
+     - Rasmiy import: Har bir qator deterministic UUID `operation_id` bilan `OpeningBalanceService` orqali tranzaksiyaviy, auditlangan va idempotent tarzda kiritiladi.
+4. **Production Reliz Tekshiruvi va Sertifikati:**
+   - `ProductionVerifyCommand` (`php artisan app:production-verify --env=production`):
+     - 62 ta PostgreSQL jadvali yaxlitligi tasdiqlandi;
+     - Soxta ma'lumotlar yo'qligi tasdiqlandi;
+     - Liveness va Readiness probelari 200 OK qaytardi;
+     - Signed Android Release APK mavjudligi va yaxlitlik nazorati tasdiqlandi.
+5. **Signed Android Release APK Artefakti:**
+   - Fayl: `mobile/build/app/outputs/flutter-apk/app-release.apk` (55.47 MB);
+   - SHA-256: `7cd20467e56dde2ad4acaa826d348e7a63800ade86f0f73d4168a5bdb6c9b8c2`;
+   - SHA-1: `a944cd9bfb5acc3d82d53916971a36b916b98fae`.
+6. **Production Zaxirasi (Disaster Recovery Baseline):**
+   - Ishga tushirishdan oldingi birinchi toza tizim zaxirasi `php artisan app:backup-create --env=production` orqali AES-256-CBC shifrlangan holatda yaratildi (1.8s, RPO < 15m, RTO < 2h).
+7. **Production Handover Qo'llanmasi:**
+   - [`docs/PRODUCTION_HANDOVER.md`](docs/PRODUCTION_HANDOVER.md) hujjati yaratildi. Unda:
+     - Egasini (OWNER) yaratish (`php artisan app:bootstrap-owner`);
+     - Qoldiqlarni import qilish va tekshirish tartibi;
+     - Kompyuter (PC PWA) va Android ilovalarni xodimlar qurilmalariga ulash;
+     - Telegram botni @BotFather orqali ulash va webhook o'rnatish;
+     - Kundalik zaxira va tiklash qo'llanmasi jamlandi.
+
+---
+
+### 2. O‘zgargan va Yangi Yaratilgan Fayllar:
+- `backend/.env.production` (yangi - rasmiy production muhiti konfiguratsiyasi)
+- `backend/database/seeders/ProductionReferenceSeeder.php` (yangi - toza ma'lumotnomalar seederi)
+- `backend/app/Console/Commands/ImportOpeningBalancesCommand.php` (yangi - boshlang'ich qoldiqlarni import qilish vositasi)
+- `backend/app/Console/Commands/ProductionVerifyCommand.php` (yangi - production reliz tekshiruvi)
+- `docs/PRODUCTION_HANDOVER.md` (yangi - production topshirish va ishga tushirish qo'llanmasi)
+- `QURILISH_HOLATI.md` (tahrirlandi)
+
+---
+
+### 3. Tekshiruv Buyruqlari va Natijalari (Verification Evidence):
+1. **Production Reliz Tekshiruvi:**
+   - Buyruq: `php artisan app:production-verify --env=production`
+   - Natija: **PRODUCTION CERTIFICATE: TIZIM TOPSHIRISHGA TO'LIQ TAYYOR** (62 jadval, 0 soxta data, Live/Ready 200 OK, Signed APK tasdiqlandi).
+2. **Boshlang'ich Qoldiqlar Shablon Generatsiyasi va Dry-Run:**
+   - Buyruq: `php artisan app:import-opening-balances --generate-template --env=production` -> **PASSED**
+   - Buyruq: `php artisan app:import-opening-balances --file="storage/app/opening_balances_template.json" --dry-run --env=production` -> **PASSED** (0 DB o'zgarish).
+3. **Production Backup Yaratish:**
+   - Buyruq: `php artisan app:backup-create --env=production`
+   - Natija: **PASSED** (11.4 MB, AES-256 shifrlangan, SHA-256 yaxlitligi tasdiqlandi).
+4. **Backend Full Test Suite Regression:**
+   - Buyruq: `php artisan test`
+   - Natija: **216/216 testlar 100% PASS** (1446 assertions, 0 failures, 0 errors).
+5. **PWA Offline va Sync Protokol Testlari:**
+   - Buyruq: `node tests/pwa-indexeddb-test.cjs` -> **7/7 PASS**
+   - Buyruq: `node tests/pwa-sync-protocol-test.cjs` -> **7/7 PASS**
+6. **Mobile (Flutter) Test Suite va Statik Tahlil:**
+   - Buyruq: `flutter test` -> **19/19 PASS** (duration 3.5s)
+   - Buyruq: `flutter analyze` -> **No issues found!** (0 errors, 0 warnings)
+7. **Xavfsizlik Dependency Auditlari:**
+   - Buyruq: `composer audit` -> **No security vulnerability advisories found.**
+   - Buyruq: `npm audit` -> **found 0 vulnerabilities.**
+
+---
+
+### 4. Loyihaning 25 Bosqichli Qurilish Yakuni:
+- **1-dan 25-gacha barcha bosqichlar:** **100% DONE**.
+- Arxitektura tamoyillariga to'liq rioya qilindi: bitta do'kon, bitta ombor, faqat butun dona, signed balance mijoz/ta'minotchi daftarlari, offline multi-device ajratma va reconcilation, barqaror `operation_id` idempotency kafolati, PWA va Flutter Android integratsiyasi, Telegram Bot interfeysi, RPO 15m / RTO 2h avtomatlashtirilgan zaxiralash va tiklash dvigateli.
+- Tizim buyurtmachiga topshirish uchun to'liq tayyor!
+
+---
+*25-bosqich muvaffaqiyatli yakunlandi. Barcha 25 bosqich to'liq topshirildi.*
+
 
 
