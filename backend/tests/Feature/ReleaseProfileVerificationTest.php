@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Http\Controllers\Api\HealthController;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ReleaseProfileVerificationTest extends TestCase
@@ -17,10 +18,12 @@ class ReleaseProfileVerificationTest extends TestCase
 
     public function test_staging_drill_is_blocked_in_production_before_any_write(): void
     {
+        $settingsBefore = DB::table('system_settings')->orderBy('id')->get()->toJson();
+        $salesBefore = DB::table('sales')->orderBy('id')->get()->toJson();
         $this->app['env'] = 'production';
         $this->artisan('app:staging-acceptance')->expectsOutputToContain('Simulation requires an isolated')->assertFailed();
-        $this->assertDatabaseCount('system_settings', 0);
-        $this->assertDatabaseCount('sales', 0);
+        $this->assertSame($settingsBefore, DB::table('system_settings')->orderBy('id')->get()->toJson());
+        $this->assertSame($salesBefore, DB::table('sales')->orderBy('id')->get()->toJson());
     }
 
     public function test_failed_readiness_does_not_print_a_success_certificate(): void
@@ -36,10 +39,12 @@ class ReleaseProfileVerificationTest extends TestCase
 
     public function test_staging_drill_rejects_nonisolated_database_in_testing(): void
     {
+        $settingsBefore = DB::table('system_settings')->orderBy('id')->get()->toJson();
+        $salesBefore = DB::table('sales')->orderBy('id')->get()->toJson();
         $connection = config('database.default');
         config(['database.connections.'.$connection.'.database' => 'aquaoptom_contest']);
         $this->artisan('app:staging-acceptance')->expectsOutputToContain('Simulation requires an isolated')->assertFailed();
-        $this->assertDatabaseCount('system_settings', 0);
-        $this->assertDatabaseCount('sales', 0);
+        $this->assertSame($settingsBefore, DB::table('system_settings')->orderBy('id')->get()->toJson());
+        $this->assertSame($salesBefore, DB::table('sales')->orderBy('id')->get()->toJson());
     }
 }
