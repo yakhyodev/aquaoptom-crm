@@ -1,0 +1,102 @@
+name: Android APK Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: Debug test APK or owner-signed release APK
+        type: choice
+        options: [debug, release]
+        default: debug
+        required: true
+      api_base_url:
+        description: API URL ending in /api; required HTTPS for release
+        type: string
+        default: http://10.0.2.2:8000/api
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: bash
+        working-directory: mobile
+    env:
+      BUILD_TYPE: ${{ inputs.build_type }}
+      API_BASE_URL: ${{ inputs.api_base_url }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+      - name: Validate build settings
+        run: |
+          case "$BUILD_TYPE" in debug|release) ;; *) exit 1 ;; esac
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          url = urlparse(os.environ['API_BASE_URL'])
+          assert url.scheme in ('http', 'https') and url.hostname and url.path.endswith('/api'), 'A valid API URL ending in /api is required'
+          if os.environ['BUILD_TYPE'] == 'release':
+              assert url.scheme == 'https', 'Release requires an HTTPS API URL'
+          PY
+      - name: Prepare private release signing
+        if: inputs.build_type == 'release'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.AQUAOPTOM_KEYSTORE_BASE64 }}
+          AQUAOPTOM_KEY_ALIAS: ${{ secrets.AQUAOPTOM_KEY_ALIAS }}
+          AQUAOPTOM_KEY_PASSWORD: ${{ secrets.AQUAOPTOM_KEY_PASSWORD }}
+          AQUAOPTOM_STORE_PASSWORD: ${{ secrets.AQUAOPTOM_STORE_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" && test -n "$AQUAOPTOM_KEY_ALIAS" && test -n "$AQUAOPTOM_KEY_PASSWORD" && test -n "$AQUAOPTOM_STORE_PASSWORD" || { echo 'Owner signing secrets are required for release.'; exit 1; }
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/aquaoptom-release.jks"
+          printf 'AQUAOPTOM_STORE_FILE=%s\n' "$RUNNER_TEMP/aquaoptom-release.jks" >> "$GITHUB_ENV"
+      - name: Install locked dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Build APK on GitHub runner
+        env:
+          AQUAOPTOM_KEY_ALIAS: ${{ secrets.AQUAOPTOM_KEY_ALIAS }}
+          AQUAOPTOM_KEY_PASSWORD: ${{ secrets.AQUAOPTOM_KEY_PASSWORD }}
+          AQUAOPTOM_STORE_PASSWORD: ${{ secrets.AQUAOPTOM_STORE_PASSWORD }}
+        run: |
+          flutter build apk "--$BUILD_TYPE" --build-number="$GITHUB_RUN_NUMBER" "--dart-define=API_BASE_URL=$API_BASE_URL"
+      - name: Verify signature and package artifact
+        run: |
+          mkdir -p dist
+          apk="build/app/outputs/flutter-apk/app-$BUILD_TYPE.apk"
+          apksigner=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          test -n "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk" > dist/signature.txt
+          cp "$apk" "dist/aquaoptom-$BUILD_TYPE-${GITHUB_SHA:0:7}.apk"
+          (cd dist && sha256sum ./*.apk > SHA256SUMS)
+          printf 'Source: %s\nBuild: %s\nMode: %s\nAPI: %s\nDebug mode is a test build, not a production release.\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$BUILD_TYPE" "$API_BASE_URL" > dist/BUILD_INFO.txt
+          cat dist/BUILD_INFO.txt >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload downloadable APK
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: aquaoptom-android-${{ inputs.build_type }}-${{ github.sha }}
+          path: mobile/dist/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove private signing file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/aquaoptom-release.jks"
