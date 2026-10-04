@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Sale;
 use App\Models\Supplier;
 use App\Services\Catalog\CreateProductService;
 use App\Services\Catalog\CreateVariantService;
+use App\Services\Dashboard\DashboardQueryService;
 use App\Services\Inventory\InventoryCalculatorService;
+use App\Services\Payments\CustomerPaymentService;
+use App\Services\Payments\SupplierPaymentService;
 use App\Services\Purchase\ReceivePurchaseService;
+use App\Services\Reports\ReportQueryService;
 use App\Services\Sales\CreateSaleService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -23,7 +29,11 @@ class ApiController extends Controller
         protected CreateVariantService $variantService,
         protected ReceivePurchaseService $purchaseService,
         protected CreateSaleService $saleService,
-        protected InventoryCalculatorService $calculatorService
+        protected InventoryCalculatorService $calculatorService,
+        protected DashboardQueryService $dashboardService,
+        protected ReportQueryService $reportService,
+        protected CustomerPaymentService $customerPaymentService,
+        protected SupplierPaymentService $supplierPaymentService
     ) {}
 
     /**
@@ -183,7 +193,12 @@ class ApiController extends Controller
         $validated = $request->validate([
             'customer_name' => 'nullable|string',
             'customer_id' => 'nullable|exists:customers,id',
-            'payment_type' => 'required|string|in:cash,card,debt,bank,CASH,CARD,DEBT,BANK',
+            'payment_type' => 'nullable|string|in:cash,card,debt,bank,mixed,full,partial,CASH,CARD,DEBT,BANK,MIXED,FULL,PARTIAL',
+            'payment_method' => 'nullable|string|in:cash,card,bank,CASH,CARD,BANK',
+            'paid_amount' => 'nullable|integer|min:0',
+            'cash_account_id' => 'nullable|exists:cash_accounts,id',
+            'operation_id' => 'nullable|uuid',
+            'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.variant_id' => 'required|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.1',
@@ -201,7 +216,14 @@ class ApiController extends Controller
                 $customerId = $customer->id;
             }
 
-            $paymentType = strtoupper($validated['payment_type']);
+            $paymentType = strtoupper($validated['payment_type'] ?? 'CASH');
+            $paymentMethod = strtoupper($validated['payment_method'] ?? 'CASH');
+            // null => CreateSaleService o'zi CASH/CARD/BANK uchun to'liq, DEBT uchun 0 deb hal qiladi
+            $paidAmount = isset($validated['paid_amount']) ? (int) $validated['paid_amount'] : 0;
+            // null => servis to'lov usuli (CASH/CARD/BANK) bo'yicha default kassani tanlaydi
+            $cashAccountId = $validated['cash_account_id'] ?? null;
+            $operationId = $validated['operation_id'] ?? null;
+            $notes = $validated['notes'] ?? null;
 
             $preparedItems = [];
             foreach ($validated['items'] as $item) {
@@ -229,20 +251,47 @@ class ApiController extends Controller
             $sale = $this->saleService->execute(
                 customerId: $customerId,
                 items: $preparedItems,
+                operationId: $operationId,
+                paidAmount: $paidAmount,
+                cashAccountId: $cashAccountId,
                 paymentType: $paymentType,
+                paymentMethod: $paymentMethod,
+                notes: $notes,
                 warehouseId: null,
+                userId: auth()->id(),
                 source: 'Flutter Mobile / API'
             );
+
+            $sale->load(['customer', 'items.variant.product', 'items.variant.volume']);
+            $canViewCost = auth()->check() && auth()->user()->can('view_cost_price');
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Savdo yakunlandi va Telegram kanalga xabar yuborildi!',
                 'data' => [
                     'sale_id' => $sale->id,
+                    'id' => $sale->id,
+                    'operation_id' => $sale->operation_id,
                     'invoice_number' => $sale->invoice_number,
+                    'customer_id' => $sale->customer_id,
+                    'customer_name' => $sale->customer?->name,
                     'total_amount' => $sale->total_amount,
-                    'gross_profit' => (auth()->check() && ! auth()->user()->can('view_cost_price')) ? null : $sale->gross_profit,
+                    'paid_amount' => $sale->paid_amount,
+                    'debt_amount' => $sale->debt_amount,
+                    'gross_profit' => $canViewCost ? $sale->gross_profit : null,
                     'payment_type' => $sale->payment_type,
+                    'payment_method' => $sale->payment_method,
+                    'created_at' => $sale->created_at?->toIso8601String(),
+                    'items' => $sale->items->map(fn ($it) => [
+                        'id' => $it->id,
+                        'variant_id' => $it->variant_id,
+                        'product_name' => $it->variant?->product?->name ?? 'Mahsulot',
+                        'volume_name' => $it->variant?->volume?->name ?? '',
+                        'quantity' => $it->quantity,
+                        'sale_price' => $it->sale_price,
+                        'total_price' => $it->total_price,
+                        'is_system_price' => $it->is_system_price,
+                    ]),
                 ],
             ], 201);
 
@@ -276,6 +325,322 @@ class ApiController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => $result,
+        ]);
+    }
+
+    /**
+     * Dashboard statistikasi (rolga moslashtirilgan real SQL ma'lumotlar)
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $period = $request->input('period', 'today');
+        $customStart = $request->input('start_date');
+        $customEnd = $request->input('end_date');
+
+        $data = $this->dashboardService->getDashboardData(
+            user: $request->user(),
+            period: $period,
+            customStart: $customStart,
+            customEnd: $customEnd
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $data,
+        ]);
+    }
+
+    /**
+     * Mijozlar ro'yxati (Search va qarz balansi bilan)
+     */
+    public function getCustomers(Request $request): JsonResponse
+    {
+        $search = $request->input('search');
+        $query = Customer::query();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('store_name', 'ilike', "%{$search}%");
+            });
+        }
+
+        $customers = $query->orderBy('name')->limit(100)->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $customers->map(fn ($c) => [
+                'id' => $c->id,
+                'uuid' => $c->uuid,
+                'name' => $c->name,
+                'phone' => $c->phone,
+                'store_name' => $c->store_name,
+                'address' => $c->address,
+                'debt_limit' => (int) $c->debt_limit,
+                'current_debt' => (int) $c->current_debt,
+                'display_name' => $c->display_name,
+            ]),
+        ]);
+    }
+
+    /**
+     * Yangi mijoz yaratish (inline POS yoki alohida forma)
+     */
+    public function storeCustomer(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|min:2',
+            'phone' => 'nullable|string',
+            'store_name' => 'nullable|string',
+            'address' => 'nullable|string',
+            'debt_limit' => 'nullable|integer|min:0',
+        ]);
+
+        $customer = Customer::create([
+            'name' => trim($validated['name']),
+            'phone' => $validated['phone'] ?? null,
+            'store_name' => $validated['store_name'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'debt_limit' => $validated['debt_limit'] ?? 0,
+            'current_debt' => 0,
+            'status' => 'ACTIVE',
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Mijoz muvaffaqiyatli saqlandi',
+            'data' => [
+                'id' => $customer->id,
+                'uuid' => $customer->uuid,
+                'name' => $customer->name,
+                'phone' => $customer->phone,
+                'store_name' => $customer->store_name,
+                'address' => $customer->address,
+                'debt_limit' => (int) $customer->debt_limit,
+                'current_debt' => 0,
+                'display_name' => $customer->display_name,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Ta'minotchilar ro'yxati (Search va qarz balansi bilan)
+     */
+    public function getSuppliers(Request $request): JsonResponse
+    {
+        $search = $request->input('search');
+        $query = Supplier::query();
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'ilike', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('company_name', 'ilike', "%{$search}%");
+            });
+        }
+
+        $suppliers = $query->orderBy('name')->limit(100)->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $suppliers->map(fn ($s) => [
+                'id' => $s->id,
+                'uuid' => $s->uuid,
+                'name' => $s->name,
+                'company_name' => $s->company_name,
+                'phone' => $s->phone,
+                'address' => $s->address,
+                'balance' => (int) $s->balance,
+                'credit_limit' => (int) $s->credit_limit,
+                'display_name' => $s->display_name,
+            ]),
+        ]);
+    }
+
+    /**
+     * Yangi ta'minotchi yaratish (inline Kirim yoki alohida forma)
+     */
+    public function storeSupplier(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|min:2',
+            'company_name' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'address' => 'nullable|string',
+        ]);
+
+        $supplier = Supplier::create([
+            'name' => trim($validated['name']),
+            'company_name' => $validated['company_name'] ?? null,
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
+            'balance' => 0,
+            'status' => 'ACTIVE',
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Ta'minotchi muvaffaqiyatli saqlandi",
+            'data' => [
+                'id' => $supplier->id,
+                'uuid' => $supplier->uuid,
+                'name' => $supplier->name,
+                'company_name' => $supplier->company_name,
+                'phone' => $supplier->phone,
+                'address' => $supplier->address,
+                'balance' => 0,
+                'display_name' => $supplier->display_name,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Kassa hisob raqamlari
+     */
+    public function getCashAccounts(): JsonResponse
+    {
+        $accounts = CashAccount::all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $accounts->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'type' => $a->type,
+                'balance' => (int) $a->balance,
+                'is_default' => (bool) $a->is_default,
+            ]),
+        ]);
+    }
+
+    /**
+     * Mijozdan qarz yig'ish yoki ta'minotchiga to'lov qilish
+     */
+    public function storePayment(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => 'required|string|in:customer,supplier,CUSTOMER,SUPPLIER',
+            'party_id' => 'required|integer',
+            'amount' => 'required|integer|min:1',
+            'cash_account_id' => 'nullable|exists:cash_accounts,id',
+            'payment_method' => 'nullable|string|in:cash,card,bank,CASH,CARD,BANK',
+            'operation_id' => 'nullable|uuid',
+            'notes' => 'nullable|string',
+            'confirm_excess_as_advance' => 'nullable|boolean',
+        ]);
+
+        try {
+            $type = strtolower($validated['type']);
+            $cashAccountId = $validated['cash_account_id'] ?? null;
+            if (! $cashAccountId) {
+                $defaultAccount = CashAccount::where('is_default', true)->first() ?? CashAccount::first();
+                $cashAccountId = $defaultAccount?->id;
+            }
+
+            $method = strtoupper($validated['payment_method'] ?? 'CASH');
+            $opId = $validated['operation_id'] ?? null;
+            $notes = $validated['notes'] ?? null;
+            $confirmAdvance = (bool) ($validated['confirm_excess_as_advance'] ?? true);
+
+            if ($type === 'customer') {
+                $result = $this->customerPaymentService->execute(
+                    customerId: (int) $validated['party_id'],
+                    amount: (int) $validated['amount'],
+                    cashAccountId: (int) $cashAccountId,
+                    paymentMethod: $method,
+                    operationId: $opId,
+                    userId: auth()->id(),
+                    notes: $notes,
+                    confirmExcessAsAdvance: $confirmAdvance
+                );
+            } else {
+                $result = $this->supplierPaymentService->execute(
+                    supplierId: (int) $validated['party_id'],
+                    amount: (int) $validated['amount'],
+                    cashAccountId: (int) $cashAccountId,
+                    paymentMethod: $method,
+                    operationId: $opId,
+                    userId: auth()->id(),
+                    notes: $notes,
+                    confirmExcessAsAdvance: $confirmAdvance
+                );
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => "To'lov muvaffaqiyatli qabul qilindi",
+                'data' => $result,
+            ], 201);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 400);
+        }
+    }
+
+    /**
+     * Savdo tarixi (So'nggi savdolar ro'yxati)
+     */
+    public function getSalesHistory(Request $request): JsonResponse
+    {
+        $canViewCost = auth()->check() && auth()->user()->can('view_cost_price');
+
+        $sales = Sale::with(['customer', 'items.variant.product', 'items.variant.volume'])
+            ->orderBy('id', 'desc')
+            ->limit(50)
+            ->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $sales->map(fn ($sale) => [
+                'id' => $sale->id,
+                'operation_id' => $sale->operation_id,
+                'invoice_number' => $sale->invoice_number,
+                'customer_name' => $sale->customer?->name ?? 'Tezkor xaridor',
+                'total_amount' => (int) $sale->total_amount,
+                'paid_amount' => (int) $sale->paid_amount,
+                'debt_amount' => (int) $sale->debt_amount,
+                'gross_profit' => $canViewCost ? (int) $sale->gross_profit : null,
+                'payment_type' => $sale->payment_type,
+                'status' => $sale->status,
+                'created_at' => $sale->created_at?->toIso8601String(),
+                'items_count' => $sale->items->count(),
+                'items' => $sale->items->map(fn ($it) => [
+                    'id' => $it->id,
+                    'product_name' => $it->variant?->product?->name ?? 'Noma\'lum',
+                    'volume_name' => $it->variant?->volume?->name ?? '',
+                    'quantity' => $it->quantity,
+                    'sale_price' => (int) $it->sale_price,
+                    'total_price' => (int) $it->total_price,
+                ]),
+            ]),
+        ]);
+    }
+
+    /**
+     * Hisobotlar (Davriy savdo va kassa xulosalari)
+     */
+    public function getReports(Request $request): JsonResponse
+    {
+        $filters = [
+            'period' => $request->input('period', 'today'),
+            'start_date' => $request->input('start_date'),
+            'end_date' => $request->input('end_date'),
+        ];
+
+        $salesSummary = $this->reportService->getSalesSummary($filters);
+        $cashSummary = $this->reportService->getCashSummary($filters);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'sales' => $salesSummary,
+                'cash' => $cashSummary,
+            ],
         ]);
     }
 }

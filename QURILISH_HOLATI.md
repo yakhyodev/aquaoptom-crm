@@ -1192,6 +1192,103 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 ---
 *19-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 20.*
 
+---
+
+## 40. 20-Bosqich: Flutter Android: kirish va online biznes oynalari — DONE
+
+### 1. Bajarilgan Ishlar Xulosasi:
+- **Mavjud `mobile/` katalogi arxitekturaga moslashtirildi:** Yangi parallel loyiha yaratilmadi. Eski template counter testi va demo/fake mock ma'lumotlar butunlay olib tashlandi.
+- **Konfiguratsiya va Sessiya Boshqaruvi:**
+  - `AppConfig`: `String.fromEnvironment('API_BASE_URL')` orqali dinamik URL (default `http://10.0.2.2:8000/api`), ish vaqtida o'zgartirish modali va `webAdminUrl`.
+  - `SessionService`: `ChangeNotifier` asosidagi singleton sessiya, Sanctum token saqlash va tozalash.
+  - `UserModel`: Rol (`OWNER`, `ADMIN`, `CASHIER`, `WAREHOUSE`, `SALES_MANAGER`) va ruxsatlar (`canViewCost`, `canReceiveStock`, `canViewDebts`), case-insensitive normalizatsiya.
+  - `ApiService` & `ApiExceptions`: Typed xatoliklar (`ApiException`, `UnauthorizedException`, `ForbiddenException`, `ValidationException`, `NetworkException`, `ServerException`). Token yoki maxfiy ma'lumotlarni xato xabarlarida leak qilmaydi; 401 da sessiya avtomatik tozalanadi.
+  - `OperationId`: RFC 4122 UUID v4 barqaror operatsiya identifikatori.
+  - `Formatters`: Butun sonli aniq pul formatlagich (`formatMoney`, float xatolarisiz), hajm va sana formatlagichlari.
+- **To'liq Biznes Ekranlari:**
+  - `LoginScreen`: Login, parol, xato banneri, server sozlamalari modali (`TextButton.icon`).
+  - `MainNavigationScreen`: Rolga mos navigation tabs va drawer:
+    - Owner/Admin: Dashboard, POS, Katalog, Qarzlar, Tarix, Hisobotlar, Kalkulyator, Kirim, Admin Web.
+    - Cashier: POS, Katalog, Qarzlar, Tarix.
+    - Warehouse: Katalog, Kirim, Kalkulyator.
+  - `DashboardScreen`: Oqim (davriy savdo, kassa, yangi nasiya, yalpi foyda, xarajat) va as-of balanslar (kassa, bank, karta, mijoz/ta'minotchi qarzlari, tovar tannarxi, potensial tushum). Ruxsatsiz rollar uchun tannarx va foyda yashirilgan.
+  - `CatalogScreen`: Tovar va hajm variantlari qoldig'i, server qidiruvi, kam qoldiq ogohlantirishi, ruxsatli kirim tugmasi.
+  - `CalculatorScreen`: Checkboxlar, all/clear, dona va litr, tizim sotuv qiymati va kutilayotgan yalpi foyda. Narxsiz tovarlar nolga tenglashtirilmaydi.
+  - `PosScreen`: Ko'p qatorli savat, butun sonli miqdorlar, tizim/manual narx dialogi, tezkor vs mijoz tanlash, to'liq / qisman / nasiya to'lov, kassa tanlash, barqaror UUID `operation_id`, chek modali.
+  - `InwardScreen`: Inline ta'minotchi va tovar yaratish, blok/qadoq konvertatsiyasi, butun sonli tannarx.
+  - `DebtScreen`: Mijozlar qarzi va ta'minotchilarga qarzdorlik tablari, qidiruv, to'lov/qarz yopish dialogi, kassa hisobini tanlash.
+  - `SalesHistoryScreen`: Savdolar lentasi, kengaytiriladigan tovar qatorlari, chek qayta ochish.
+  - `ReportsScreen`: Savdo va kassa xulosalari, davr filtri.
+  - `AdminWebScreen`: Murakkab operatsiyalar uchun xavfsiz veb havolalar.
+  - `EventInvalidationService`: `/api/events/invalidation?cursor=...` orqali cursor catch-up repository adapteri.
+- **Backend API Kengaytirilishi (`backend/`):**
+  - `backend/app/Http/Controllers/Api/ApiController.php`: `dashboard()`, `getCustomers()`, `storeCustomer()`, `getSuppliers()`, `storeSupplier()`, `getCashAccounts()`, `storePayment()`, `getSalesHistory()`, `getReports()` endpointlari qo'shildi.
+  - `storeSale()`: UUID `operation_id` tekshiruvi, `CreateSaleService` ga to'liq integratsiya, chek formatlagich, ruxsatsiz foydalanuvchilar uchun gross profit maskalash.
+  - `backend/routes/api.php`: Barcha endpointlar `auth:sanctum` va `active` guruhiga ulandi.
+
+---
+
+### 2. Yaratilgan va Yangilangan Fayllar:
+- **Backend:**
+  - `backend/app/Http/Controllers/Api/ApiController.php`
+  - `backend/routes/api.php`
+- **Flutter Mobil (`mobile/`):**
+  - `mobile/lib/config/app_config.dart`
+  - `mobile/lib/models/user_model.dart`
+  - `mobile/lib/models/product_model.dart`
+  - `mobile/lib/models/customer_model.dart`
+  - `mobile/lib/models/supplier_model.dart`
+  - `mobile/lib/models/sale_model.dart`
+  - `mobile/lib/models/dashboard_model.dart`
+  - `mobile/lib/models/report_model.dart`
+  - `mobile/lib/models/cash_account_model.dart`
+  - `mobile/lib/models/product.dart`
+  - `mobile/lib/models/sale.dart`
+  - `mobile/lib/services/api_exceptions.dart`
+  - `mobile/lib/services/session_service.dart`
+  - `mobile/lib/services/api_service.dart`
+  - `mobile/lib/services/event_invalidation_service.dart`
+  - `mobile/lib/utils/formatters.dart`
+  - `mobile/lib/utils/operation_id.dart`
+  - `mobile/lib/screens/login_screen.dart`
+  - `mobile/lib/screens/main_navigation_screen.dart`
+  - `mobile/lib/screens/dashboard_screen.dart`
+  - `mobile/lib/screens/catalog_screen.dart`
+  - `mobile/lib/screens/pos_screen.dart`
+  - `mobile/lib/screens/inward_screen.dart`
+  - `mobile/lib/screens/debt_screen.dart`
+  - `mobile/lib/screens/calculator_screen.dart`
+  - `mobile/lib/screens/sales_history_screen.dart`
+  - `mobile/lib/screens/reports_screen.dart`
+  - `mobile/lib/screens/admin_web_screen.dart`
+  - `mobile/lib/screens/home_screen.dart`
+  - `mobile/lib/main.dart`
+  - `mobile/test/widget_test.dart`
+  - `mobile/test/api_flow_test.dart`
+
+---
+
+### 3. Tekshiruv Buyruqlari va Natijalari (Verification Evidence):
+1. **Flutter Statik Tahlil:**
+   - Buyruq: `flutter analyze`
+   - Natija: **No issues found!** (ran in 1.4s, 0 errors, 0 warnings).
+2. **Flutter Test Suite:**
+   - Buyruq: `flutter test`
+   - Natija: **6/6 testlar 100% PASS** (0 failures, duration 1.8s):
+     - `AquaOptom API Contract & Flow Tests Full business flow: Login -> Inward -> Sale -> Debt/Payment -> Stock -> Event Invalidation`: PASS
+     - `AquaOptom API Contract & Flow Tests Cost price is masked for unprivileged roles without leaking data`: PASS
+     - `AquaOptom API Contract & Flow Tests Typed API Exceptions handle 401, 403, and 422 cleanly without exposing tokens`: PASS
+     - `AquaOptomApp UI Smoke Tests Unauthenticated user sees LoginScreen and can open Server Settings`: PASS
+     - `AquaOptomApp UI Smoke Tests Owner role renders MainNavigationScreen with all tabs`: PASS
+     - `AquaOptomApp UI Smoke Tests Cashier role renders restricted tabs without dashboard`: PASS
+3. **Backend Test Suite:**
+   - Buyruq: `php artisan test`
+   - Natija: **196/196 testlar 100% PASS** (1264 assertions, duration 63.5s, 0 failures, 0 errors).
+
+---
+*20-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 21.*
+
+
 
 
 

@@ -1,44 +1,64 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../models/product.dart';
+import '../models/product_model.dart';
 import '../services/api_service.dart';
+import '../services/session_service.dart';
+import '../utils/formatters.dart';
 
 class CalculatorScreen extends StatefulWidget {
-  const CalculatorScreen({super.key});
+  final ApiService? apiService;
+
+  const CalculatorScreen({super.key, this.apiService});
 
   @override
   State<CalculatorScreen> createState() => _CalculatorScreenState();
 }
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
+  late final ApiService _api;
   List<Product> _products = [];
   final Set<int> _selectedVariantIds = {};
-  final _moneyFormat = NumberFormat('#,###', 'uz_UZ');
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+    _api = widget.apiService ?? ApiService();
     _loadProducts();
   }
 
   Future<void> _loadProducts() async {
-    final prods = await ApiService.getProducts();
     setState(() {
-      _products = prods;
-      // Boshida hammasini tanlab qo'yish
-      for (var p in prods) {
-        for (var v in p.variants) {
-          _selectedVariantIds.add(v.id);
-        }
-      }
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    try {
+      final list = await _api.getProducts();
+      if (!mounted) return;
+      setState(() {
+        _products = list;
+        for (final p in list) {
+          for (final v in p.variants) {
+            _selectedVariantIds.add(v.id);
+          }
+        }
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   void _selectAll(bool select) {
     setState(() {
       if (select) {
-        for (var p in _products) {
-          for (var v in p.variants) {
+        for (final p in _products) {
+          for (final v in p.variants) {
             _selectedVariantIds.add(v.id);
           }
         }
@@ -48,24 +68,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     });
   }
 
-  double get _totalCost {
-    double sum = 0;
-    for (var p in _products) {
-      for (var v in p.variants) {
-        if (_selectedVariantIds.contains(v.id)) {
-          sum += (v.stockQty * v.costPrice);
+  // Exact integer money totals
+  int get _totalCost {
+    int sum = 0;
+    for (final p in _products) {
+      for (final v in p.variants) {
+        if (_selectedVariantIds.contains(v.id) && v.costPrice != null) {
+          sum += (v.stockQty * v.costPrice!);
         }
       }
     }
     return sum;
   }
 
-  double get _totalRetail {
-    double sum = 0;
-    for (var p in _products) {
-      for (var v in p.variants) {
+  int get _totalRetail {
+    int sum = 0;
+    for (final p in _products) {
+      for (final v in p.variants) {
         if (_selectedVariantIds.contains(v.id)) {
-          sum += (v.stockQty * v.retailPrice);
+          sum += (v.stockQty * v.defaultSalePrice);
         }
       }
     }
@@ -74,8 +95,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   int get _totalQty {
     int sum = 0;
-    for (var p in _products) {
-      for (var v in p.variants) {
+    for (final p in _products) {
+      for (final v in p.variants) {
         if (_selectedVariantIds.contains(v.id)) {
           sum += v.stockQty;
         }
@@ -84,178 +105,166 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return sum;
   }
 
+  int get _expectedProfit {
+    return _totalRetail - _totalCost;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final profit = _totalRetail - _totalCost;
-    final margin = _totalRetail > 0 ? ((profit / _totalRetail) * 100).round() : 0;
+    final user = SessionService().currentUser;
+    final canViewCost = user?.canViewCost ?? false;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        title: const Text('Ombor Kalkulyatori', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text('Ombor Rentabellik Kalkulyatori'),
         backgroundColor: const Color(0xFF1E293B),
-        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.select_all),
-            tooltip: 'Hammasini tanlash',
+            icon: const Icon(Icons.select_all, color: Colors.cyanAccent),
+            tooltip: 'Barchasini tanlash',
             onPressed: () => _selectAll(true),
           ),
           IconButton(
-            icon: const Icon(Icons.deselect),
+            icon: const Icon(Icons.deselect, color: Colors.blueGrey),
             tooltip: 'Tozalash',
             onPressed: () => _selectAll(false),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Banner metrics
-          Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
-            ),
-            child: Column(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Kirim sarmoyasi:', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                        Text('${_moneyFormat.format(_totalCost)} so\'m', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        const Text('Kutilayotgan sotuv:', style: TextStyle(color: Colors.grey, fontSize: 11)),
-                        Text('${_moneyFormat.format(_totalRetail)} so\'m', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 14)),
-                      ],
-                    ),
-                  ],
-                ),
-                const Divider(color: Colors.white10, height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Kutilayotgan SOF FOYDA:', style: TextStyle(color: Colors.greenAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                        Text('+${_moneyFormat.format(profit)} so\'m', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-
-                      child: Text('Marja: $margin% | $_totalQty dona', style: const TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // List of Products with Litre Checkboxes
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _products.length,
-              itemBuilder: (ctx, idx) {
-                final prod = _products[idx];
-                final allChecked = prod.variants.every((v) => _selectedVariantIds.contains(v.id));
-
-                return Card(
-                  color: const Color(0xFF1E293B),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
+                if (_errorMessage != null)
+                  Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(color: Colors.redAccent)),
+                  ),
+
+                // Calculation Summary Cards
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: const Color(0xFF1E293B),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSummaryItem(
+                            'Tanlangan Qoldiq',
+                            '$_totalQty dona',
+                            Colors.blueAccent,
+                          ),
+                          _buildSummaryItem(
+                            'Sotuv Qiymati',
+                            Formatters.formatMoney(_totalRetail),
+                            Colors.greenAccent,
+                          ),
+                        ],
+                      ),
+                      if (canViewCost) ...[
+                        const Divider(color: Color(0xFF334155), height: 16),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Checkbox(
-                              value: allChecked,
-                              activeColor: Colors.blueAccent,
+                            _buildSummaryItem(
+                              'Jami Tannarx',
+                              Formatters.formatMoney(_totalCost),
+                              Colors.amberAccent,
+                            ),
+                            _buildSummaryItem(
+                              'Kutilayotgan Yalpi Foyda',
+                              Formatters.formatMoney(_expectedProfit),
+                              Colors.cyanAccent,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Product Variants Checkbox List
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: _products.length,
+                    itemBuilder: (ctx, idx) {
+                      final prod = _products[idx];
+                      return Card(
+                        color: const Color(0xFF1E293B),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF334155)),
+                        ),
+                        child: ExpansionTile(
+                          initiallyExpanded: true,
+                          title: Text(
+                            prod.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${prod.variants.length} ta hajm',
+                            style: const TextStyle(
+                                color: Colors.blueGrey, fontSize: 12),
+                          ),
+                          children: prod.variants.map((v) {
+                            final isChecked =
+                                _selectedVariantIds.contains(v.id);
+                            return CheckboxListTile(
+                              value: isChecked,
                               onChanged: (val) {
                                 setState(() {
-                                  if (val ?? false) {
-                                    for (var v in prod.variants) {
-                                      _selectedVariantIds.add(v.id);
-                                    }
+                                  if (val == true) {
+                                    _selectedVariantIds.add(v.id);
                                   } else {
-                                    for (var v in prod.variants) {
-                                      _selectedVariantIds.remove(v.id);
-                                    }
+                                    _selectedVariantIds.remove(v.id);
                                   }
                                 });
                               },
-                            ),
-                            Text(prod.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-
-                        // Litrlar bo'yicha checkboxlar
-                        Column(
-                          children: prod.variants.map((v) {
-                            final isChecked = _selectedVariantIds.contains(v.id);
-                            final vTotal = v.stockQty * v.retailPrice;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 6),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isChecked ? Colors.blueAccent.withValues(alpha: 0.1) : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: isChecked ? Colors.blueAccent.withValues(alpha: 0.4) : Colors.white10),
+                              activeColor: Colors.blueAccent,
+                              title: Text(
+                                '${v.displayVolume} — ${v.stockQty} dona',
+                                style: const TextStyle(color: Colors.white),
                               ),
-
-                              child: Row(
-                                children: [
-                                  Checkbox(
-                                    value: isChecked,
-                                    activeColor: Colors.blueAccent,
-                                    onChanged: (val) {
-                                      setState(() {
-                                        if (val ?? false) {
-                                          _selectedVariantIds.add(v.id);
-                                        } else {
-                                          _selectedVariantIds.remove(v.id);
-                                        }
-                                      });
-                                    },
-                                  ),
-                                  Text('${v.litres}L', style: const TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  const SizedBox(width: 8),
-                                  Text('(${v.stockQty} dona)', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                                  const Spacer(),
-                                  Text('${_moneyFormat.format(vTotal)} so\'m', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                ],
+                              subtitle: Text(
+                                'Sotuv: ${Formatters.formatMoney(v.defaultSalePrice)} ${canViewCost && v.costPrice != null ? "| Tannarx: ${Formatters.formatMoney(v.costPrice!)}" : ""}',
+                                style: const TextStyle(
+                                    color: Colors.blueGrey, fontSize: 12),
                               ),
                             );
                           }).toList(),
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
-                );
-              },
+                ),
+              ],
             ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

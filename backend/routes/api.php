@@ -33,6 +33,21 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Sales (Requires active cashier / seller / owner)
     Route::post('/sales', [ApiController::class, 'storeSale']);
+    Route::get('/sales/history', [ApiController::class, 'getSalesHistory']);
+
+    // Dashboard & Reports
+    Route::get('/dashboard', [ApiController::class, 'dashboard']);
+    Route::get('/reports', [ApiController::class, 'getReports']);
+
+    // Customers & Suppliers
+    Route::get('/customers', [ApiController::class, 'getCustomers']);
+    Route::post('/customers', [ApiController::class, 'storeCustomer']);
+    Route::get('/suppliers', [ApiController::class, 'getSuppliers']);
+    Route::post('/suppliers', [ApiController::class, 'storeSupplier']);
+
+    // Cash Accounts & Payments
+    Route::get('/cash-accounts', [ApiController::class, 'getCashAccounts']);
+    Route::post('/payments', [ApiController::class, 'storePayment']);
 
     // Profit / Cost Calculator
     Route::post('/calculator', [ApiController::class, 'calculate'])

@@ -1,166 +1,430 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
-import '../models/product.dart';
-import '../models/sale.dart';
+import '../config/app_config.dart';
+import '../models/cash_account_model.dart';
+import '../models/customer_model.dart';
+import '../models/dashboard_model.dart';
+import '../models/product_model.dart';
+import '../models/report_model.dart';
+import '../models/sale_model.dart';
+import '../models/supplier_model.dart';
+import '../models/user_model.dart';
+import 'api_exceptions.dart';
+import 'session_service.dart';
 
 class ApiService {
-  // Standart Laravel API manzili (port: 3003)
-  static String baseUrl = 'http://127.0.0.1:3003/api';
+  final http.Client _client;
 
-  // Local keshlangan ma'lumotlar (agar server ulanmagan bo'lsa darhol ishlashi uchun)
-  static List<Product> cachedProducts = [
-    Product(
-      id: 1,
-      name: 'Fanta',
-      variants: [
-        ProductVariant(id: 1, productId: 1, litres: 0.5, stockQty: 150, costPrice: 5000, retailPrice: 6500),
-        ProductVariant(id: 2, productId: 1, litres: 1.0, stockQty: 80, costPrice: 7500, retailPrice: 9500),
-        ProductVariant(id: 3, productId: 1, litres: 1.5, stockQty: 200, costPrice: 10000, retailPrice: 12500),
-      ],
-    ),
-    Product(
-      id: 2,
-      name: 'Coca-Cola',
-      variants: [
-        ProductVariant(id: 4, productId: 2, litres: 0.5, stockQty: 240, costPrice: 5200, retailPrice: 6500),
-        ProductVariant(id: 5, productId: 2, litres: 1.5, stockQty: 180, costPrice: 10500, retailPrice: 13000),
-      ],
-    ),
-    Product(
-      id: 3,
-      name: 'Chortoq',
-      variants: [
-        ProductVariant(id: 6, productId: 3, litres: 0.5, stockQty: 300, costPrice: 4000, retailPrice: 5500),
-        ProductVariant(id: 7, productId: 3, litres: 1.0, stockQty: 120, costPrice: 6000, retailPrice: 8000),
-      ],
-    ),
-    Product(
-      id: 4,
-      name: 'Nestle Pure Life',
-      variants: [
-        ProductVariant(id: 8, productId: 4, litres: 5.0, stockQty: 90, costPrice: 9000, retailPrice: 12000),
-        ProductVariant(id: 9, productId: 4, litres: 18.9, stockQty: 50, costPrice: 14000, retailPrice: 20000),
-      ],
-    ),
-  ];
+  ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  static Future<List<Product>> getProducts() async {
-    try {
-      final res = await http.get(Uri.parse('$baseUrl/products')).timeout(const Duration(seconds: 3));
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body)['data'] as List;
-        cachedProducts = data.map((json) => Product.fromJson(json)).toList();
-      }
-    } catch (_) {
-      // Server ulanmasa lokal keshdan qaytaradi
+  String get baseUrl => AppConfig.apiBaseUrl;
+
+  Map<String, String> _buildHeaders() {
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    final token = SessionService().token;
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     }
-    return cachedProducts;
+
+    return headers;
   }
 
-  static Future<bool> quickInward({
-    required String name,
-    required double litres,
-    required int quantity,
-    required double costPrice,
-  }) async {
+  /// Xatoliklarni qayta ishlash va typed exceptionga o'girish
+  Never _handleErrorResponse(http.Response response) {
+    Map<String, dynamic> body = {};
     try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/inward'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'name': name,
-          'litres': litres,
-          'quantity': quantity,
-          'cost_price': costPrice,
-        }),
-      ).timeout(const Duration(seconds: 3));
-
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        await getProducts();
-        return true;
-      }
+      body = json.decode(response.body) as Map<String, dynamic>;
     } catch (_) {}
 
-    // Lokal simulyatsiya (offline rejimda ishlash)
-    var prod = cachedProducts.firstWhere(
-      (p) => p.name.toLowerCase() == name.toLowerCase(),
-      orElse: () {
-        final newP = Product(id: cachedProducts.length + 1, name: name, variants: []);
-        cachedProducts.add(newP);
-        return newP;
-      },
-    );
+    final message = body['message'] as String? ??
+        body['error'] as String? ??
+        'Xatolik yuz berdi (${response.statusCode})';
 
-    var variantIndex = prod.variants.indexWhere((v) => v.litres == litres);
-    if (variantIndex != -1) {
-      final old = prod.variants[variantIndex];
-      final newTotalCost = (old.stockQty * old.costPrice) + (quantity * costPrice);
-      final newStock = old.stockQty + quantity;
-      final newCost = (newTotalCost / newStock).roundToDouble();
-
-      prod.variants[variantIndex] = ProductVariant(
-        id: old.id,
-        productId: prod.id,
-        litres: litres,
-        stockQty: newStock,
-        costPrice: newCost,
-        retailPrice: old.retailPrice,
-      );
-    } else {
-      prod.variants.add(
-        ProductVariant(
-          id: DateTime.now().millisecondsSinceEpoch % 10000,
-          productId: prod.id,
-          litres: litres,
-          stockQty: quantity,
-          costPrice: costPrice,
-          retailPrice: (costPrice * 1.25).roundToDouble(),
-        ),
-      );
-    }
-    return true;
-  }
-
-  static Future<bool> checkoutSale({
-    required String customerName,
-    required List<CartItem> items,
-    required String paymentType,
-  }) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$baseUrl/sales'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'customer_name': customerName,
-          'payment_type': paymentType,
-          'items': items.map((i) => i.toJson()).toList(),
-        }),
-      ).timeout(const Duration(seconds: 3));
-
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        await getProducts();
-        return true;
-      }
-    } catch (_) {}
-
-    // Lokal qoldiqlarni kamaytirish
-    for (var cartItem in items) {
-      for (var p in cachedProducts) {
-        for (var i = 0; i < p.variants.length; i++) {
-          if (p.variants[i].id == cartItem.variantId) {
-            final old = p.variants[i];
-            p.variants[i] = ProductVariant(
-              id: old.id,
-              productId: old.productId,
-              litres: old.litres,
-              stockQty: (old.stockQty - cartItem.quantity).clamp(0, 999999),
-              costPrice: old.costPrice,
-              retailPrice: old.retailPrice,
-            );
+    switch (response.statusCode) {
+      case 401:
+        SessionService().clearSession();
+        throw UnauthorizedException(message, body);
+      case 403:
+        throw ForbiddenException(message, body);
+      case 422:
+        final rawErrors = body['errors'] as Map<String, dynamic>? ?? {};
+        final parsedErrors = rawErrors.map((key, value) {
+          if (value is List) {
+            return MapEntry(key, value.map((e) => e.toString()).toList());
           }
-        }
-      }
+          return MapEntry(key, [value.toString()]);
+        });
+        throw ValidationException(message, errors: parsedErrors, details: body);
+      case 500:
+      case 502:
+      case 503:
+        throw ServerException(message, response.statusCode, body);
+      default:
+        throw ServerException(message, response.statusCode, body);
     }
-    return true;
+  }
+
+  Future<http.Response> _sendRequest(
+    Future<http.Response> Function() requestFn,
+  ) async {
+    try {
+      final res = await requestFn().timeout(const Duration(seconds: 15));
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return res;
+      }
+      _handleErrorResponse(res);
+    } on ApiException {
+      rethrow;
+    } on SocketException catch (e) {
+      throw NetworkException("Serverga ulanib bo'lmadi: ${e.message}");
+    } on TimeoutException {
+      throw const NetworkException("Server javob berish vaqti tugadi (Timeout).");
+    } on http.ClientException catch (e) {
+      throw NetworkException("Tarmoq xatosi: ${e.message}");
+    } catch (e) {
+      throw NetworkException("Kutilmagan xatolik: $e");
+    }
+  }
+
+  // ==========================================
+  // AUTHENTICATION
+  // ==========================================
+
+  Future<UserModel> login({
+    required String email,
+    required String password,
+    String deviceName = 'AquaOptom Android Mobile',
+  }) async {
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/auth/login'),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: json.encode({
+            'email': email.trim(),
+            'password': password,
+            'device_name': deviceName,
+          }),
+        ));
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    final token = data['token'] as String? ?? '';
+    final userJson = data['user'] as Map<String, dynamic>? ?? {};
+
+    final user = UserModel.fromJson(userJson);
+    SessionService().setSession(user: user, token: token);
+    return user;
+  }
+
+  Future<UserModel> me() async {
+    final response = await _sendRequest(() => _client.get(
+          Uri.parse('$baseUrl/auth/me'),
+          headers: _buildHeaders(),
+        ));
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+    SessionService().updateCurrentUser(user);
+    return user;
+  }
+
+  Future<void> logout() async {
+    try {
+      await _sendRequest(() => _client.post(
+            Uri.parse('$baseUrl/auth/logout'),
+            headers: _buildHeaders(),
+          ));
+    } finally {
+      SessionService().clearSession();
+    }
+  }
+
+  // ==========================================
+  // DASHBOARD
+  // ==========================================
+
+  Future<DashboardData> getDashboard({
+    String period = 'today',
+    String? startDate,
+    String? endDate,
+  }) async {
+    final queryParams = <String, String>{'period': period};
+    if (startDate != null) queryParams['start_date'] = startDate;
+    if (endDate != null) queryParams['end_date'] = endDate;
+
+    final uri = Uri.parse('$baseUrl/dashboard').replace(queryParameters: queryParams);
+    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return DashboardData.fromJson(data);
+  }
+
+  // ==========================================
+  // PRODUCTS & STOCK
+  // ==========================================
+
+  Future<List<Product>> getProducts() async {
+    final response = await _sendRequest(() => _client.get(
+          Uri.parse('$baseUrl/products'),
+          headers: _buildHeaders(),
+        ));
+
+    final data = json.decode(response.body)['data'] as List<dynamic>;
+    return data.map((json) => Product.fromJson(json as Map<String, dynamic>)).toList();
+  }
+
+  // ==========================================
+  // INWARD (KIRIM)
+  // ==========================================
+
+  Future<Map<String, dynamic>> createInward({
+    int? variantId,
+    String? productName,
+    double? litres,
+    int? volumeMl,
+    required double quantity,
+    String packageName = 'dona',
+    int? costPrice,
+    String? supplierName,
+    String? invoiceNumber,
+  }) async {
+    final body = <String, dynamic>{
+      'quantity': quantity,
+      'package_name': packageName,
+    };
+
+    if (variantId != null) body['variant_id'] = variantId;
+    if (productName != null) body['product_name'] = productName;
+    if (litres != null) body['litres'] = litres;
+    if (volumeMl != null) body['volume_ml'] = volumeMl;
+    if (costPrice != null) body['cost_price'] = costPrice;
+    if (supplierName != null && supplierName.isNotEmpty) {
+      body['supplier_name'] = supplierName;
+    }
+    if (invoiceNumber != null && invoiceNumber.isNotEmpty) {
+      body['invoice_number'] = invoiceNumber;
+    }
+
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/inward'),
+          headers: _buildHeaders(),
+          body: json.encode(body),
+        ));
+
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
+  // ==========================================
+  // SALES (SOTUV)
+  // ==========================================
+
+  Future<SaleRecord> createSale({
+    int? customerId,
+    String? customerName,
+    required List<Map<String, dynamic>> items,
+    String paymentType = 'CASH',
+    String paymentMethod = 'CASH',
+    int? paidAmount,
+    int? cashAccountId,
+    String? operationId,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      'items': items,
+      'payment_type': paymentType,
+      'payment_method': paymentMethod,
+    };
+
+    if (customerId != null) body['customer_id'] = customerId;
+    if (customerName != null && customerName.isNotEmpty) {
+      body['customer_name'] = customerName;
+    }
+    if (paidAmount != null) body['paid_amount'] = paidAmount;
+    if (cashAccountId != null) body['cash_account_id'] = cashAccountId;
+    if (operationId != null && operationId.isNotEmpty) {
+      body['operation_id'] = operationId;
+    }
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/sales'),
+          headers: _buildHeaders(),
+          body: json.encode(body),
+        ));
+
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return SaleRecord.fromJson(data);
+  }
+
+  // ==========================================
+  // CUSTOMERS
+  // ==========================================
+
+  Future<List<CustomerModel>> getCustomers({String? search}) async {
+    final queryParams = <String, String>{};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+    final uri = Uri.parse('$baseUrl/customers').replace(queryParameters: queryParams);
+    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final data = json.decode(response.body)['data'] as List<dynamic>;
+    return data.map((c) => CustomerModel.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  Future<CustomerModel> createCustomer({
+    required String name,
+    String? phone,
+    String? storeName,
+    String? address,
+    int debtLimit = 0,
+  }) async {
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/customers'),
+          headers: _buildHeaders(),
+          body: json.encode({
+            'name': name.trim(),
+            'phone': phone?.trim(),
+            'store_name': storeName?.trim(),
+            'address': address?.trim(),
+            'debt_limit': debtLimit,
+          }),
+        ));
+
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return CustomerModel.fromJson(data);
+  }
+
+  // ==========================================
+  // SUPPLIERS
+  // ==========================================
+
+  Future<List<SupplierModel>> getSuppliers({String? search}) async {
+    final queryParams = <String, String>{};
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+
+    final uri = Uri.parse('$baseUrl/suppliers').replace(queryParameters: queryParams);
+    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final data = json.decode(response.body)['data'] as List<dynamic>;
+    return data.map((s) => SupplierModel.fromJson(s as Map<String, dynamic>)).toList();
+  }
+
+  Future<SupplierModel> createSupplier({
+    required String name,
+    String? companyName,
+    String? phone,
+    String? address,
+  }) async {
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/suppliers'),
+          headers: _buildHeaders(),
+          body: json.encode({
+            'name': name.trim(),
+            'company_name': companyName?.trim(),
+            'phone': phone?.trim(),
+            'address': address?.trim(),
+          }),
+        ));
+
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return SupplierModel.fromJson(data);
+  }
+
+  // ==========================================
+  // CASH ACCOUNTS & PAYMENTS
+  // ==========================================
+
+  Future<List<CashAccountModel>> getCashAccounts() async {
+    final response = await _sendRequest(() => _client.get(
+          Uri.parse('$baseUrl/cash-accounts'),
+          headers: _buildHeaders(),
+        ));
+
+    final data = json.decode(response.body)['data'] as List<dynamic>;
+    return data.map((a) => CashAccountModel.fromJson(a as Map<String, dynamic>)).toList();
+  }
+
+  Future<Map<String, dynamic>> createPayment({
+    required String type, // 'customer' or 'supplier'
+    required int partyId,
+    required int amount,
+    int? cashAccountId,
+    String paymentMethod = 'CASH',
+    String? operationId,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      'type': type,
+      'party_id': partyId,
+      'amount': amount,
+      'payment_method': paymentMethod,
+    };
+    if (cashAccountId != null) body['cash_account_id'] = cashAccountId;
+    if (operationId != null && operationId.isNotEmpty) {
+      body['operation_id'] = operationId;
+    }
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/payments'),
+          headers: _buildHeaders(),
+          body: json.encode(body),
+        ));
+
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
+  // ==========================================
+  // SALES HISTORY
+  // ==========================================
+
+  Future<List<SaleRecord>> getSalesHistory() async {
+    final response = await _sendRequest(() => _client.get(
+          Uri.parse('$baseUrl/sales/history'),
+          headers: _buildHeaders(),
+        ));
+
+    final data = json.decode(response.body)['data'] as List<dynamic>;
+    return data.map((s) => SaleRecord.fromJson(s as Map<String, dynamic>)).toList();
+  }
+
+  // ==========================================
+  // REPORTS
+  // ==========================================
+
+  Future<ReportsData> getReports({
+    String period = 'today',
+    String? startDate,
+    String? endDate,
+  }) async {
+    final queryParams = <String, String>{'period': period};
+    if (startDate != null) queryParams['start_date'] = startDate;
+    if (endDate != null) queryParams['end_date'] = endDate;
+
+    final uri = Uri.parse('$baseUrl/reports').replace(queryParameters: queryParams);
+    final response = await _sendRequest(() => _client.get(uri, headers: _buildHeaders()));
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return ReportsData.fromJson(data);
+  }
+
+  // ==========================================
+  // CALCULATOR
+  // ==========================================
+
+  Future<Map<String, dynamic>> calculateCalculator({
+    List<int>? variantIds,
+  }) async {
+    final response = await _sendRequest(() => _client.post(
+          Uri.parse('$baseUrl/calculator'),
+          headers: _buildHeaders(),
+          body: json.encode({'variant_ids': variantIds ?? []}),
+        ));
+
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    return data;
   }
 }
