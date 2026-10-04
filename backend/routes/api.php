@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApiController;
 use App\Http\Controllers\Api\AuthApiController;
 use App\Http\Controllers\Api\EventInvalidationApiController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\OperationApiController;
 use App\Http\Controllers\Api\SyncApiController;
 use App\Http\Controllers\TelegramController;
@@ -14,8 +15,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Public Authentication & Health Ping
+// Public Authentication & Health Probes
 Route::get('/health', [SyncApiController::class, 'ping']);
+Route::get('/health/live', [HealthController::class, 'liveness']);
+Route::get('/health/ready', [HealthController::class, 'readiness']);
 Route::post('/auth/login', [AuthApiController::class, 'login'])->middleware('throttle:login');
 
 // Protected API Routes (Sanctum Token + Active User Check)
@@ -61,6 +64,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/sync/bootstrap', [SyncApiController::class, 'bootstrap']);
     Route::get('/sync/pull', [SyncApiController::class, 'pull']);
     Route::post('/sync/push', [SyncApiController::class, 'push']);
+    Route::post('/sync/reconcile-recovery', [SyncApiController::class, 'reconcileRecovery']);
     Route::get('/sync/status/{operation_id}', [SyncApiController::class, 'status']);
     Route::get('/sync/conflicts', [SyncApiController::class, 'conflicts'])
         ->middleware('permission:manage_devices');

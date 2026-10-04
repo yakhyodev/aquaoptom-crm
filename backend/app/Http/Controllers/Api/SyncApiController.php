@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Device;
 use App\Models\OperationResult;
 use App\Models\SyncConflict;
+use App\Models\SystemSetting;
+use App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException;
+use App\Services\Sync\RecoveryReconciliationService;
 use App\Services\Sync\SyncBootstrapService;
 use App\Services\Sync\SyncChangeLogService;
 use App\Services\Sync\SyncConflictResolutionService;
@@ -20,7 +23,8 @@ class SyncApiController extends Controller
         protected SyncBootstrapService $bootstrapService,
         protected SyncChangeLogService $changeLogService,
         protected SyncPushService $pushService,
-        protected SyncConflictResolutionService $conflictResolutionService
+        protected SyncConflictResolutionService $conflictResolutionService,
+        protected RecoveryReconciliationService $reconciliationService
     ) {}
 
     /**
@@ -48,6 +52,9 @@ class SyncApiController extends Controller
             'server_time' => Carbon::now()->toIso8601String(),
             'database' => 'connected',
             'user_id' => $request->user()?->id,
+            'recovery_epoch' => (int) SystemSetting::get('system_recovery_epoch', 1),
+            'recovery_status' => (string) SystemSetting::get('system_recovery_status', 'NORMAL'),
+            'recovery_watermark' => SystemSetting::get('system_recovery_watermark', null),
         ]);
     }
 
@@ -134,12 +141,53 @@ class SyncApiController extends Controller
             ], 404);
         }
 
-        $results = $this->pushService->pushBatch($device, $user, $operations, $leaseToken);
+        try {
+            $results = $this->pushService->pushBatch($device, $user, $operations, $leaseToken);
 
-        return response()->json([
-            'success' => true,
-            'results' => $results,
-        ]);
+            return response()->json([
+                'success' => true,
+                'results' => $results,
+            ]);
+        } catch (RecoveryReconciliationRequiredException $e) {
+            return response()->json([
+                'success' => false,
+                'error_code' => 'RECOVERY_RECONCILIATION_REQUIRED',
+                'message' => $e->getMessage(),
+                'recovery_epoch' => $e->recoveryEpoch,
+                'recovery_watermark' => $e->recoveryWatermark,
+            ], 428);
+        }
+    }
+
+    /**
+     * POST /api/sync/reconcile-recovery
+     * Zaxiradan tiklangan tizimda mijoz saqlangan amallarini (outbox/ACK history) qayta tiklash
+     */
+    public function reconcileRecovery(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $deviceUuid = $request->header('X-Device-UUID') ?: $request->input('device_uuid');
+        $clientEpoch = (int) $request->input('client_epoch', 1);
+        $operations = $request->input('operations', []);
+
+        if (! $deviceUuid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'device_uuid parametri yoki X-Device-UUID headeri talab qilinadi!',
+            ], 422);
+        }
+
+        $device = Device::where('device_uuid', $deviceUuid)->first();
+        if (! $device) {
+            return response()->json([
+                'success' => false,
+                'message' => "Qurilma (#{$deviceUuid}) topilmadi!",
+            ], 404);
+        }
+
+        $result = $this->reconciliationService->reconcileDevice($device, $user, $clientEpoch, $operations);
+
+        return response()->json($result);
     }
 
     /**

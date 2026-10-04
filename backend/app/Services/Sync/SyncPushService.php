@@ -48,8 +48,22 @@ class SyncPushService
      * @param  string|null  $leaseToken  Qurilma ruxsat tokeni
      * @return array Har bir operatsiya uchun mustaqil natijalar massivi
      */
-    public function pushBatch(Device $device, User $user, array $operations, ?string $leaseToken = null): array
+    public function pushBatch(Device $device, User $user, array $operations, ?string $leaseToken = null, bool $isReconciliation = false): array
     {
+        if (! $isReconciliation) {
+            $recoveryStatus = \App\Models\SystemSetting::get('system_recovery_status', 'NORMAL');
+            if ($recoveryStatus === 'RECONCILIATION_REQUIRED') {
+                $recoveryEpoch = (int) \App\Models\SystemSetting::get('system_recovery_epoch', 1);
+                $recoveryWatermark = \App\Models\SystemSetting::get('system_recovery_watermark', null);
+
+                throw new \App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException(
+                    "Tizim zaxiradan tiklangan (Recovery Epoch: {$recoveryEpoch}). Oddiy sinxronizatsiya vaqtincha to'xtatildi. Iltimos, /api/sync/reconcile-recovery orqali amallarni muvofiqlashtiring.",
+                    $recoveryEpoch,
+                    $recoveryWatermark
+                );
+            }
+        }
+
         $results = [];
 
         foreach ($operations as $op) {
@@ -433,7 +447,10 @@ class SyncPushService
         }
 
         foreach ($payload['items'] as $item) {
-            $variantId = $item['variant_id'];
+            $variantId = $item['variant_id'] ?? $item['product_variant_id'] ?? null;
+            if (! $variantId) {
+                throw new \InvalidArgumentException("Har bir qatorda variant_id yoki product_variant_id ko'rsatilishi shart!");
+            }
             $qty = (int) $item['quantity'];
             $variant = ProductVariant::findOrFail($variantId);
 

@@ -1,0 +1,17 @@
+[Unit]
+Description=AquaOptom CRM Reverb WebSocket Server
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/aquaoptom/backend
+ExecStart=/usr/bin/php /var/www/aquaoptom/backend/artisan reverb:start --host=0.0.0.0 --port=8080
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

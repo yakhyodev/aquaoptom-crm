@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Nginx Reverse Proxy
+  # ============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: aquaoptom_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../backend/public:/var/www/html/public:ro
+      - ../backend/storage/app/public:/var/www/html/storage/app/public:ro
+    depends_on:
+      - app
+      - reverb
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # PHP-FPM Web Application
+  # ============================================================================
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: aquaoptom_app
+    restart: unless-stopped
+    env_file:
+      - ../backend/.env
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # Background Queue Worker
+  # ============================================================================
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: aquaoptom_worker
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3"]
+    env_file:
+      - ../backend/.env
+    volumes:
+      - app_storage:/var/www/html/storage
+    depends_on:
+      - app
+      - redis
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # Laravel Reverb WebSocket Server
+  # ============================================================================
+  reverb:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: aquaoptom_reverb
+    restart: unless-stopped
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    env_file:
+      - ../backend/.env
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # Outbox Event Dispatcher Daemon
+  # ============================================================================
+  outbox:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: aquaoptom_outbox
+    restart: unless-stopped
+    command: ["php", "artisan", "app:process-outbox"]
+    env_file:
+      - ../backend/.env
+    depends_on:
+      - app
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # Scheduler / Task Runner
+  # ============================================================================
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: aquaoptom_scheduler
+    restart: unless-stopped
+    command: ["php", "artisan", "schedule:work"]
+    env_file:
+      - ../backend/.env
+    depends_on:
+      - app
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # PostgreSQL 16 Database
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: aquaoptom_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-aquaoptom_prod}
+      POSTGRES_USER: ${DB_USERNAME:-aquaoptom_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_db_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-aquaoptom_user} -d ${DB_DATABASE:-aquaoptom_prod}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aquaoptom_network
+
+  # ============================================================================
+  # Redis 7 Cache & Queue Broker
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aquaoptom_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-secure_redis_password}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-secure_redis_password}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aquaoptom_network
+
+networks:
+  aquaoptom_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_storage:

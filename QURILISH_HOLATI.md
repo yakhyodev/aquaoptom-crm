@@ -93,7 +93,7 @@
 | **20** | **Flutter Android: kirish va online biznes oynalari** | Mobil ilova | **DONE** | Mavjud `mobile/` loyihasi arxitekturaga moslashtirildi; Sanctum sessiya va rolga mos navigatsiya; Dashboard, Katalog, Kassa/POS, Kirim, Qarzlar, Kalkulyator, Savdo tarixi, Hisobotlar, Admin Web ko'rinishlari; inline tovar/hajm/taraf yaratish; narxlar va pullar integer tiyinlarda; xatoliklar typed `ApiException` bilan; 6/6 Flutter testlari (100%) va 196/196 backend testlari 100% o'tdi. | 21-bosqichni boshlash |
 | **21** | **Flutter offline savdo, sync va reliz paketi** | Mobil ilova | **DONE** | SQLite lokal katalog/qoldiq/ajratma/navbat modeli (`AppDatabase`, 10 jadval, v1->v2 migratsiya saqlanishi); atomik lokal confirm (`confirmSaleOffline`, ajratmadan ayirish, `#OFF-...` vaqtinchalik chek, `sync_queue` PENDING); PWA/Backend bilan 100% bir xil kanonik SHA-256 fingerprint (`PayloadFingerprint`); worker lease lock va restart/duplicate-worker dedup; user isolation (sessiya almashganda navbat xavfsiz ajratilgan); offline customer UUID parent mapping; ACK saqlash va `NEEDS_REVIEW` klassifikatsiyasi; void/cancel tuzatish amali; Android ruxsatlari, release signing konfigi va release APK build (`app-release.apk`, 55.5MB); 19/19 Flutter testlari va 196/196 backend testlari 100% o'tdi. | 22-bosqichni boshlash |
 | **22** | **To‘liq tizim testlari, xavfsizlik va yuklama** | Release sifati | **DONE** | Barcha oldingi acceptance gatelar to'liq tekshirildi; test PostgreSQL'da 100 qoldiqdan 60+60 poyga (biri o'tib, ikkinchisi 422 berishi, qoldiq manfiy bo'lmasligi); 20 ta duplicate operation_id bitta yozuv berishi; payload mismatch 409 conflict; crash/rollback tranzaksiyaviy yaxlitligi; Arxitektura 14.3 stsenariysi (boshlang'ich 500k, -300k kirim, +140k savdo, +100k qarz yig'ish, -50k ta'minotchi to'lovi = 390 000 so'm naqd, qarz/ombor/foyda aralashmasligi); Rate limit (/api/auth/login 10/min); Private kanallar avtorizatsiyasi; Hisobot eksport ruxsati va CSV formula inyeksiyasidan himoya; Telegram webhook xavfsizlik headeri; Katta datasetda SQL paginatsiyadan oldin agregatsiya (<50ms); PWA (7+7) va Flutter (19) testlari; 207/207 backend testlari 100% o'tdi. | 23-bosqichni boshlash |
-| 23 | Production paketi, backup va tiklash rejasi | Ishga chiqarish | TODO | - | Docker/Nginx/Supervisord konfig, backup/restore sinovi |
+| **23** | **Production paketi, backup va tiklash rejasi** | Ishga chiqarish | **DONE** | Reproducible production Dockerfile, Docker Compose (app, worker, reverb, scheduler, outbox, postgres, redis, nginx), Supervisord va Systemd birliklari; Nginx HTTPS/reverse proxy, private storage himoyasi; `.env.production.example`; Liveness (/api/health/live) va Readiness (/api/health/ready) problari; maxfiy ma'lumotlarni [REDACTED] qiluvchi structured JSON logging; AES-256-CBC authenticated shifrlangan va SHA-256 checksumli DB+Files zaxirasi; Avtomatlashtirilgan Disaster Recovery drill: izolyatsiya qilingan yangi DBda (`aquaoptom_restore_test`) tiklanib, ledger, qoldiqlar, kassa va qarzlar 100% tengligi tasdiqlandi; Recovery Epoch va Watermark mexanizmi (eski backupdan qaytganda push to'xtatilib, /api/sync/reconcile-recovery orqali klient outbox amallari idempotentsiya bilan tiklandi, allocation sarfi qayta muvofiqlashtirildi, 0 ma'lumot yo'qotildi); Runbook va Training qo'llanmalari yozildi; 212/212 backend testlari 100% o'tdi. | 24-bosqichni boshlash |
 | 24 | Staging deploy va haqiqiy qurilmalarda qabul sinovi | Ishga chiqarish | TODO | - | Real qurilmalarda tarmoq uzilishi va kassa tekshiruvi |
 | 25 | Productionga chiqarish va yakuniy topshirish | Ishga chiqarish | TODO | - | Prod deploy, checklist, foydalanuvchiga topshirish |
 
@@ -1498,4 +1498,114 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 - Keyingi bosqich: **Prompt 23 — Production paketi, backup va tiklash rejasi** (Group: Ishga chiqarish).
 
 ---
-*22-bosqich muvaffaqiyatli yakunlandi. Keyingi prompt avtomatik boshlanmaydi.*
+*22-bosqich muvaffaqiyatli yakunlandi.*
+
+---
+
+## 23-Bosqich: Production Paketi, Backup va Tiklash Rejasi (Ishga Chiqarish)
+
+**Guruh:** Ishga chiqarish  
+**Status:** **DONE** (Barcha majburiy acceptance gate'lar va avtomatlashtirilgan tekshiruvlar to'liq o'tdi)  
+**Sana:** 2026-10-04  
+
+### 1. Bajarilgan Asosiy Ishlar:
+1. **Reproducible Production Build va Jarayonlar Konfiguratsiyasi:**
+   - **Docker Muhiti:** Ko'p bosqichli `docker/Dockerfile` (PHP 8.3-FPM, Alpine, Opcache, pdo_pgsql, bcmath, intl, zip, pcntl, predis, non-root `aquaoptom` foydalanuvchisi) va `docker/docker-compose.yml` (App, Nginx, PostgreSQL 16, Redis 7, Worker, Reverb WebSockets, Scheduler, Outbox).
+   - **Jarayonlar Boshqaruvi:** Web (`php-fpm`), Queue worker (`queue:work --sleep=3 --tries=3`), Reverb WebSockets (`reverb:start --port=8080`), Scheduler (`schedule:work`), va Outbox worker (`app:process-outbox`) uchun yaxlit `docker/supervisord.conf` hamda VPS uchun `deploy/systemd/*.service` birliklari tayyorlandi.
+   - **Nginx & HTTPS Reverse Proxy:** `docker/nginx.conf` va `deploy/nginx-aquaoptom.conf` yaratildi; HTTP/2, HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, API va login rate limiting (`limit_req`), 50M upload limiti sozlandi.
+   - **Private Uploads Himoyasi:** `/storage/app/private/` va `/storage/backups/` yo'llariga bevosita veb murojaat Nginx darajasida `deny all; return 403;` orqali to'liq yopildi; maxfiy fayllar faqat ruxsatli autentifikatsiya qilingan marshrutlar orqali uzatiladi.
+   - **Avtomatik Deploy Skripti:** `deploy/deploy.sh` orqali atomik zero-downtime deployment (maintenance mode, git checkout, composer no-dev, npm build, safe migration, config/route/view/event cache, supervisor/systemd reload, readiness verification) tayyorlandi.
+   - **Production Env Shablon:** `backend/.env.production.example` barcha zarur kalitlar va xavfsizlik tushuntirishlari bilan shakllantirildi.
+2. **Readiness va Liveness Probelari:**
+   - `GET /api/health/live`: Web server va PHP jarayoni holati (HTTP 200 `LIVE`).
+   - `GET /api/health/ready`: PostgreSQL DB ulanishi, Redis ulanishi, storage yozish huquqi, recovery holati (HTTP 200 `READY` yoki 503 `UNAVAILABLE`).
+3. **Structured Secretsiz Loglar:**
+   - Monolog `MaskSensitiveDataProcessor` yaratildi (`App\Logging\MaskSensitiveDataProcessor`);
+   - Parollar, bearer tokenlar, telegram bot tokenlari, API kalitlari, karta ma'lumotlari avtomatik `[REDACTED]` bilan tozalanadi;
+   - `storage/logs/structured.log` da standart JSON structured formatda xavfsiz log yozilishi ta'minlandi.
+4. **Zaxira Nusxalar (Backup & Restore Engine) — DB + Files, AES-256, RPO 15m / RTO 2h:**
+   - `BackupService` xizmati:
+     - PostgreSQL ma'lumotlar bazasini `pg_dump` orqali to'liq dump qilish;
+     - Ilova yuklamalari (`storage/app/private` va public fayllar) arxivlanishi;
+     - `manifest.json` metama'lumotlari (RPO 15m, RTO 2h, jadvallar soni, watermark vaqti, recovery epoch);
+     - AES-256-CBC authenticated shifrlash (HMAC-SHA256) va SHA-256 yaxlitlik checksumi (`.sha256`);
+   - Artisan buyruqlari:
+     - `php artisan app:backup-create`
+     - `php artisan app:backup-restore {archive} [--target-db=]`
+     - `php artisan app:backup-drill [--target-db=aquaoptom_restore_test]`
+5. **Real Disaster Recovery Drill (Yangi Izolyatsiya Qilingan Bazada Tiklash):**
+   - Zaxira nusxa yaratilib, butunlay yangi va alohida `aquaoptom_restore_test` bazasiga avtomatik tiklandi;
+   - Tiklangan bazadagi barcha 62 ta jadval, mahsulotlar, qoldiqlar qiymati (`inventory_balances`), kassa harakatlari (`cash_movements`), mijozlar qarzi (`customer_ledger`) va ta'minotchi qarzi (`supplier_ledger`) 100% solishtirilib, to'liq tenglik (MATCH) tasdiqlandi;
+   - Drill 2-3 soniya ichida muvaffaqiyatli yakunlanib, test bazasi xavfsiz tozalandi.
+6. **Recovery Epoch va Offline Klient Muvofiqlashtiruvi (Reconciliation):**
+   - Eski backupdan qaytganda ma'lumotlar yo'qolishining oldini olish uchun:
+     - Serverda `system_recovery_epoch` avtomatik +1 ga oshiriladi, `system_recovery_watermark` backup vaqtiga o'rnatiladi, `system_recovery_status = 'RECONCILIATION_REQUIRED'`;
+     - Klientlar oddiy `/api/sync/push` qilganda, tizim `428 Precondition Required` va `RECOVERY_RECONCILIATION_REQUIRED` bilan oddiy syncni vaqtincha to'xtatadi;
+     - Klient o'zining outbox/ACK tarixida saqlangan (lekin tiklangan bazada yo'qolgan) amallarini `/api/sync/reconcile-recovery` orqali taqdim etadi;
+     - `RecoveryReconciliationService` zaxirada yo'q amallarni bazaga qayta yozadi (`RESTORED_AND_APPLIED`), avvaldan borlarini tekshiradi (`ALREADY_PERSISTED`), va qurilmaning `inventory_allocations` sarfini qayta muvofiqlashtiradi;
+     - Muvofiqlashtirish tugagach tizim `NORMAL` holatga qaytadi va oddiy sinxronizatsiya davom etadi;
+     - Natijada: Klientdan hech qanday ma'lumot o'chirilmaydi (drop yo'q) va shifrlash kalitlari buzilmaydi (rotate yo'q).
+7. **Runbook va Training Qo'llanmalari:**
+   - `docs/RUNBOOK.md`: Ishga tushirish, jarayonlar monitoringi, migratsiya va rollback chegaralari, disaster recovery, recovery epoch runbooki, favqulodda holatlar algoritmi.
+   - `docs/TRAINING_GUIDE.md`: Do'kon egasi, admin, kassir/sotuvchi, omborchi va Telegram bot foydalanuvchilari uchun batafsil amaliy yo'riqnoma.
+
+---
+
+### 2. O‘zgargan va Yangi Yaratilgan Fayllar:
+- `backend/app/Http/Controllers/Api/HealthController.php` (yangi - liveness va readiness problari)
+- `backend/app/Logging/MaskSensitiveDataProcessor.php` (yangi - loglarda maxfiy ma'lumotlarni tozalash)
+- `backend/config/logging.php` (tahrirlandi - structured kanali va tap qo'shildi)
+- `backend/routes/api.php` (tahrirlandi - health va reconcile-recovery yo'llari ulandi)
+- `backend/app/Services/Backup/BackupService.php` (yangi - DB+Files zaxirasi, AES-256 shifrlash, restore)
+- `backend/app/Console/Commands/BackupCreateCommand.php` (yangi)
+- `backend/app/Console/Commands/BackupRestoreCommand.php` (yangi)
+- `backend/app/Console/Commands/BackupDrillCommand.php` (yangi - avtomatlashtirilgan tiklash sinovi)
+- `backend/app/Services/Sync/Exceptions/RecoveryReconciliationRequiredException.php` (yangi)
+- `backend/app/Services/Sync/RecoveryReconciliationService.php` (yangi - offline ACK reconciliation)
+- `backend/app/Services/Sync/SyncPushService.php` (tahrirlandi - recovery status nazorati)
+- `backend/app/Http/Controllers/Api/SyncApiController.php` (tahrirlandi - recovery status va reconciliation endpointi)
+- `docker/Dockerfile`, `docker/docker-compose.yml`, `docker/nginx.conf`, `docker/php.ini`, `docker/opcache.ini`, `docker/supervisord.conf` (yangi - konteyner paketi)
+- `deploy/deploy.sh`, `deploy/nginx-aquaoptom.conf`, `deploy/systemd/*.service` (yangi - VPS deploy paketi)
+- `backend/.env.production.example` (yangi - ishlab chiqarish muhit shabloni)
+- `.gitignore` (tahrirlandi - .env.production.example ga ruxsat berildi)
+- `docs/RUNBOOK.md` (yangi - production runbook)
+- `docs/TRAINING_GUIDE.md` (yangi - xodimlar qo'llanmasi)
+- `backend/tests/Feature/ProductionReadinessAndHealthTest.php` (yangi - 3 ta test)
+- `backend/tests/Feature/BackupRestoreAndRecoveryDrillTest.php` (yangi - 2 ta chuqur test)
+- `QURILISH_HOLATI.md` (tahrirlandi)
+
+---
+
+### 3. Tekshiruv Buyruqlari va Natijalari (Verification Evidence):
+1. **Liveness va Readiness Probelari & Log Masking:**
+   - Buyruq: `php artisan test tests/Feature/ProductionReadinessAndHealthTest.php`
+   - Natija: **3/3 testlar 100% PASS** (25 assertions, duration 2.2s).
+2. **Zaxira, Izolyatsiya Qilingan Baza Tiklash Sinovi va Offline Reconciliation:**
+   - Buyruq: `php artisan test tests/Feature/BackupRestoreAndRecoveryDrillTest.php`
+   - Natija: **2/2 testlar 100% PASS** (25 assertions, duration 4.5s).
+3. **Avtomatlashtirilgan CLI Disaster Recovery Drill:**
+   - Buyruq: `php artisan app:backup-drill`
+   - Natija: **RESTORE DRILL CERTIFICATE: PASSED 100%** (Duration: 3.02s, RPO 15m, RTO < 2h, barcha 62 ta jadval, qoldiqlar, kassa, mijoz va ta'minotchi daftarlari 100% MATCH).
+4. **Backend Barcha Testlari (Full Test Suite):**
+   - Buyruq: `php artisan test`
+   - Natija: **212/212 testlar 100% PASS** (1412 assertions, duration 75.8s, 0 failures, 0 errors).
+5. **PWA Offline va Sync Protokol Testlari:**
+   - Buyruq: `node tests/pwa-indexeddb-test.cjs` -> **7/7 PASS**
+   - Buyruq: `node tests/pwa-sync-protocol-test.cjs` -> **7/7 PASS**
+6. **Mobile (Flutter) Test Suite va Statik Tahlil:**
+   - Buyruq: `flutter test` -> **19/19 PASS** (duration 3.5s)
+   - Buyruq: `flutter analyze` -> **No issues found!** (0 errors, 0 warnings)
+7. **Xavfsizlik Dependency Auditlari:**
+   - Buyruq: `composer audit` -> **No security vulnerability advisories found.**
+   - Buyruq: `npm audit` -> **found 0 vulnerabilities.**
+
+---
+
+### 4. Qolgan Cheklovlar va Keyingi Qadam:
+- Hozir productionga deploy qilinmadi yoki haqiqiy qoldiqlar import qilinmadi (qoidaga qat'iy rioya qilindi).
+- Real server va haqiqiy qurilmalarda tarmoq uzilishi va kassa tekshiruvi keyingi **Prompt 24 (Staging deploy va haqiqiy qurilmalarda qabul sinovi)** bosqichida amalga oshiriladi.
+- Keyingi bosqich: **Prompt 24 — Staging deploy va haqiqiy qurilmalarda qabul sinovi** (Group: Ishga chiqarish).
+
+---
+*23-bosqich muvaffaqiyatli yakunlandi. Keyingi prompt avtomatik boshlanmaydi.*
+
