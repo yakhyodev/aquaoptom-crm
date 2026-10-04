@@ -1,0 +1,135 @@
+name: Temporary Web Preview
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: Temporary preview lifetime; all data is discarded afterwards
+        type: choice
+        options: ['30', '60', '120']
+        default: '120'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temporary-web-preview
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      PREVIEW_OWNER_PASSWORD: ${{ secrets.AQUAOPTOM_PREVIEW_OWNER_PASSWORD }}
+      PREVIEW_MINUTES: ${{ inputs.minutes }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require private login and bounded lifetime
+        run: |
+          test -n "$PREVIEW_OWNER_PASSWORD" || { echo 'Set AQUAOPTOM_PREVIEW_OWNER_PASSWORD repository secret.'; exit 1; }
+          case "$PREVIEW_MINUTES" in 30|60|120) ;; *) exit 1 ;; esac
+      - name: Download official tunnel binary and verify digest
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, urllib.request
+          request = urllib.request.Request('https://api.github.com/repos/cloudflare/cloudflared/releases/latest', headers={'User-Agent': 'aquaoptom-preview'})
+          release = json.load(urllib.request.urlopen(request, timeout=30))
+          asset = next(a for a in release['assets'] if a['name'] == 'cloudflared-linux-amd64')
+          assert asset['browser_download_url'].startswith('https://github.com/cloudflare/cloudflared/releases/download/')
+          data = urllib.request.urlopen(asset['browser_download_url'], timeout=120).read()
+          assert asset.get('digest') == 'sha256:' + hashlib.sha256(data).hexdigest(), 'Tunnel binary digest mismatch'
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'cloudflared'
+          path.write_bytes(data)
+          path.chmod(0o700)
+          PY
+      - name: Allocate temporary HTTPS address
+        run: |
+          "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate --url http://127.0.0.1:8080 > "$RUNNER_TEMP/tunnel.log" 2>&1 &
+          echo "TUNNEL_PID=$!" >> "$GITHUB_ENV"
+          for attempt in $(seq 1 60); do
+            url=$(sed -nE 's|.*(https://[a-z0-9-]+\.trycloudflare\.com).*|\1|p' "$RUNNER_TEMP/tunnel.log" | head -1)
+            if [ -n "$url" ]; then echo "PREVIEW_URL=$url" >> "$GITHUB_ENV"; exit 0; fi
+            sleep 2
+          done
+          echo 'Temporary tunnel URL unavailable.'; exit 1
+      - name: Configure isolated application
+        run: |
+          python3 - <<'PY'
+          import base64, os, pathlib, secrets
+          url = os.environ['PREVIEW_URL']
+          db_password = secrets.token_hex(24)
+          print('::add-mask::' + db_password)
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('PREVIEW_DB_PASSWORD=' + db_password + '\n')
+          env = {
+              'APP_NAME': 'AquaOptom', 'APP_ENV': 'staging', 'APP_DEBUG': 'false', 'APP_URL': url,
+              'ASSET_URL': url, 'APP_KEY': 'base64:' + base64.b64encode(secrets.token_bytes(32)).decode(),
+              'LOG_CHANNEL': 'stderr', 'DB_CONNECTION': 'pgsql', 'DB_HOST': 'postgres', 'DB_PORT': '5432',
+              'DB_DATABASE': 'aquaoptom_preview', 'DB_USERNAME': 'postgres', 'DB_PASSWORD': db_password,
+              'REDIS_CLIENT': 'predis', 'REDIS_HOST': 'redis', 'REDIS_PORT': '6379',
+              'CACHE_STORE': 'redis', 'QUEUE_CONNECTION': 'redis', 'SESSION_DRIVER': 'database',
+              'SESSION_SECURE_COOKIE': 'true', 'SESSION_SAME_SITE': 'lax',
+              'SANCTUM_STATEFUL_DOMAINS': url.removeprefix('https://'), 'MAIL_MAILER': 'log',
+              'BROADCAST_CONNECTION': 'reverb', 'REVERB_APP_ID': 'preview', 'REVERB_APP_KEY': 'preview-public-key',
+              'REVERB_APP_SECRET': secrets.token_hex(32), 'REVERB_HOST': 'reverb', 'REVERB_PORT': '8080', 'REVERB_SCHEME': 'http',
+              'TELEGRAM_BOT_TOKEN': '', 'TELEGRAM_WEBHOOK_SECRET': secrets.token_hex(32),
+          }
+          path = pathlib.Path('backend/.env')
+          path.write_text(''.join(key + '=' + value + '\n' for key, value in env.items()))
+          path.chmod(0o600)
+          nginx = pathlib.Path('docker/nginx.conf').read_text()
+          nginx = nginx.replace('include fastcgi_params;', 'include fastcgi_params;\n            fastcgi_param HTTPS on;\n            fastcgi_param SERVER_PORT 443;')
+          pathlib.Path('docker/preview-nginx.conf').write_text(nginx)
+          PY
+      - name: Build web images on GitHub runner
+        run: |
+          host="${PREVIEW_URL#https://}"
+          docker build --target production --build-arg VITE_REVERB_APP_KEY=preview-public-key --build-arg "VITE_REVERB_HOST=$host" -f docker/Dockerfile -t aquaoptom-preview:current .
+          docker build --target nginx --build-arg VITE_REVERB_APP_KEY=preview-public-key --build-arg "VITE_REVERB_HOST=$host" -f docker/Dockerfile -t aquaoptom-preview-nginx:current .
+      - name: Start clean preview and create owner
+        run: |
+          docker compose -f docker/preview-compose.yml up -d postgres redis app reverb nginx
+          docker compose -f docker/preview-compose.yml exec -T app php artisan migrate --force
+          docker compose -f docker/preview-compose.yml exec -T app php artisan db:seed --class=ProductionReferenceSeeder --force
+          docker compose -f docker/preview-compose.yml exec -T app php artisan app:bootstrap-owner --name='Preview Owner' --email=owner@preview.aquaoptom.test --password="$PREVIEW_OWNER_PASSWORD" --no-interaction
+          docker compose -f docker/preview-compose.yml up -d worker outbox
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent "$PREVIEW_URL/login" > "$RUNNER_TEMP/login.html"; then break; fi
+            sleep 2
+          done
+          curl --fail --silent "$PREVIEW_URL/api/health/ready" > "$RUNNER_TEMP/ready.json"
+      - name: Publish connection information
+        run: |
+          mkdir -p preview-info
+          python3 - <<'PY'
+          import datetime, json, os, pathlib
+          expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=int(os.environ['PREVIEW_MINUTES']))
+          info = {'url': os.environ['PREVIEW_URL'], 'login': 'owner@preview.aquaoptom.test', 'expires_at_utc': expiry.isoformat(), 'source': os.environ['GITHUB_SHA'], 'temporary': True, 'data_persistent': False}
+          pathlib.Path('preview-info/connection.json').write_text(json.dumps(info, indent=2))
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+              output.write(f"### Temporary AquaOptom web preview\n\nWeb: {info['url']}\n\nLogin: {info['login']}\n\nExpiry UTC: {info['expires_at_utc']}\n\nTemporary isolated data, not production. Password is a repository secret.\n")
+          print('Preview ready: ' + info['url'])
+          PY
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: aquaoptom-web-preview-info
+          path: preview-info/
+          if-no-files-found: error
+          retention-days: 3
+      - name: Keep preview available for selected lifetime
+        run: |
+          for minute in $(seq 1 "$PREVIEW_MINUTES"); do
+            kill -0 "$TUNNEL_PID"
+            curl --fail --silent http://127.0.0.1:8080/api/health/live > /dev/null
+            sleep 60
+          done
+      - name: Stop preview and discard isolated data
+        if: always()
+        run: |
+          docker compose -f docker/preview-compose.yml down --volumes || true
+          if [ -n "${TUNNEL_PID:-}" ]; then kill "$TUNNEL_PID" || true; fi
+          rm -f backend/.env
