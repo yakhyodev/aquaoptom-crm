@@ -6,6 +6,9 @@ const fs = require('node:fs');
     const browser = await chromium.launch();
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     const evidence = [];
+    const failures = [];
+    page.on('pageerror', error => failures.push(error.message));
+    page.on('response', response => { if (response.status() >= 400) failures.push(response.status() + ' ' + new URL(response.url()).pathname); });
     fs.mkdirSync('ui-evidence', { recursive: true });
     async function checkContrast(locator, label) {
         const result = await locator.evaluate(el => {
@@ -78,6 +81,8 @@ const fs = require('node:fs');
         await page.screenshot({ path: 'ui-evidence/mobile-warehouse.png', fullPage: true });
         console.log('Browser UI checks passed; no business data created.');
     } finally {
+        await page.screenshot({ path: 'ui-evidence/last-page.png', fullPage: true });
+        fs.writeFileSync('ui-evidence/browser-errors.json', JSON.stringify(failures, null, 2));
         fs.writeFileSync('ui-evidence/contrast.json', JSON.stringify(evidence, null, 2));
         await browser.close();
     }

@@ -629,4 +629,19 @@ class CatalogAndPartiesManagementTest extends TestCase
         $this->assertEquals(1, Customer::where('uuid', $uuid)->count());
         $this->assertEquals(1, Customer::where('phone', '+998900001122')->count());
     }
+
+    public function test_receiving_and_sales_pages_render_the_actual_workflow_forms(): void
+    {
+        $this->actingAs($this->owner)->get('/ombor?tab=inward')
+            ->assertOk()
+            ->assertSee('Kirim qilinadigan mahsulotlar')
+            ->assertSee('Yangi Mahsulot')
+            ->assertSee("Ta'minotchi (Majburiy)", false);
+
+        $this->get('/sotuv')
+            ->assertOk()
+            ->assertSee('Mavjud mijozni qidirish')
+            ->assertSee('Yangi Mijoz')
+            ->assertSee('Savdo Qoralamasi');
+    }
 }

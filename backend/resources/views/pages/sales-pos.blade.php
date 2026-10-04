@@ -27,6 +27,6 @@
             </a>
         </div>
 
-        @livewire('optom-pos')
+        @livewire('sales.optom-pos')
     </div>
 </x-layouts.app>

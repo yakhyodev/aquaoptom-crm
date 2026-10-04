@@ -567,7 +567,7 @@
     @elseif($activeTab === 'inward')
         <!-- TAB 3: TOVAR KIRIMI (QUICK INWARD) -->
         <div class="space-y-4">
-            @livewire('quick-inward')
+            @livewire('inventory.quick-inward')
         </div>
     @elseif($activeTab === 'returns')
         <!-- TAB 4: QAYTARISHLAR (RETURNS) -->

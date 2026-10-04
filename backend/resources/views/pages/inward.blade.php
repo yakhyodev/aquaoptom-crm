@@ -1,3 +1,3 @@
 <x-layouts.app>
-    <livewire:quick-inward />
+    <livewire:inventory.quick-inward />
 </x-layouts.app>

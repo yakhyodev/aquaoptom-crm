@@ -1,3 +1,3 @@
 <x-layouts.app>
-    <livewire:optom-pos />
+    <livewire:sales.optom-pos />
 </x-layouts.app>
