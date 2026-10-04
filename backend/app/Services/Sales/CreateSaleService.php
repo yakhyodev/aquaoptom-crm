@@ -13,6 +13,7 @@ use App\Models\Payment;
 use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Ledger\CashAccountService;
 use App\Services\Ledger\CreditAllocationService;
@@ -76,6 +77,27 @@ class CreateSaleService
     ): Sale {
         $operationId = $operationId ?: (string) Str::uuid();
 
+        $actor = $userId ? User::find($userId) : auth()->user();
+        if (! $actor || ! $actor->isActive() || ! $actor->hasRole(['OWNER', 'ADMIN', 'SALES_MANAGER', 'CASHIER'])) {
+            throw new OperationValidationException($operationId, 'Savdo qilishga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+        }
+        $userId = $actor->id;
+        $operationPayload = $rawPayload ?? [
+            'customer_id' => $customerId, 'items' => $items, 'paid_amount' => $paidAmount,
+            'cash_account_id' => $cashAccountId, 'payment_type' => strtoupper($paymentType),
+            'payment_method' => strtoupper($paymentMethod), 'notes' => $notes,
+            'warehouse_id' => $warehouseId, 'device_id' => $deviceId, 'source' => $source,
+            'use_system_price' => $useSystemPrice,
+            'goods_picked_up_at' => $goodsPickedUpAt instanceof \DateTimeInterface ? $goodsPickedUpAt->format(DATE_ATOM) : $goodsPickedUpAt,
+        ];
+        $replay = $this->transactionalOperationService->replay($operationId, 'CREATE_SALE', $operationPayload, $userId);
+        if ($replay !== null) {
+            return Sale::with(['items.variant.product', 'items.variant.volume', 'customer', 'cashAccount'])->findOrFail($replay['sale_id']);
+        }
+        if ($paidAmount < 0) {
+            throw new OperationValidationException($operationId, 'To‘lov manfiy bo‘lishi mumkin emas.', errorCode: 'INVALID_PAYMENT_AMOUNT');
+        }
+
         // 1. Savat bo'sh emasligini tekshirish
         if (empty($items)) {
             throw new OperationValidationException(
@@ -106,7 +128,7 @@ class CreateSaleService
             }
 
             // Kasr dona va noldan kichik miqdor taqiqlangan (Faqat butun musbat dona!)
-            if (! is_numeric($rawQty) || (int) $rawQty != $rawQty || (int) $rawQty <= 0) {
+            if (! is_numeric($rawQty) || (int) $rawQty != $rawQty || (int) $rawQty <= 0 || $rawQty > InventoryLedgerService::MAX_QUANTITY) {
                 throw new OperationValidationException(
                     operationId: $operationId,
                     message: "Tovar miqdori 0 dan katta butun dona bo'lishi shart! Kasr dona bilan savdo taqiqlanadi. (Qator #".($index + 1).')',
@@ -143,7 +165,7 @@ class CreateSaleService
                 $unitPrice = (int) $variant->default_sale_price;
             } else {
                 $rawPrice = $item['sale_price'] ?? $item['unit_price'] ?? 0;
-                if (! is_numeric($rawPrice) || (int) $rawPrice <= 0) {
+                if (! is_numeric($rawPrice) || (int) $rawPrice != $rawPrice || (int) $rawPrice <= 0 || $rawPrice > PHP_INT_MAX) {
                     throw new OperationValidationException(
                         operationId: $operationId,
                         message: "Tovar narxi 0 dan katta butun so'm bo'lishi shart! Manfiy yoki nol narxda savdo taqiqlanadi. (Qator #".($index + 1).')',
@@ -153,11 +175,17 @@ class CreateSaleService
                 $unitPrice = (int) $rawPrice;
             }
 
+            if ($unitPrice > intdiv(PHP_INT_MAX - $totalAmount, $qty)) {
+                throw new OperationValidationException($operationId, 'Savdo summasi ruxsat etilgan chegaradan oshdi.', errorCode: 'AMOUNT_OVERFLOW');
+            }
             $lineTotal = $qty * $unitPrice;
             $totalAmount += $lineTotal;
 
             // Takroriy qatorlar bo'yicha jami donani jamlash
             $aggregateQtyByVariant[$variantId] = ($aggregateQtyByVariant[$variantId] ?? 0) + $qty;
+            if ($aggregateQtyByVariant[$variantId] > InventoryLedgerService::MAX_QUANTITY) {
+                throw new OperationValidationException($operationId, 'Jami dona ruxsat etilgan chegaradan oshdi.', errorCode: 'INVALID_QUANTITY');
+            }
 
             $validatedItems[] = [
                 'variant' => $variant,
@@ -202,10 +230,6 @@ class CreateSaleService
                 );
             }
 
-            if ($paidAmount < 0) {
-                $paidAmount = 0;
-            }
-
             $debtAmount = max(0, $totalAmount - $paidAmount);
             if ($paidAmount >= $totalAmount) {
                 $resolvedPaymentType = 'FULL';
@@ -232,25 +256,7 @@ class CreateSaleService
             $cashAccountId = $defaultCash->id;
         }
 
-        // Kanonik payload (Idempotency tekshiruvi uchun)
-        $operationPayload = $rawPayload ?? [
-            'type' => 'SALE',
-            'customer_id' => $customerId,
-            'items' => array_map(fn ($it) => [
-                'variant_id' => $it['variant_id'],
-                'quantity' => $it['quantity'],
-                'sale_price' => $it['sale_price'],
-                'is_system_price' => $it['is_system_price'],
-            ], $validatedItems),
-            'total_amount' => $totalAmount,
-            'paid_amount' => $paidAmount,
-            'debt_amount' => $debtAmount,
-            'cash_account_id' => $cashAccountId,
-            'payment_method' => strtoupper($paymentMethod),
-            'warehouse_id' => $warehouseId,
-            'device_id' => $deviceId,
-            'source' => $source,
-        ];
+        ksort($aggregateQtyByVariant);
 
         // 5. TransactionalOperationService orqali atomik bajarish
         $resultData = $this->transactionalOperationService->execute(
@@ -277,6 +283,11 @@ class CreateSaleService
                 $deviceId
             ) {
                 $actualWarehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
+
+                // Serialize credit checks with customer sales, payments and allocation grants.
+                if ($customerId) {
+                    $customer = Customer::whereKey($customerId)->lockForUpdate()->firstOrFail();
+                }
 
                 // 5.1. Concurrency stock lock va Rezerv tekshiruvi:
                 // "Fizik qoldiq va sotish huquqi rezervi alohida: 100 dona PC60/phone30/free10."
@@ -599,28 +610,30 @@ class CreateSaleService
 
                 $sale->update(['receipt_data' => $receiptData]);
 
-                // 5.8. Telegram broadcast
-                try {
-                    $telegramItems = array_map(fn ($it) => [
-                        'name' => $it['product_name'],
-                        'litres' => $it['volume_name'],
-                        'quantity' => $it['quantity'],
-                        'unit_price' => $it['sale_price'],
-                        'is_system_price' => true,
-                    ], $itemsRecorded);
+                // Send only after the outermost transaction has committed.
+                DB::afterCommit(function () use ($itemsRecorded, $customer, $totalAmount, $saleTotalCost, $netGrossProfit, $resolvedPaymentType, $source) {
+                    try {
+                        $telegramItems = array_map(fn ($it) => [
+                            'name' => $it['product_name'],
+                            'litres' => $it['volume_name'],
+                            'quantity' => $it['quantity'],
+                            'unit_price' => $it['sale_price'],
+                            'is_system_price' => true,
+                        ], $itemsRecorded);
 
-                    $this->telegram->notifySale(
-                        customer: $customer ? $customer->name : 'Tezkor savdo (Naqd)',
-                        items: $telegramItems,
-                        totalRetail: $totalAmount,
-                        totalCost: $saleTotalCost,
-                        netProfit: $netGrossProfit,
-                        paymentType: strtolower($resolvedPaymentType),
-                        source: $source
-                    );
-                } catch (\Throwable $e) {
-                    // Telegram bildirishnomasi xatosi asosiy tranzaksiyani to'xtatmaydi
-                }
+                        $this->telegram->notifySale(
+                            customer: $customer ? $customer->name : 'Tezkor savdo (Naqd)',
+                            items: $telegramItems,
+                            totalRetail: $totalAmount,
+                            totalCost: $saleTotalCost,
+                            netProfit: $netGrossProfit,
+                            paymentType: strtolower($resolvedPaymentType),
+                            source: $source
+                        );
+                    } catch (\Throwable $e) {
+                        // Telegram bildirishnomasi xatosi asosiy tranzaksiyani to'xtatmaydi
+                    }
+                });
 
                 return [
                     'sale_id' => $sale->id,
@@ -638,6 +651,7 @@ class CreateSaleService
                 ];
             },
             actorId: $userId,
+            deviceId: $deviceId ? (string) $deviceId : null,
             source: $source
         );
 

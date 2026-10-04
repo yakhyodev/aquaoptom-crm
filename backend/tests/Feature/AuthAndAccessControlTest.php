@@ -26,6 +26,13 @@ class AuthAndAccessControlTest extends TestCase
         $this->seed(RoleAndPermissionSeeder::class);
     }
 
+    public function test_audit_warehouse_role_cannot_post_sales(): void
+    {
+        $warehouseUser = User::factory()->create(['role' => 'WAREHOUSE_MANAGER']);
+        $this->actingAs($warehouseUser, 'sanctum')->postJson('/api/sales', [])->assertForbidden();
+        $this->assertDatabaseCount('sales', 0);
+    }
+
     /**
      * TEST 1: Anonymous users are redirected to /login on all protected web routes.
      */

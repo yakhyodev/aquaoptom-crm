@@ -183,6 +183,44 @@ export class AquaDB {
      * 5. `cart_draft` qoralama savatini tozalash
      * Barchasi BITTA tranzaksiyada! Storage failure bo'lsa, hech narsa saqlanmaydi!
      */
+    async applyBootstrap(snapshot) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['device_lease', 'stock_allocations', 'credit_allocations', 'catalog', 'customers', 'meta', 'sync_outbox'], 'readwrite');
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(new Error('Avval saqlangan offline amallarni sinxronlang yoki tekshiruvini yakunlang.'));
+            tx.onerror = () => reject(tx.error || new Error('Bootstrap saqlanmadi.'));
+            const pending = tx.objectStore('sync_outbox').getAll();
+            pending.onsuccess = () => {
+                if (pending.result.some(row => !['ACKNOWLEDGED', 'APPLIED', 'SUCCESS', 'RETRY_SUCCESS'].includes(row.status))) {
+                    tx.abort();
+                    return;
+                }
+                const warehouse = snapshot.warehouse || {};
+                tx.objectStore('device_lease').put({key: 'current', device_id: snapshot.device.id,
+                    device_code: snapshot.device.device_code, device_uuid: snapshot.device.device_uuid,
+                    warehouse_id: warehouse.id, warehouse_name: warehouse.name,
+                    lease_token: snapshot.lease.lease_token, signature: snapshot.lease.signature,
+                    valid_from: snapshot.lease.valid_from, expires_at: snapshot.lease.expires_at,
+                    permissions: snapshot.lease.permissions || []});
+                const stocks = tx.objectStore('stock_allocations');
+                const credits = tx.objectStore('credit_allocations');
+                const catalog = tx.objectStore('catalog');
+                stocks.clear(); credits.clear(); catalog.clear();
+                for (const row of snapshot.stock_allocations || []) {
+                    stocks.put({...row, product_variant_id: row.variant_id});
+                }
+                for (const row of snapshot.credit_allocations || []) {
+                    credits.put({...row, allocated_credit: row.allocated_amount,
+                        consumed_credit: row.consumed_amount, available_credit: row.available_amount});
+                }
+                for (const row of snapshot.catalog || []) catalog.put(row);
+                for (const row of snapshot.customers || []) tx.objectStore('customers').put({...row, is_local: false});
+                tx.objectStore('meta').put({key: 'last_cursor', value: snapshot.current_cursor || 0});
+            };
+        });
+    }
+
     async executeSaleTransaction({
         operationId,
         items,
@@ -196,6 +234,20 @@ export class AquaDB {
         notes = '',
         receiptData = {}
     }) {
+        const totals = items.map(item => Number(item.quantity) * Number(item.sale_price));
+        if (items.some(item => !Number.isSafeInteger(Number(item.quantity)) || Number(item.quantity) <= 0
+            || !Number.isSafeInteger(Number(item.sale_price)) || Number(item.sale_price) <= 0)
+            || totals.some(value => !Number.isSafeInteger(value))
+            || !Number.isSafeInteger(totalAmount) || totals.reduce((sum, value) => sum + value, 0) !== totalAmount
+            || !Number.isSafeInteger(paidAmount) || paidAmount < 0 || paidAmount > totalAmount
+            || debtAmount !== totalAmount - paidAmount || (debtAmount > 0 && !customerId && !customerUuid)) {
+            throw new Error('Dona va so‘m butun musbat son bo‘lishi, savdo va to‘lov summalari mos kelishi shart.');
+        }
+        const stockItems = Object.values(items.reduce((map, item) => {
+            const id = item.variant_id;
+            map[id] = {...item, quantity: (map[id]?.quantity || 0) + Number(item.quantity)};
+            return map;
+        }, {}));
         const db = await this.open();
 
         return new Promise((resolve, reject) => {
@@ -238,13 +290,13 @@ export class AquaDB {
 
             // 1. Tovar ajratmalarini (quota) birma-bir tekshiramiz va yangilaymiz
             let itemsChecked = 0;
-            const totalItemsCount = items.length;
+            const totalItemsCount = stockItems.length;
 
             if (totalItemsCount === 0) {
                 return abort("Savat bo'sh! Savdo qilish uchun mahsulot tanlang.");
             }
 
-            for (const item of items) {
+            for (const item of stockItems) {
                 const variantId = parseInt(item.variant_id);
                 const reqQty = parseInt(item.quantity);
 

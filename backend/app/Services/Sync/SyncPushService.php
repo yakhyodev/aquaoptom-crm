@@ -13,6 +13,7 @@ use App\Models\OperationResult;
 use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\SyncConflict;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\Devices\Exceptions\DeviceRevokedException;
 use App\Services\Devices\Exceptions\LeaseExpiredException;
@@ -25,6 +26,7 @@ use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Operations\PayloadFingerprint;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Sales\CreateSaleService;
+use App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -50,13 +52,14 @@ class SyncPushService
      */
     public function pushBatch(Device $device, User $user, array $operations, ?string $leaseToken = null, bool $isReconciliation = false): array
     {
+        abort_unless($user->isActive() && ($device->assigned_user_id === $user->id || $user->hasRole(['OWNER', 'ADMIN'])), 403);
         if (! $isReconciliation) {
-            $recoveryStatus = \App\Models\SystemSetting::get('system_recovery_status', 'NORMAL');
+            $recoveryStatus = SystemSetting::get('system_recovery_status', 'NORMAL');
             if ($recoveryStatus === 'RECONCILIATION_REQUIRED') {
-                $recoveryEpoch = (int) \App\Models\SystemSetting::get('system_recovery_epoch', 1);
-                $recoveryWatermark = \App\Models\SystemSetting::get('system_recovery_watermark', null);
+                $recoveryEpoch = (int) SystemSetting::get('system_recovery_epoch', 1);
+                $recoveryWatermark = SystemSetting::get('system_recovery_watermark', null);
 
-                throw new \App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException(
+                throw new RecoveryReconciliationRequiredException(
                     "Tizim zaxiradan tiklangan (Recovery Epoch: {$recoveryEpoch}). Oddiy sinxronizatsiya vaqtincha to'xtatildi. Iltimos, /api/sync/reconcile-recovery orqali amallarni muvofiqlashtiring.",
                     $recoveryEpoch,
                     $recoveryWatermark
@@ -81,7 +84,10 @@ class SyncPushService
             // 1. Idempotentsiya tekshiruvi: timeout yoki qayta yuborish
             $existingOp = OperationResult::where('operation_id', $opId)->first();
             if ($existingOp) {
-                if ($existingOp->payload_fingerprint === $canonicalFingerprint) {
+                if ($existingOp->payload_fingerprint === $canonicalFingerprint
+                    && $existingOp->operation_type === $type
+                    && (int) $existingOp->actor_id === $user->id
+                    && (int) $existingOp->device_id === $device->id) {
                     $resPayload = $existingOp->result_payload ?: [];
                     $results[] = [
                         'operation_id' => $opId,
@@ -148,6 +154,12 @@ class SyncPushService
             // 3. Har bir operatsiyani mustaqil tranzaksiyada bajarish (Per-item transaction)
             DB::beginTransaction();
             try {
+                if (! Str::isUuid($opId)) {
+                    throw new OperationValidationException($opId, 'Barqaror UUID talab qilinadi.', errorCode: 'INVALID_OPERATION_ID');
+                }
+                if (! $user->hasPermission('offline_sales')) {
+                    throw new OperationValidationException($opId, 'Offline savdoga ruxsat yo‘q.', errorCode: 'PERMISSION_DENIED');
+                }
                 if ($type === 'CREATE_CUSTOMER') {
                     $res = $this->handleCreateCustomer($device, $user, $opId, $payload, $canonicalFingerprint, $deviceCreatedAt, $receivedAt);
                 } elseif ($type === 'CREATE_SALE') {
@@ -168,7 +180,10 @@ class SyncPushService
                 $errorCode = $e instanceof OperationException
                     ? $e->getErrorCode()
                     : (method_exists($e, 'getErrorCode') ? $e->getErrorCode() : ($e->errorCode ?? ($e->getCode() ?: 'OPERATION_FAILED')));
-                $errorMsg = $e->getMessage();
+                $errorMsg = $e instanceof OperationException || $e instanceof \InvalidArgumentException
+                    || $e instanceof InsufficientAllocationException || $e instanceof InsufficientCreditAllocationException
+                    || $e instanceof DeviceRevokedException || $e instanceof LeaseExpiredException
+                    ? $e->getMessage() : 'Operatsiyani bajarishda ichki xatolik yuz berdi.';
 
                 // NEEDS_REVIEW toifasidagi xatolar:
                 // Late closed session, lease/limit/mapping xatosi NEEDS_REVIEW; yozuv tashlab yuborilmaydi!
@@ -244,7 +259,7 @@ class SyncPushService
             'last_ip_address' => request()->ip(),
         ]);
 
-        return $results;
+        return $user->hasPermission('view_cost_price') ? $results : $this->changeLogService->maskSensitiveFields($results);
     }
 
     /**
@@ -359,8 +374,8 @@ class SyncPushService
     ): array {
         // 1. Mijoz bog'liqligini aniqlash (Customer Dependency)
         $customerId = null;
-        if (! empty($payload['customer_client_uuid'])) {
-            $clientUuid = (string) $payload['customer_client_uuid'];
+        if (! empty($payload['customer_client_uuid']) || ! empty($payload['customer_uuid'])) {
+            $clientUuid = (string) ($payload['customer_client_uuid'] ?? $payload['customer_uuid']);
             $cust = Str::isUuid($clientUuid) ? Customer::where('uuid', $clientUuid)->first() : null;
             if (! $cust) {
                 throw new OperationValidationException(
@@ -451,12 +466,12 @@ class SyncPushService
             if (! $variantId) {
                 throw new \InvalidArgumentException("Har bir qatorda variant_id yoki product_variant_id ko'rsatilishi shart!");
             }
-            $qty = (int) $item['quantity'];
+            $qty = $item['quantity'] ?? 0;
             $variant = ProductVariant::findOrFail($variantId);
 
             $agreedPrice = isset($item['sale_price'])
-                ? (int) $item['sale_price']
-                : (int) ($item['unit_price'] ?? $variant->default_sale_price);
+                ? $item['sale_price']
+                : ($item['unit_price'] ?? $variant->default_sale_price);
 
             if ((int) $variant->default_sale_price !== $agreedPrice) {
                 $staleNotes[] = "Variant #{$variantId} ({$variant->sku}): offline narx {$agreedPrice} so'm saqlandi (server joriy: {$variant->default_sale_price} so'm)";

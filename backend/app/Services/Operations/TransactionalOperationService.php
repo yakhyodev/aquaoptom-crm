@@ -58,7 +58,7 @@ class TransactionalOperationService
         // 3. Tranzaksiyadan tashqarida tezkor idempotent tekshiruv (Read-cache / fast path)
         $existing = OperationResult::where('operation_id', $operationId)->first();
         if ($existing) {
-            if ($existing->payload_fingerprint === $fingerprint) {
+            if ($this->matches($existing, $fingerprint, $operationType, $actorId)) {
                 // Aynan shu ID va shu ma'lumot — eski natijani darhol qaytaramiz (Idempotent 200 OK)
                 return $existing->result_payload ?? [];
             }
@@ -93,7 +93,7 @@ class TransactionalOperationService
                 // Lockni olgach, takroran tekshiramiz (boshqa parallel oqim commit qilgan bo'lishi mumkin)
                 $lockedExisting = OperationResult::where('operation_id', $operationId)->first();
                 if ($lockedExisting) {
-                    if ($lockedExisting->payload_fingerprint === $fingerprint) {
+                    if ($this->matches($lockedExisting, $fingerprint, $operationType, $actorId)) {
                         return $lockedExisting->result_payload ?? [];
                     }
 
@@ -157,7 +157,7 @@ class TransactionalOperationService
         } catch (UniqueConstraintViolationException $e) {
             // Agar locksiz DB unikal cheklovi ishga tushgan bo'lsa (concurrency race)
             $racing = OperationResult::where('operation_id', $operationId)->first();
-            if ($racing && $racing->payload_fingerprint === $fingerprint) {
+            if ($racing && $this->matches($racing, $fingerprint, $operationType, $actorId)) {
                 return $racing->result_payload ?? [];
             }
 
@@ -172,7 +172,7 @@ class TransactionalOperationService
             }
 
             // Raw SQL xatoliklarini yashiramiz, sir chiqib ketmasligi uchun
-            Log::error('TransactionalOperationService QueryException: '.$e->getMessage());
+            Log::error('Operation database constraint failed.', ['operation_id' => $operationId, 'sql_state' => $e->getCode()]);
             throw new OperationValidationException(
                 operationId: $operationId,
                 message: 'Ma\'lumotlar bazasi cheklovi buzildi. Kiritilgan qiymatlarni tekshiring.',
@@ -184,14 +184,35 @@ class TransactionalOperationService
                 message: $e->getMessage()
             );
         } catch (Throwable $e) {
+            Log::error('Unexpected operation failure.', ['operation_id' => $operationId, 'exception_type' => $e::class]);
             // Barcha boshqa kutilmagan raw exceptionlar
             throw new OperationException(
                 operationId: $operationId,
                 errorCategory: 'needs_review',
                 errorCode: 'INTERNAL_OPERATION_ERROR',
-                message: $e->getMessage() ?: 'Operatsiyani bajarishda kutilmagan xatolik yuz berdi.',
+                message: 'Operatsiyani bajarishda kutilmagan xatolik yuz berdi.',
                 statusCode: 500
             );
         }
+    }
+
+    private function matches(OperationResult $result, string $fingerprint, string $operationType, ?int $actorId): bool
+    {
+        return $result->payload_fingerprint === $fingerprint
+            && $result->operation_type === $operationType
+            && ($result->actor_id === null ? null : (int) $result->actor_id) === $actorId;
+    }
+
+    public function replay(string $operationId, string $operationType, array $payload, ?int $actorId): ?array
+    {
+        $existing = OperationResult::where('operation_id', $operationId)->first();
+        if (! $existing) {
+            return null;
+        }
+        if (! $this->matches($existing, PayloadFingerprint::compute($payload), $operationType, $actorId)) {
+            throw new OperationConflictException(operationId: $operationId);
+        }
+
+        return $existing->result_payload ?? [];
     }
 }

@@ -43,7 +43,12 @@ void main() {
 
       // Backend PHP computes: 07f9f20bf995cc2e5ac5aec9353295186d34b2c5e979e15c0206ecd3362d294d
       final hash1 = PayloadFingerprint.compute(payload1);
-      expect(hash1, equals('07f9f20bf995cc2e5ac5aec9353295186d34b2c5e979e15c0206ecd3362d294d'));
+      expect(
+        hash1,
+        equals(
+          '07f9f20bf995cc2e5ac5aec9353295186d34b2c5e979e15c0206ecd3362d294d',
+        ),
+      );
 
       // payload2 with different key ordering, string spaces, and transport keys
       final payload2 = {
@@ -63,7 +68,10 @@ void main() {
     test('Floating point values are canonicalized up to 4 decimal places', () {
       final p1 = {'price': 15000.50000001};
       final p2 = {'price': 15000.5};
-      expect(PayloadFingerprint.compute(p1), equals(PayloadFingerprint.compute(p2)));
+      expect(
+        PayloadFingerprint.compute(p1),
+        equals(PayloadFingerprint.compute(p2)),
+      );
     });
   });
 
@@ -123,28 +131,37 @@ void main() {
       await testDb.close();
     });
 
-    test('Migration v1 -> v2 preserves pending sync_queue rows without data loss', () async {
-      // 1. v1 holatida navbatga yozuv kiritamiz
-      await testDb.insert('sync_queue', {
-        'operation_id': 'op-preserve-1',
-        'user_id': 1,
-        'device_uuid': 'dev-1',
-        'type': 'CREATE_SALE',
-        'payload': json.encode({'total': 50000}),
-        'payload_fingerprint': 'dummy-hash',
-        'status': 'PENDING',
-        'device_created_at': DateTime.now().toUtc().toIso8601String(),
-      });
+    test(
+      'Migration v1 -> v2 preserves pending sync_queue rows without data loss',
+      () async {
+        // 1. v1 holatida navbatga yozuv kiritamiz
+        await testDb.insert('sync_queue', {
+          'operation_id': 'op-preserve-1',
+          'user_id': 1,
+          'device_uuid': 'dev-1',
+          'type': 'CREATE_SALE',
+          'payload': json.encode({'total': 50000}),
+          'payload_fingerprint': 'dummy-hash',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+        });
 
-      // 2. v2 ga migratsiya qilamiz (indekslar qo'shish)
-      await testDb.execute('CREATE INDEX IF NOT EXISTS idx_sync_queue_user_status ON sync_queue (user_id, status)');
+        // 2. v2 ga migratsiya qilamiz (indekslar qo'shish)
+        await testDb.execute(
+          'CREATE INDEX IF NOT EXISTS idx_sync_queue_user_status ON sync_queue (user_id, status)',
+        );
 
-      // 3. Tekshiramiz: navbatdagi element saqlanib qolganmi?
-      final rows = await testDb.query('sync_queue', where: 'operation_id = ?', whereArgs: ['op-preserve-1']);
-      expect(rows.length, equals(1));
-      expect(rows.first['status'], equals('PENDING'));
-      expect(rows.first['user_id'], equals(1));
-    });
+        // 3. Tekshiramiz: navbatdagi element saqlanib qolganmi?
+        final rows = await testDb.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: ['op-preserve-1'],
+        );
+        expect(rows.length, equals(1));
+        expect(rows.first['status'], equals('PENDING'));
+        expect(rows.first['user_id'], equals(1));
+      },
+    );
   });
 
   group('3. Offline Sales Service: Stock Allocation & Atomic Confirm', () {
@@ -275,8 +292,14 @@ void main() {
         'device_uuid': 'dev-test-123',
         'user_id': testUserA.id,
         'lease_token': 'lease-token-abc',
-        'valid_from': DateTime.now().subtract(const Duration(hours: 1)).toUtc().toIso8601String(),
-        'expires_at': DateTime.now().add(const Duration(hours: 23)).toUtc().toIso8601String(),
+        'valid_from': DateTime.now()
+            .subtract(const Duration(hours: 1))
+            .toUtc()
+            .toIso8601String(),
+        'expires_at': DateTime.now()
+            .add(const Duration(hours: 23))
+            .toUtc()
+            .toIso8601String(),
         'permissions': json.encode(['sell_products', 'create_customer']),
         'epoch': 1,
         'is_active': 1,
@@ -326,78 +349,104 @@ void main() {
       AppDatabase.setTestDatabase(null);
     });
 
-    test('confirmSaleOffline deducts stock allocation and creates sync_queue row', () async {
-      final result = await salesService.confirmSaleOffline(
-        items: [
-          {'variant_id': 101, 'quantity': 10, 'sale_price': 10000},
-        ],
-        paymentType: 'CASH',
-        paymentMethod: 'CASH',
-        paidAmount: 100000,
-        user: testUserA,
-      );
-
-      expect(result.totalAmount, equals(100000));
-      expect(result.paidAmount, equals(100000));
-      expect(result.debtAmount, equals(0));
-      expect(result.tempInvoiceNumber.startsWith('#OFF-'), isTrue);
-
-      // Ombor ajratmasi 50 dan 40 ga tushgan bo'lishi kerak
-      final allocs = await db.query('stock_allocations', where: 'variant_id = 101');
-      expect(allocs.first['available_quantity'], equals(40));
-      expect(allocs.first['consumed_quantity'], equals(10));
-
-      // sync_queue ga PENDING yozuv kiritilgan bo'lishi kerak
-      final queueRows = await db.query('sync_queue', where: 'operation_id = ?', whereArgs: [result.operationId]);
-      expect(queueRows.length, equals(1));
-      expect(queueRows.first['status'], equals('PENDING'));
-      expect(queueRows.first['user_id'], equals(testUserA.id));
-      expect(queueRows.first['type'], equals('CREATE_SALE'));
-    });
-
-    test('Throws ValidationException if selling more than available stock allocation', () async {
-      expect(
-        () async => await salesService.confirmSaleOffline(
+    test(
+      'confirmSaleOffline deducts stock allocation and creates sync_queue row',
+      () async {
+        final result = await salesService.confirmSaleOffline(
           items: [
-            {'variant_id': 101, 'quantity': 60, 'sale_price': 10000}, // 60 > 50
+            {'variant_id': 101, 'quantity': 10, 'sale_price': 10000},
           ],
           paymentType: 'CASH',
           paymentMethod: 'CASH',
+          paidAmount: 100000,
           user: testUserA,
-        ),
-        throwsA(isA<ValidationException>()),
-      );
-    });
+        );
 
-    test('Debt sale deducts customer credit allocation and updates local customer debt', () async {
-      final result = await salesService.confirmSaleOffline(
-        items: [
-          {'variant_id': 101, 'quantity': 5, 'sale_price': 10000},
-        ],
-        customerId: 501,
-        paymentType: 'DEBT',
-        paymentMethod: 'DEBT',
-        paidAmount: 0,
-        user: testUserA,
-      );
+        expect(result.totalAmount, equals(100000));
+        expect(result.paidAmount, equals(100000));
+        expect(result.debtAmount, equals(0));
+        expect(result.tempInvoiceNumber.startsWith('#OFF-'), isTrue);
 
-      expect(result.totalAmount, equals(50000));
-      expect(result.debtAmount, equals(50000));
+        // Ombor ajratmasi 50 dan 40 ga tushgan bo'lishi kerak
+        final allocs = await db.query(
+          'stock_allocations',
+          where: 'variant_id = 101',
+        );
+        expect(allocs.first['available_quantity'], equals(40));
+        expect(allocs.first['consumed_quantity'], equals(10));
 
-      // Kredit ajratmasi 100,000 dan 50,000 ga tushgan
-      final creditRows = await db.query('credit_allocations', where: 'customer_id = 501');
-      expect(creditRows.first['available_amount'], equals(50000));
-      expect(creditRows.first['consumed_amount'], equals(50000));
+        // sync_queue ga PENDING yozuv kiritilgan bo'lishi kerak
+        final queueRows = await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: [result.operationId],
+        );
+        expect(queueRows.length, equals(1));
+        expect(queueRows.first['status'], equals('PENDING'));
+        expect(queueRows.first['user_id'], equals(testUserA.id));
+        expect(queueRows.first['type'], equals('CREATE_SALE'));
+      },
+    );
 
-      // Mijozning lokal qarzi oshgan
-      final custRows = await db.query('customers', where: 'id = 501');
-      expect(custRows.first['current_debt'], equals(50000));
-    });
+    test(
+      'Throws ValidationException if selling more than available stock allocation',
+      () async {
+        expect(
+          () async => await salesService.confirmSaleOffline(
+            items: [
+              {
+                'variant_id': 101,
+                'quantity': 60,
+                'sale_price': 10000,
+              }, // 60 > 50
+            ],
+            paymentType: 'CASH',
+            paymentMethod: 'CASH',
+            user: testUserA,
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+      },
+    );
+
+    test(
+      'Debt sale deducts customer credit allocation and updates local customer debt',
+      () async {
+        final result = await salesService.confirmSaleOffline(
+          items: [
+            {'variant_id': 101, 'quantity': 5, 'sale_price': 10000},
+          ],
+          customerId: 501,
+          paymentType: 'DEBT',
+          paymentMethod: 'DEBT',
+          paidAmount: 0,
+          user: testUserA,
+        );
+
+        expect(result.totalAmount, equals(50000));
+        expect(result.debtAmount, equals(50000));
+
+        // Kredit ajratmasi 100,000 dan 50,000 ga tushgan
+        final creditRows = await db.query(
+          'credit_allocations',
+          where: 'customer_id = 501',
+        );
+        expect(creditRows.first['available_amount'], equals(50000));
+        expect(creditRows.first['consumed_amount'], equals(50000));
+
+        // Mijozning lokal qarzi oshgan
+        final custRows = await db.query('customers', where: 'id = 501');
+        expect(custRows.first['current_debt'], equals(50000));
+      },
+    );
 
     test('Throws ForbiddenException when offline lease is expired', () async {
       // Leaseni muddatidan o'tgan qilib o'zgartiramiz
       await db.update('offline_leases', {
-        'expires_at': DateTime.now().subtract(const Duration(minutes: 5)).toUtc().toIso8601String(),
+        'expires_at': DateTime.now()
+            .subtract(const Duration(minutes: 5))
+            .toUtc()
+            .toIso8601String(),
       });
 
       expect(
@@ -413,59 +462,83 @@ void main() {
       );
     });
 
-    test('voidSaleOffline creates linked correction without deleting original row', () async {
-      // 1. Savdo qilamiz
-      final sale = await salesService.confirmSaleOffline(
-        items: [
-          {'variant_id': 101, 'quantity': 5, 'sale_price': 10000},
-        ],
-        paymentType: 'CASH',
-        paymentMethod: 'CASH',
-        user: testUserA,
-      );
+    test(
+      'voidSaleOffline creates linked correction without deleting original row',
+      () async {
+        // 1. Savdo qilamiz
+        final sale = await salesService.confirmSaleOffline(
+          items: [
+            {'variant_id': 101, 'quantity': 5, 'sale_price': 10000},
+          ],
+          paymentType: 'CASH',
+          paymentMethod: 'CASH',
+          user: testUserA,
+        );
 
-      // Ombor qoldig'i 45
-      var alloc = (await db.query('stock_allocations', where: 'variant_id = 101')).first;
-      expect(alloc['available_quantity'], equals(45));
+        // Ombor qoldig'i 45
+        var alloc = (await db.query(
+          'stock_allocations',
+          where: 'variant_id = 101',
+        )).first;
+        expect(alloc['available_quantity'], equals(45));
 
-      // 2. Bekor qilamiz (void)
-      final voidOpId = await salesService.voidSaleOffline(
-        originalOperationId: sale.operationId,
-        reason: 'Xato chek',
-        user: testUserA,
-      );
+        // 2. Bekor qilamiz (void)
+        final voidOpId = await salesService.voidSaleOffline(
+          originalOperationId: sale.operationId,
+          reason: 'Xato chek',
+          user: testUserA,
+        );
 
-      // Original savdo navbatda saqlanib qolgan!
-      final origQueue = await db.query('sync_queue', where: 'operation_id = ?', whereArgs: [sale.operationId]);
-      expect(origQueue.length, equals(1));
+        // Original savdo navbatda saqlanib qolgan!
+        final origQueue = await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: [sale.operationId],
+        );
+        expect(origQueue.length, equals(1));
 
-      // Yangi VOID yozuvi navbatga kiritilgan
-      final voidQueue = await db.query('sync_queue', where: 'operation_id = ?', whereArgs: [voidOpId]);
-      expect(voidQueue.length, equals(1));
-      expect(voidQueue.first['type'], equals('VOID_SALE'));
+        // Yangi VOID yozuvi navbatga kiritilgan
+        final voidQueue = await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: [voidOpId],
+        );
+        expect(voidQueue.length, equals(1));
+        expect(voidQueue.first['type'], equals('VOID_SALE'));
 
-      // Ombor qoldig'i qayta tiklangan (45 + 5 = 50)
-      alloc = (await db.query('stock_allocations', where: 'variant_id = 101')).first;
-      expect(alloc['available_quantity'], equals(50));
-    });
+        // Ombor qoldig'i qayta tiklangan (45 + 5 = 50)
+        alloc = (await db.query(
+          'stock_allocations',
+          where: 'variant_id = 101',
+        )).first;
+        expect(alloc['available_quantity'], equals(50));
+      },
+    );
 
-    test('createCustomerOffline generates temp UUID and parent dependency queue item', () async {
-      final cust = await salesService.createCustomerOffline(
-        name: 'Sobirbek',
-        phone: '+998901234567',
-        storeName: 'Sobir Do\'koni',
-        debtLimit: 200000,
-        user: testUserA,
-      );
+    test(
+      'createCustomerOffline generates temp UUID and parent dependency queue item',
+      () async {
+        final cust = await salesService.createCustomerOffline(
+          name: 'Sobirbek',
+          phone: '+998901234567',
+          storeName: 'Sobir Do\'koni',
+          debtLimit: 200000,
+          user: testUserA,
+        );
 
-      expect(cust.uuid.isNotEmpty, isTrue);
-      expect(cust.name, equals('Sobirbek'));
+        expect(cust.uuid.isNotEmpty, isTrue);
+        expect(cust.name, equals('Sobirbek'));
 
-      // sync_queue ga CREATE_CUSTOMER yozilgan
-      final qRows = await db.query('sync_queue', where: 'type = ?', whereArgs: ['CREATE_CUSTOMER']);
-      expect(qRows.length, equals(1));
-      expect(qRows.first['status'], equals('PENDING'));
-    });
+        // sync_queue ga CREATE_CUSTOMER yozilgan
+        final qRows = await db.query(
+          'sync_queue',
+          where: 'type = ?',
+          whereArgs: ['CREATE_CUSTOMER'],
+        );
+        expect(qRows.length, equals(1));
+        expect(qRows.first['status'], equals('PENDING'));
+      },
+    );
   });
 
   group('4. OfflineSyncService: User Isolation, Idempotency & Conflict Resolution', () {
@@ -626,181 +699,318 @@ void main() {
       AppDatabase.setTestDatabase(null);
     });
 
-    test('User Isolation: Pending operations are isolated per user on user switch', () async {
-      // 1. User A navbatiga yozuv qo'shamiz
-      await db.insert('sync_queue', {
-        'operation_id': 'op-user-a',
-        'user_id': testUserA.id,
-        'device_uuid': 'dev-1',
-        'type': 'CREATE_SALE',
-        'payload': json.encode({'total': 30000}),
-        'payload_fingerprint': 'hash-a',
-        'status': 'PENDING',
-        'device_created_at': DateTime.now().toUtc().toIso8601String(),
-      });
+    test(
+      'User Isolation: Pending operations are isolated per user on user switch',
+      () async {
+        // 1. User A navbatiga yozuv qo'shamiz
+        await db.insert('sync_queue', {
+          'operation_id': 'op-user-a',
+          'user_id': testUserA.id,
+          'device_uuid': 'dev-1',
+          'type': 'CREATE_SALE',
+          'payload': json.encode({'total': 30000}),
+          'payload_fingerprint': 'hash-a',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+        });
 
-      // User A sifatida holatni ko'ramiz
-      SessionService().setSession(user: testUserA, token: 'token-a');
-      final syncService = OfflineSyncService(appDb: appDb);
-      var summary = await syncService.getStatusSummary();
-      expect(summary.pendingCount, equals(1));
+        // User A sifatida holatni ko'ramiz
+        SessionService().setSession(user: testUserA, token: 'token-a');
+        final syncService = OfflineSyncService(appDb: appDb);
+        var summary = await syncService.getStatusSummary();
+        expect(summary.pendingCount, equals(1));
 
-      // 2. User A chiqib, User B kiradi (User Switch)
-      SessionService().clearSession();
-      SessionService().setSession(user: testUserB, token: 'token-b');
+        // 2. User A chiqib, User B kiradi (User Switch)
+        SessionService().clearSession();
+        SessionService().setSession(user: testUserB, token: 'token-b');
 
-      summary = await syncService.getStatusSummary();
-      // User B uchun navbat bo'sh (0 ta)
-      expect(summary.pendingCount, equals(0));
+        summary = await syncService.getStatusSummary();
+        // User B uchun navbat bo'sh (0 ta)
+        expect(summary.pendingCount, equals(0));
 
-      // User B push qilsa, 0 ta amal yuboriladi
-      final pushedCount = await syncService.pushPendingOperations(deviceUuid: 'dev-1');
-      expect(pushedCount, equals(0));
+        // User B push qilsa, 0 ta amal yuboriladi
+        final pushedCount = await syncService.pushPendingOperations(
+          deviceUuid: 'dev-1',
+        );
+        expect(pushedCount, equals(0));
 
-      // User A ning yozuvi tegilmasdan saqlanib qolgan
-      final aRow = (await db.query('sync_queue', where: 'operation_id = ?', whereArgs: ['op-user-a'])).first;
-      expect(aRow['status'], equals('PENDING'));
-      expect(aRow['user_id'], equals(testUserA.id));
-    });
+        // User A ning yozuvi tegilmasdan saqlanib qolgan
+        final aRow = (await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: ['op-user-a'],
+        )).first;
+        expect(aRow['status'], equals('PENDING'));
+        expect(aRow['user_id'], equals(testUserA.id));
+      },
+    );
 
-    test('Push handles ACK, updates server document number, and retains ACK payload', () async {
-      SessionService().setSession(user: testUserA, token: 'token-a');
+    test(
+      'Push handles ACK, updates server document number, and retains ACK payload',
+      () async {
+        SessionService().setSession(user: testUserA, token: 'token-a');
 
-      await db.insert('sync_queue', {
-        'operation_id': 'op-ack-test',
-        'user_id': testUserA.id,
-        'device_uuid': 'dev-1',
-        'type': 'CREATE_SALE',
-        'payload': json.encode({'total': 45000}),
-        'payload_fingerprint': 'hash-ack',
-        'status': 'PENDING',
-        'device_created_at': DateTime.now().toUtc().toIso8601String(),
-        'lease_token': 'lease-tok',
-      });
+        await db.insert('sync_queue', {
+          'operation_id': 'op-ack-test',
+          'user_id': testUserA.id,
+          'device_uuid': 'dev-1',
+          'type': 'CREATE_SALE',
+          'payload': json.encode({'total': 45000}),
+          'payload_fingerprint': 'hash-ack',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+          'lease_token': 'lease-tok',
+        });
 
-      final mockClient = MockClient((request) async {
-        if (request.url.path.contains('/sync/push')) {
+        final mockClient = MockClient((request) async {
+          if (request.url.path.contains('/sync/push')) {
+            return http.Response(
+              json.encode({
+                'results': [
+                  {
+                    'operation_id': 'op-ack-test',
+                    'status': 'APPLIED',
+                    'server_document_id': 999,
+                    'server_document_number': 'INV-2026-00999',
+                    'message': 'Muvaffaqiyatli qabul qilindi',
+                  },
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('Not found', 404);
+        });
+
+        final syncService = OfflineSyncService(
+          appDb: appDb,
+          client: mockClient,
+        );
+        final count = await syncService.pushPendingOperations(
+          deviceUuid: 'dev-1',
+        );
+        expect(count, equals(1));
+
+        // Baza tekshiruvi: status ACKNOWLEDGED, server_document_number to'ldirilgan, navbatdan o'chirilmagan!
+        final row = (await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: ['op-ack-test'],
+        )).first;
+        expect(row['status'], equals('ACKNOWLEDGED'));
+        expect(row['server_document_id'], equals(999));
+        expect(row['server_document_number'], equals('INV-2026-00999'));
+        expect(row['ack_payload'], contains('INV-2026-00999'));
+      },
+    );
+
+    test(
+      'Push handles NEEDS_REVIEW error classification without queue deletion',
+      () async {
+        SessionService().setSession(user: testUserA, token: 'token-a');
+
+        await db.insert('sync_queue', {
+          'operation_id': 'op-review-test',
+          'user_id': testUserA.id,
+          'device_uuid': 'dev-1',
+          'type': 'CREATE_SALE',
+          'payload': json.encode({'total': 90000}),
+          'payload_fingerprint': 'hash-rev',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+          'lease_token': 'lease-tok',
+        });
+
+        final mockClient = MockClient((request) async {
+          if (request.url.path.contains('/sync/push')) {
+            return http.Response(
+              json.encode({
+                'results': [
+                  {
+                    'operation_id': 'op-review-test',
+                    'status': 'NEEDS_REVIEW',
+                    'error_code': 'INSUFFICIENT_STOCK_SERVER',
+                    'message':
+                        'Serverda ombor kamomadi aniqlandi, menejer ko\'rib chiqishi shart',
+                  },
+                ],
+              }),
+              200,
+              headers: {'content-type': 'application/json'},
+            );
+          }
+          return http.Response('Not found', 404);
+        });
+
+        final syncService = OfflineSyncService(
+          appDb: appDb,
+          client: mockClient,
+        );
+        final count = await syncService.pushPendingOperations(
+          deviceUuid: 'dev-1',
+        );
+        expect(count, equals(1));
+
+        // Baza tekshiruvi: status NEEDS_REVIEW, xatolik kodi saqlangan
+        final row = (await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: ['op-review-test'],
+        )).first;
+        expect(row['status'], equals('NEEDS_REVIEW'));
+        expect(row['error_code'], equals('INSUFFICIENT_STOCK_SERVER'));
+        expect(
+          row['error_message'],
+          contains('menejer ko\'rib chiqishi shart'),
+        );
+      },
+    );
+
+    test(
+      'Duplicate-worker & Idempotent retry yields identical single operation without duplication',
+      () async {
+        SessionService().setSession(user: testUserA, token: 'token-a');
+
+        final opId = 'op-replay-${OperationId.generate()}';
+        await db.insert('sync_queue', {
+          'operation_id': opId,
+          'user_id': testUserA.id,
+          'device_uuid': 'dev-1',
+          'type': 'CREATE_SALE',
+          'payload': json.encode({'total': 70000}),
+          'payload_fingerprint': 'hash-replay-123',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+          'lease_token': 'lease-tok',
+        });
+
+        // Server RETRY_SUCCESS qaytaradi (avval qabul qilingan)
+        final mockClient = MockClient((request) async {
           return http.Response(
             json.encode({
               'results': [
                 {
-                  'operation_id': 'op-ack-test',
-                  'status': 'SUCCESS',
-                  'server_document_id': 999,
-                  'server_document_number': 'INV-2026-00999',
-                  'message': 'Muvaffaqiyatli qabul qilindi',
-                }
-              ]
+                  'operation_id': opId,
+                  'status': 'RETRY_SUCCESS',
+                  'is_replay': true,
+                  'server_document_id': 1050,
+                  'server_document_number': 'INV-2026-01050',
+                  'message': 'Operatsiya avval bajarilgan (Idempotent replay).',
+                },
+              ],
             }),
             200,
             headers: {'content-type': 'application/json'},
           );
-        }
-        return http.Response('Not found', 404);
-      });
+        });
 
-      final syncService = OfflineSyncService(appDb: appDb, client: mockClient);
-      final count = await syncService.pushPendingOperations(deviceUuid: 'dev-1');
-      expect(count, equals(1));
+        final syncService = OfflineSyncService(
+          appDb: appDb,
+          client: mockClient,
+        );
+        await syncService.pushPendingOperations(deviceUuid: 'dev-1');
 
-      // Baza tekshiruvi: status ACKNOWLEDGED, server_document_number to'ldirilgan, navbatdan o'chirilmagan!
-      final row = (await db.query('sync_queue', where: 'operation_id = ?', whereArgs: ['op-ack-test'])).first;
-      expect(row['status'], equals('ACKNOWLEDGED'));
-      expect(row['server_document_id'], equals(999));
-      expect(row['server_document_number'], equals('INV-2026-00999'));
-      expect(row['ack_payload'], contains('INV-2026-00999'));
-    });
-
-    test('Push handles NEEDS_REVIEW error classification without queue deletion', () async {
-      SessionService().setSession(user: testUserA, token: 'token-a');
-
-      await db.insert('sync_queue', {
-        'operation_id': 'op-review-test',
-        'user_id': testUserA.id,
-        'device_uuid': 'dev-1',
-        'type': 'CREATE_SALE',
-        'payload': json.encode({'total': 90000}),
-        'payload_fingerprint': 'hash-rev',
-        'status': 'PENDING',
-        'device_created_at': DateTime.now().toUtc().toIso8601String(),
-        'lease_token': 'lease-tok',
-      });
-
-      final mockClient = MockClient((request) async {
-        if (request.url.path.contains('/sync/push')) {
-          return http.Response(
-            json.encode({
-              'results': [
-                {
-                  'operation_id': 'op-review-test',
-                  'status': 'NEEDS_REVIEW',
-                  'error_code': 'INSUFFICIENT_STOCK_SERVER',
-                  'message': 'Serverda ombor kamomadi aniqlandi, menejer ko\'rib chiqishi shart',
-                }
-              ]
-            }),
-            200,
-            headers: {'content-type': 'application/json'},
-          );
-        }
-        return http.Response('Not found', 404);
-      });
-
-      final syncService = OfflineSyncService(appDb: appDb, client: mockClient);
-      final count = await syncService.pushPendingOperations(deviceUuid: 'dev-1');
-      expect(count, equals(1));
-
-      // Baza tekshiruvi: status NEEDS_REVIEW, xatolik kodi saqlangan
-      final row = (await db.query('sync_queue', where: 'operation_id = ?', whereArgs: ['op-review-test'])).first;
-      expect(row['status'], equals('NEEDS_REVIEW'));
-      expect(row['error_code'], equals('INSUFFICIENT_STOCK_SERVER'));
-      expect(row['error_message'], contains('menejer ko\'rib chiqishi shart'));
-    });
-
-    test('Duplicate-worker & Idempotent retry yields identical single operation without duplication', () async {
-      SessionService().setSession(user: testUserA, token: 'token-a');
-
-      final opId = 'op-replay-${OperationId.generate()}';
-      await db.insert('sync_queue', {
-        'operation_id': opId,
-        'user_id': testUserA.id,
-        'device_uuid': 'dev-1',
-        'type': 'CREATE_SALE',
-        'payload': json.encode({'total': 70000}),
-        'payload_fingerprint': 'hash-replay-123',
-        'status': 'PENDING',
-        'device_created_at': DateTime.now().toUtc().toIso8601String(),
-        'lease_token': 'lease-tok',
-      });
-
-      // Server RETRY_SUCCESS qaytaradi (avval qabul qilingan)
-      final mockClient = MockClient((request) async {
-        return http.Response(
+        final rows = await db.query(
+          'sync_queue',
+          where: 'operation_id = ?',
+          whereArgs: [opId],
+        );
+        // Qatorda dublikat yo'q (aniq 1 ta yozuv)
+        expect(rows.length, equals(1));
+        expect(rows.first['status'], equals('ACKNOWLEDGED'));
+        expect(rows.first['server_document_number'], equals('INV-2026-01050'));
+      },
+    );
+  });
+  test(
+    'Audit: real bootstrap catalog and pending allocation protection',
+    () async {
+      final db = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: AppDatabase.createSchema,
+        ),
+      );
+      AppDatabase.setTestDatabase(db);
+      SessionService().setSession(user: testUserA, token: 'audit-test-token');
+      final client = MockClient(
+        (request) async => http.Response(
           json.encode({
-            'results': [
-              {
-                'operation_id': opId,
-                'status': 'RETRY_SUCCESS',
-                'is_replay': true,
-                'server_document_id': 1050,
-                'server_document_number': 'INV-2026-01050',
-                'message': 'Operatsiya avval bajarilgan (Idempotent replay).',
-              }
-            ]
+            'success': true,
+            'data': {
+              'device': {'device_uuid': 'audit-device'},
+              'lease': {
+                'lease_token': 'audit-lease',
+                'permissions': ['offline_sales'],
+              },
+              'catalog': [
+                {
+                  'id': 101,
+                  'product_id': 1,
+                  'product_name': 'Fanta',
+                  'volume_litres': '0.500',
+                  'volume_ml': 500,
+                  'volume_name': '0.5 L',
+                  'default_sale_price': 6500,
+                },
+              ],
+              'stock_allocations': [
+                {
+                  'allocation_id': 1,
+                  'variant_id': 101,
+                  'allocated_quantity': 10,
+                  'consumed_quantity': 0,
+                  'available_quantity': 10,
+                },
+              ],
+              'current_cursor': 42,
+            },
           }),
           200,
-          headers: {'content-type': 'application/json'},
+        ),
+      );
+      try {
+        final service = OfflineSyncService(
+          appDb: AppDatabase(),
+          client: client,
         );
-      });
-
-      final syncService = OfflineSyncService(appDb: appDb, client: mockClient);
-      await syncService.pushPendingOperations(deviceUuid: 'dev-1');
-
-      final rows = await db.query('sync_queue', where: 'operation_id = ?', whereArgs: [opId]);
-      // Qatorda dublikat yo'q (aniq 1 ta yozuv)
-      expect(rows.length, equals(1));
-      expect(rows.first['status'], equals('ACKNOWLEDGED'));
-      expect(rows.first['server_document_number'], equals('INV-2026-01050'));
-    });
-  });
+        service.setDeviceUuid('');
+        await service.bootstrap();
+        expect(service.deviceUuid, 'audit-device');
+        expect((await db.query('products')).single['name'], 'Fanta');
+        expect(
+          (await db.query('product_variants')).single['default_sale_price'],
+          6500,
+        );
+        expect((await db.query('sync_cursor')).single['cursor_pos'], 42);
+        await db.update('stock_allocations', {
+          'consumed_quantity': 2,
+          'available_quantity': 8,
+        });
+        await db.insert('sync_queue', {
+          'operation_id': 'audit-pending',
+          'user_id': 1,
+          'device_uuid': 'audit-device',
+          'type': 'CREATE_SALE',
+          'payload': '{}',
+          'payload_fingerprint': 'test',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toUtc().toIso8601String(),
+        });
+        await expectLater(service.bootstrap(), throwsA(isA<ServerException>()));
+        expect(
+          (await db.query('stock_allocations')).single['available_quantity'],
+          8,
+        );
+        expect((await db.query('sync_queue')).single['status'], 'PENDING');
+      } finally {
+        AppDatabase.setTestDatabase(null);
+        SessionService().clearSession();
+        await db.close();
+        client.close();
+      }
+    },
+  );
 }

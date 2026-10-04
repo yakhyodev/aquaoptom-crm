@@ -38,14 +38,14 @@ class OfflineSyncService extends ChangeNotifier {
     return _instance;
   }
   OfflineSyncService._internal()
-      : _appDb = AppDatabase(),
-        _client = http.Client();
+    : _appDb = AppDatabase(),
+      _client = http.Client();
 
   AppDatabase _appDb;
   http.Client _client;
 
   String? _deviceUuid;
-  String get deviceUuid => _deviceUuid ?? 'mobile-device-android-01';
+  String get deviceUuid => _deviceUuid ?? '';
 
   void setDeviceUuid(String uuid) {
     _deviceUuid = uuid;
@@ -103,28 +103,55 @@ class OfflineSyncService extends ChangeNotifier {
     final response = await _client.post(
       Uri.parse('${AppConfig.apiBaseUrl}/sync/bootstrap'),
       headers: headers,
-      body: json.encode({'device_uuid': deviceUuid}),
+      body: json.encode({if (deviceUuid.isNotEmpty) 'device_uuid': deviceUuid}),
     );
 
     if (response.statusCode != 200) {
-      throw ServerException("Bootstrap muvaffaqiyatsiz tugadi (${response.statusCode})");
+      throw ServerException(
+        "Bootstrap muvaffaqiyatsiz tugadi (${response.statusCode})",
+      );
     }
 
-    final data = (json.decode(response.body)['data'] as Map<String, dynamic>?) ?? {};
+    final data =
+        (json.decode(response.body)['data'] as Map<String, dynamic>?) ?? {};
     final db = await _appDb.database;
 
     await db.transaction((txn) async {
+      final unresolved = await txn.query(
+        'sync_queue',
+        columns: ['operation_id'],
+        where: "status != 'ACKNOWLEDGED'",
+        limit: 1,
+      );
+      if (unresolved.isNotEmpty) {
+        throw const ServerException(
+          'Avval saqlangan offline amallarni sinxronlang. Ajratmalar qayta yuklanmadi.',
+        );
+      }
+      final assignedDeviceUuid =
+          (data['device'] as Map<String, dynamic>?)?['device_uuid'] as String?;
+      if (assignedDeviceUuid == null || assignedDeviceUuid.isEmpty) {
+        throw const ServerException(
+          'Server qurilma identifikatorini qaytarmadi.',
+        );
+      }
       // 1. Lease saqlash
       final leaseData = data['lease'] as Map<String, dynamic>?;
       if (leaseData != null) {
-        await txn.delete('offline_leases',
-            where: 'user_id = ?', whereArgs: [user.id]);
+        await txn.delete(
+          'offline_leases',
+          where: 'user_id = ?',
+          whereArgs: [user.id],
+        );
         await txn.insert('offline_leases', {
-          'device_uuid': deviceUuid,
+          'device_uuid': assignedDeviceUuid,
           'user_id': user.id,
           'lease_token': leaseData['lease_token'] ?? '',
-          'valid_from': leaseData['valid_from'] ?? DateTime.now().toIso8601String(),
-          'expires_at': leaseData['expires_at'] ?? DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
+          'valid_from':
+              leaseData['valid_from'] ?? DateTime.now().toIso8601String(),
+          'expires_at':
+              leaseData['expires_at'] ??
+              DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
           'permissions': json.encode(leaseData['permissions'] ?? []),
           'epoch': leaseData['epoch'] ?? 1,
           'signature': leaseData['signature'] ?? '',
@@ -133,83 +160,94 @@ class OfflineSyncService extends ChangeNotifier {
       }
 
       // 2. Tovar ajratmalari (Stock Allocations)
-      final stockAllocations = (data['stock_allocations'] as List<dynamic>?) ?? [];
+      final stockAllocations =
+          (data['stock_allocations'] as List<dynamic>?) ?? [];
+      await txn.delete('stock_allocations');
       for (final alloc in stockAllocations) {
         final a = alloc as Map<String, dynamic>;
-        await txn.insert(
-          'stock_allocations',
-          {
-            'id': a['allocation_id'] ?? a['id'],
-            'variant_id': a['variant_id'],
-            'sku': a['sku'] ?? '',
-            'product_name': a['product_name'] ?? '',
-            'volume_name': a['volume_name'] ?? '',
-            'allocated_quantity': a['allocated_quantity'] ?? 0,
-            'consumed_quantity': a['consumed_quantity'] ?? 0,
-            'returned_quantity': a['returned_quantity'] ?? 0,
-            'available_quantity': a['available_quantity'] ?? 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('stock_allocations', {
+          'id': a['allocation_id'] ?? a['id'],
+          'variant_id': a['variant_id'],
+          'sku': a['sku'] ?? '',
+          'product_name': a['product_name'] ?? '',
+          'volume_name': a['volume_name'] ?? '',
+          'allocated_quantity': a['allocated_quantity'] ?? 0,
+          'consumed_quantity': a['consumed_quantity'] ?? 0,
+          'returned_quantity': a['returned_quantity'] ?? 0,
+          'available_quantity': a['available_quantity'] ?? 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
 
       // 3. Kredit ajratmalari (Credit Allocations)
-      final creditAllocations = (data['credit_allocations'] as List<dynamic>?) ?? [];
+      final creditAllocations =
+          (data['credit_allocations'] as List<dynamic>?) ?? [];
+      await txn.delete('credit_allocations');
       for (final alloc in creditAllocations) {
         final a = alloc as Map<String, dynamic>;
-        await txn.insert(
-          'credit_allocations',
-          {
-            'id': a['allocation_id'] ?? a['id'],
-            'customer_id': a['customer_id'],
-            'customer_name': a['customer_name'] ?? '',
-            'allocated_amount': a['allocated_amount'] ?? 0,
-            'consumed_amount': a['consumed_amount'] ?? 0,
-            'returned_amount': a['returned_amount'] ?? 0,
-            'available_amount': a['available_amount'] ?? 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('credit_allocations', {
+          'id': a['allocation_id'] ?? a['id'],
+          'customer_id': a['customer_id'],
+          'customer_name': a['customer_name'] ?? '',
+          'allocated_amount': a['allocated_amount'] ?? 0,
+          'consumed_amount': a['consumed_amount'] ?? 0,
+          'returned_amount': a['returned_amount'] ?? 0,
+          'available_amount': a['available_amount'] ?? 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
 
       // 4. Mahsulotlar katalogi
-      final products = (data['products'] as List<dynamic>?) ?? [];
+      final catalog = (data['catalog'] as List<dynamic>?) ?? [];
+      final groupedProducts = <int, Map<String, dynamic>>{};
+      for (final row in catalog) {
+        final variant = row as Map<String, dynamic>;
+        final productId = (variant['product_id'] as num).toInt();
+        final product = groupedProducts.putIfAbsent(
+          productId,
+          () => {
+            'id': productId,
+            'name': variant['product_name'],
+            'is_active': true,
+            'variants': <Map<String, dynamic>>[],
+          },
+        );
+        (product['variants'] as List<Map<String, dynamic>>).add({
+          ...variant,
+          'litres': double.tryParse('${variant['volume_litres']}') ?? 0,
+          'volume_ml': variant['volume_ml'],
+          'display_volume': variant['volume_name'],
+        });
+      }
+      final products =
+          data['products'] as List<dynamic>? ?? groupedProducts.values.toList();
       for (final prod in products) {
         final p = prod as Map<String, dynamic>;
-        await txn.insert(
-          'products',
-          {
-            'id': p['id'],
-            'name': p['name'],
-            'code': p['code'] ?? '',
-            'is_active': (p['is_active'] == true || p['is_active'] == 1) ? 1 : 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('products', {
+          'id': p['id'],
+          'name': p['name'],
+          'code': p['code'] ?? '',
+          'is_active': (p['is_active'] == true || p['is_active'] == 1) ? 1 : 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
 
         final variants = (p['variants'] as List<dynamic>?) ?? [];
         for (final v in variants) {
           final vr = v as Map<String, dynamic>;
-          await txn.insert(
-            'product_variants',
-            {
-              'id': vr['id'],
-              'product_id': p['id'],
-              'sku': vr['sku'] ?? '',
-              'litres': (vr['litres'] as num?)?.toDouble() ?? 0.5,
-              'volume_ml': (vr['volume_ml'] as num?)?.toInt() ?? 500,
-              'display_volume': vr['display_volume'] ?? '',
-              'stock_qty': (vr['stock_qty'] as num?)?.toInt() ?? 0,
-              'cost_price': (vr['cost_price'] as num?)?.toInt(),
-              'retail_price': (vr['retail_price'] as num?)?.toInt() ?? 0,
-              'default_sale_price': (vr['default_sale_price'] as num?)?.toInt() ?? 0,
-              'updated_at': DateTime.now().toIso8601String(),
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          await txn.insert('product_variants', {
+            'id': vr['id'],
+            'product_id': p['id'],
+            'sku': vr['sku'] ?? '',
+            'litres': (vr['litres'] as num?)?.toDouble() ?? 0.5,
+            'volume_ml': (vr['volume_ml'] as num?)?.toInt() ?? 500,
+            'display_volume': vr['display_volume'] ?? '',
+            'stock_qty': (vr['stock_qty'] as num?)?.toInt() ?? 0,
+            'cost_price': (vr['cost_price'] as num?)?.toInt(),
+            'retail_price': (vr['retail_price'] as num?)?.toInt() ?? 0,
+            'default_sale_price':
+                (vr['default_sale_price'] as num?)?.toInt() ?? 0,
+            'updated_at': DateTime.now().toIso8601String(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
       }
 
@@ -217,64 +255,65 @@ class OfflineSyncService extends ChangeNotifier {
       final customers = (data['customers'] as List<dynamic>?) ?? [];
       for (final cust in customers) {
         final c = cust as Map<String, dynamic>;
-        await txn.insert(
-          'customers',
-          {
-            'id': c['id'],
-            'uuid': c['uuid'],
-            'name': c['name'],
-            'phone': c['phone'],
-            'store_name': c['store_name'],
-            'address': c['address'],
-            'current_debt': (c['current_debt'] as num?)?.toInt() ?? 0,
-            'debt_limit': (c['debt_limit'] as num?)?.toInt() ?? 0,
-            'is_active': (c['is_active'] == true || c['is_active'] == 1) ? 1 : 0,
-            'created_offline': 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('customers', {
+          'id': c['id'],
+          'uuid': c['uuid'],
+          'name': c['name'],
+          'phone': c['phone'],
+          'store_name': c['store_name'],
+          'address': c['address'],
+          'current_debt': (c['current_debt'] as num?)?.toInt() ?? 0,
+          'debt_limit': (c['debt_limit'] as num?)?.toInt() ?? 0,
+          'is_active':
+              (c['is_active'] == null ||
+                  c['is_active'] == true ||
+                  c['is_active'] == 1)
+              ? 1
+              : 0,
+          'created_offline': 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
 
       // 6. Kassa hisoblari
       final cashAccounts = (data['cash_accounts'] as List<dynamic>?) ?? [];
       for (final acc in cashAccounts) {
         final a = acc as Map<String, dynamic>;
-        await txn.insert(
-          'cash_accounts',
-          {
-            'id': a['id'],
-            'name': a['name'],
-            'type': a['type'] ?? 'CASH',
-            'balance': (a['balance'] as num?)?.toInt() ?? 0,
-            'is_default': (a['is_default'] == true || a['is_default'] == 1) ? 1 : 0,
-            'is_active': (a['is_active'] == true || a['is_active'] == 1) ? 1 : 0,
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('cash_accounts', {
+          'id': a['id'],
+          'name': a['name'],
+          'type': a['type'] ?? 'CASH',
+          'balance': (a['balance'] as num?)?.toInt() ?? 0,
+          'is_default': (a['is_default'] == true || a['is_default'] == 1)
+              ? 1
+              : 0,
+          'is_active': (a['is_active'] == true || a['is_active'] == 1) ? 1 : 0,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       }
 
       // 7. Kursor
-      final cursorVal = (data['cursor'] as num?)?.toInt() ?? 0;
-      await txn.insert(
-        'sync_cursor',
-        {
-          'id': 1,
-          'cursor_pos': cursorVal,
-          'last_synced_at': DateTime.now().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final cursorVal = (data['current_cursor'] as num?)?.toInt() ?? 0;
+      await txn.insert('sync_cursor', {
+        'id': 1,
+        'cursor_pos': cursorVal,
+        'last_synced_at': DateTime.now().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
 
+    setDeviceUuid(
+      (data['device'] as Map<String, dynamic>)['device_uuid'] as String,
+    );
     _lastSyncedAt = DateTime.now();
     notifyListeners();
     return data;
   }
 
   /// Kutilayotgan operatsiyalarni serverga yuborish (Push Pending Operations)
-  Future<int> pushPendingOperations({String? specificWorkerId, String? deviceUuid}) async {
+  Future<int> pushPendingOperations({
+    String? specificWorkerId,
+    String? deviceUuid,
+  }) async {
     final user = SessionService().currentUser;
     if (user == null) return 0;
 
@@ -288,24 +327,31 @@ class OfflineSyncService extends ChangeNotifier {
     await db.transaction((txn) async {
       // Eski o'tib ketgan locklarni tozalash
       final nowIso = DateTime.now().toUtc().toIso8601String();
-      await txn.rawUpdate('''
+      await txn.rawUpdate(
+        '''
         UPDATE sync_queue 
         SET locked_until = NULL, worker_id = NULL 
         WHERE status = 'PENDING' AND locked_until IS NOT NULL AND locked_until < ?
-      ''', [nowIso]);
+      ''',
+        [nowIso],
+      );
 
       // Faqat ayni user_id ga tegishli PENDING yozuvlarni qulflash (User Isolation!)
-      await txn.rawUpdate('''
+      await txn.rawUpdate(
+        '''
         UPDATE sync_queue 
         SET locked_until = ?, worker_id = ? 
         WHERE user_id = ? AND status = 'PENDING' AND (locked_until IS NULL OR locked_until < ?)
-      ''', [lockExpiry.toIso8601String(), workerId, user.id, nowIso]);
+      ''',
+        [lockExpiry.toIso8601String(), workerId, user.id, nowIso],
+      );
 
       final rows = await txn.query(
         'sync_queue',
         where: 'user_id = ? AND worker_id = ? AND status = ?',
         whereArgs: [user.id, workerId, 'PENDING'],
-        orderBy: "CASE type WHEN 'CREATE_CUSTOMER' THEN 1 WHEN 'CREATE_SALE' THEN 2 ELSE 3 END, device_created_at ASC",
+        orderBy:
+            "CASE type WHEN 'CREATE_CUSTOMER' THEN 1 WHEN 'CREATE_SALE' THEN 2 ELSE 3 END, device_created_at ASC",
       );
 
       lockedItems = rows.map((r) => SyncQueueItem.fromDbMap(r)).toList();
@@ -318,7 +364,9 @@ class OfflineSyncService extends ChangeNotifier {
     final effectiveDeviceUuid = deviceUuid ?? lockedItems.first.deviceUuid;
 
     // 2. Batch payload tayyorlash
-    final pushOperations = lockedItems.map((item) => item.toPushOperation()).toList();
+    final pushOperations = lockedItems
+        .map((item) => item.toPushOperation())
+        .toList();
     final firstLeaseToken = lockedItems.first.leaseToken;
 
     final headers = _buildHeaders();
@@ -349,13 +397,16 @@ class OfflineSyncService extends ChangeNotifier {
             final opId = res['operation_id'] as String?;
             if (opId == null) continue;
 
-            final status = (res['status'] as String?)?.toUpperCase() ?? 'PENDING';
+            final status =
+                (res['status'] as String?)?.toUpperCase() ?? 'PENDING';
             final serverDocId = (res['server_document_id'] as num?)?.toInt();
             final serverDocNum = res['server_document_number'] as String?;
             final errorCode = res['error_code'] as String?;
             final errorMsg = res['message'] as String?;
 
-            if (status == 'SUCCESS' || status == 'RETRY_SUCCESS') {
+            if (status == 'SUCCESS' ||
+                status == 'APPLIED' ||
+                status == 'RETRY_SUCCESS') {
               // ACKNOWLEDGED: Original operation_id va ACK payloadni xavfsiz retention uchun saqlaymiz
               await txn.update(
                 'sync_queue',
@@ -400,11 +451,14 @@ class OfflineSyncService extends ChangeNotifier {
               );
             } else {
               // FAILED: Retry sonini oshirish va lockni bo'shatish
-              await txn.rawUpdate('''
+              await txn.rawUpdate(
+                '''
                 UPDATE sync_queue 
                 SET retry_count = retry_count + 1, error_code = ?, error_message = ?, locked_until = NULL, worker_id = NULL 
                 WHERE operation_id = ?
-              ''', [errorCode, errorMsg, opId]);
+              ''',
+                [errorCode, errorMsg, opId],
+              );
             }
           }
         });
@@ -426,11 +480,14 @@ class OfflineSyncService extends ChangeNotifier {
 
   Future<void> _releaseLocks(String workerId) async {
     final db = await _appDb.database;
-    await db.rawUpdate('''
+    await db.rawUpdate(
+      '''
       UPDATE sync_queue 
       SET locked_until = NULL, worker_id = NULL 
       WHERE worker_id = ?
-    ''', [workerId]);
+    ''',
+      [workerId],
+    );
   }
 
   /// Kursor bo'yicha serverdagi o'zgarishlarni tortish (Delta Pull)
@@ -445,15 +502,17 @@ class OfflineSyncService extends ChangeNotifier {
         ? ((cursorRows.first['cursor_pos'] as num?)?.toInt() ?? 0)
         : 0;
 
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}/sync/pull')
-        .replace(queryParameters: {'cursor': curPos.toString(), 'limit': '50'});
+    final uri = Uri.parse(
+      '${AppConfig.apiBaseUrl}/sync/pull',
+    ).replace(queryParameters: {'cursor': curPos.toString(), 'limit': '50'});
 
     final response = await _client.get(uri, headers: _buildHeaders());
     if (response.statusCode != 200) {
       return 0;
     }
 
-    final data = (json.decode(response.body)['data'] as Map<String, dynamic>?) ?? {};
+    final data =
+        (json.decode(response.body)['data'] as Map<String, dynamic>?) ?? {};
     final newCursor = (data['cursor'] as num?)?.toInt() ?? curPos;
     final changes = (data['changes'] as List<dynamic>?) ?? [];
 
@@ -465,46 +524,52 @@ class OfflineSyncService extends ChangeNotifier {
           final payload = ch['payload'] as Map<String, dynamic>? ?? {};
 
           if (entity == 'product_variant') {
-            final vId = (ch['entity_id'] as num?)?.toInt() ?? (payload['id'] as num?)?.toInt();
+            final vId =
+                (ch['entity_id'] as num?)?.toInt() ??
+                (payload['id'] as num?)?.toInt();
             if (vId != null) {
-              await txn.rawUpdate('''
+              await txn.rawUpdate(
+                '''
                 UPDATE product_variants 
                 SET stock_qty = ?, retail_price = ?, default_sale_price = ?, updated_at = ? 
                 WHERE id = ?
-              ''', [
-                payload['stock_qty'] ?? 0,
-                payload['retail_price'] ?? 0,
-                payload['default_sale_price'] ?? 0,
-                DateTime.now().toIso8601String(),
-                vId,
-              ]);
+              ''',
+                [
+                  payload['stock_qty'] ?? 0,
+                  payload['retail_price'] ?? 0,
+                  payload['default_sale_price'] ?? 0,
+                  DateTime.now().toIso8601String(),
+                  vId,
+                ],
+              );
             }
           } else if (entity == 'customer') {
-            final cId = (ch['entity_id'] as num?)?.toInt() ?? (payload['id'] as num?)?.toInt();
+            final cId =
+                (ch['entity_id'] as num?)?.toInt() ??
+                (payload['id'] as num?)?.toInt();
             if (cId != null) {
-              await txn.rawUpdate('''
+              await txn.rawUpdate(
+                '''
                 UPDATE customers 
                 SET current_debt = ?, debt_limit = ?, updated_at = ? 
                 WHERE id = ?
-              ''', [
-                payload['current_debt'] ?? 0,
-                payload['debt_limit'] ?? 0,
-                DateTime.now().toIso8601String(),
-                cId,
-              ]);
+              ''',
+                [
+                  payload['current_debt'] ?? 0,
+                  payload['debt_limit'] ?? 0,
+                  DateTime.now().toIso8601String(),
+                  cId,
+                ],
+              );
             }
           }
         }
 
-        await txn.insert(
-          'sync_cursor',
-          {
-            'id': 1,
-            'cursor_pos': newCursor,
-            'last_synced_at': DateTime.now().toIso8601String(),
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
+        await txn.insert('sync_cursor', {
+          'id': 1,
+          'cursor_pos': newCursor,
+          'last_synced_at': DateTime.now().toIso8601String(),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
       });
     }
 
@@ -546,25 +611,41 @@ class OfflineSyncService extends ChangeNotifier {
 
     final db = await _appDb.database;
 
-    final pending = Sqflite.firstIntValue(await db.rawQuery(
-      "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'PENDING'",
-      [user.id],
-    )) ?? 0;
+    final pending =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'PENDING'",
+            [user.id],
+          ),
+        ) ??
+        0;
 
-    final ack = Sqflite.firstIntValue(await db.rawQuery(
-      "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'ACKNOWLEDGED'",
-      [user.id],
-    )) ?? 0;
+    final ack =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'ACKNOWLEDGED'",
+            [user.id],
+          ),
+        ) ??
+        0;
 
-    final needsReview = Sqflite.firstIntValue(await db.rawQuery(
-      "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'NEEDS_REVIEW'",
-      [user.id],
-    )) ?? 0;
+    final needsReview =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'NEEDS_REVIEW'",
+            [user.id],
+          ),
+        ) ??
+        0;
 
-    final conflict = Sqflite.firstIntValue(await db.rawQuery(
-      "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'CONFLICT'",
-      [user.id],
-    )) ?? 0;
+    final conflict =
+        Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM sync_queue WHERE user_id = ? AND status = 'CONFLICT'",
+            [user.id],
+          ),
+        ) ??
+        0;
 
     return SyncStatusSummary(
       pendingCount: pending,

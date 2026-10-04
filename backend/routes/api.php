@@ -35,12 +35,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         ->middleware('permission:receive_stock');
 
     // Sales (Requires active cashier / seller / owner)
-    Route::post('/sales', [ApiController::class, 'storeSale']);
+    Route::post('/sales', [ApiController::class, 'storeSale'])->middleware('role:OWNER,ADMIN,SALES_MANAGER,CASHIER');
     Route::get('/sales/history', [ApiController::class, 'getSalesHistory']);
 
     // Dashboard & Reports
     Route::get('/dashboard', [ApiController::class, 'dashboard']);
-    Route::get('/reports', [ApiController::class, 'getReports']);
+    Route::get('/reports', [ApiController::class, 'getReports'])->middleware('permission:view_reports');
 
     // Customers & Suppliers
     Route::get('/customers', [ApiController::class, 'getCustomers']);
@@ -49,7 +49,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('/suppliers', [ApiController::class, 'storeSupplier']);
 
     // Cash Accounts & Payments
-    Route::get('/cash-accounts', [ApiController::class, 'getCashAccounts']);
+    Route::get('/cash-accounts', [ApiController::class, 'getCashAccounts'])->middleware('permission:view_cash');
     Route::post('/payments', [ApiController::class, 'storePayment']);
 
     // Profit / Cost Calculator

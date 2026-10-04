@@ -96,12 +96,12 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        if ($this->isOwner()) {
-            return true;
-        }
-
         if (! $this->isActive()) {
             return false;
+        }
+
+        if ($this->isOwner()) {
+            return true;
         }
 
         // 1. Check direct user permission override

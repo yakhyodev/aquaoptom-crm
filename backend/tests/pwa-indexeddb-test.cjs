@@ -217,7 +217,25 @@ async function runTests() {
     assert.strictEqual(backup.local_customers.length, 1);
     console.log("  ✅ Emergency export JSON generated with all pending items.");
 
-    console.log("\n🎉 ALL 7 AQUADB TESTS PASSED WITH 100% SUCCESS!\n");
+    const bootstrapDb = new AquaDB('BootstrapAudit_' + Date.now());
+    const snapshot = {device: {id: 1, device_uuid: 'device-audit'}, warehouse: {id: 1},
+        lease: {lease_token: 'lease-audit', permissions: ['offline_sales']},
+        stock_allocations: [{variant_id: 101, allocated_quantity: 5, consumed_quantity: 0}],
+        credit_allocations: [{customer_id: 1, allocated_amount: 20000, consumed_amount: 0, available_amount: 20000}],
+        catalog: [{id: 101, default_sale_price: 1000}], customers: [], current_cursor: 42};
+    await bootstrapDb.applyBootstrap(snapshot);
+    assert.strictEqual((await bootstrapDb.get('stock_allocations', 101)).allocated_quantity, 5);
+    assert.strictEqual((await bootstrapDb.get('device_lease', 'current')).lease_token, 'lease-audit');
+    assert.strictEqual((await bootstrapDb.get('credit_allocations', 1)).allocated_credit, 20000);
+    assert.strictEqual((await bootstrapDb.get('meta', 'last_cursor')).value, 42);
+    const saleArgs = {operationId: 'audit-dupes', items: [{variant_id: 101, quantity: 3, sale_price: 1000}, {variant_id: 101, quantity: 3, sale_price: 1000}], totalAmount: 6000, paidAmount: 6000, debtAmount: 0};
+    await assert.rejects(bootstrapDb.executeSaleTransaction(saleArgs));
+    assert.strictEqual((await bootstrapDb.get('stock_allocations', 101)).consumed_quantity, 0);
+    await bootstrapDb.executeSaleTransaction({...saleArgs, operationId: 'audit-pending', items: [{variant_id: 101, quantity: 2, sale_price: 1000}], totalAmount: 2000, paidAmount: 2000});
+    await assert.rejects(bootstrapDb.applyBootstrap(snapshot));
+    assert.strictEqual((await bootstrapDb.get('stock_allocations', 101)).consumed_quantity, 2);
+    assert.strictEqual((await bootstrapDb.getAll('sales')).length, 1);
+    console.log("\n🎉 ALL AQUADB TESTS PASSED (7 scenarios + bootstrap/duplicate-line/pending regressions)!\n");
 }
 
 runTests().catch(err => {

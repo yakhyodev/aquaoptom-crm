@@ -43,6 +43,57 @@ class OperationTransactionAndOutboxTest extends TestCase
         $this->operationService = app(TransactionalOperationService::class);
     }
 
+    public function test_audit_replay_cannot_return_another_actors_result(): void
+    {
+        $operationId = (string) Str::uuid();
+        $other = User::factory()->create();
+        $payload = ['amount' => 1000];
+        $this->operationService->execute($operationId, 'CUSTOMER_PAYMENT', $payload, fn () => ['payment_id' => 1], $this->user->id);
+
+        $this->expectException(OperationConflictException::class);
+        $this->operationService->execute($operationId, 'CUSTOMER_PAYMENT', $payload, fn () => [], $other->id);
+    }
+
+    public function test_audit_operation_type_is_part_of_replay_identity(): void
+    {
+        $operationId = (string) Str::uuid();
+        $payload = ['amount' => 1000];
+        $this->operationService->execute($operationId, 'CUSTOMER_PAYMENT', $payload, fn () => ['payment_id' => 1], $this->user->id);
+
+        $this->expectException(OperationConflictException::class);
+        $this->operationService->execute($operationId, 'SUPPLIER_PAYMENT', $payload, fn () => [], $this->user->id);
+    }
+
+    public function test_audit_generic_operation_endpoint_is_unavailable_in_production(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        try {
+            $this->actingAs($this->user, 'sanctum')->postJson('/api/operations/execute', [
+                'operation_id' => (string) Str::uuid(),
+                'operation_type' => 'CREATE_SALE',
+                'payload' => ['amount' => 1000],
+            ])->assertNotFound();
+            $this->assertDatabaseCount('operation_results', 0);
+        } finally {
+            $this->app->detectEnvironment(fn () => 'testing');
+        }
+    }
+
+    public function test_audit_internal_operation_error_does_not_disclose_secrets(): void
+    {
+        $operationId = (string) Str::uuid();
+        try {
+            $this->operationService->execute($operationId, 'AUDIT_FAILURE', [], function () {
+                throw new \RuntimeException('private-database-password');
+            }, $this->user->id);
+            $this->fail('An internal failure must not be reported as success.');
+        } catch (OperationException $exception) {
+            $this->assertStringNotContainsString('private-database-password', json_encode($exception->toResponseArray()));
+            $this->assertSame('INTERNAL_OPERATION_ERROR', $exception->errorCode);
+            $this->assertDatabaseMissing('operation_results', ['operation_id' => $operationId]);
+        }
+    }
+
     /**
      * 1. 20 ta so'rov bitta operation_id bilan kelganda: faqat 1 ta operatsiya bajariladi,
      * barcha 20 ta chaqiruv bir xil natijani oladi, DBda faqat 1 ta yozuv bo'ladi.

@@ -10,6 +10,8 @@ use Carbon\Carbon;
 
 class InventoryLedgerService
 {
+    public const MAX_QUANTITY = 2147483647;
+
     /**
      * Omborga tovar kirimini qayd etish va WAC (Weighted Average Cost) ni hisoblash.
      *
@@ -26,12 +28,16 @@ class InventoryLedgerService
         ?int $referenceId = null,
         ?int $userId = null
     ): array {
-        if ($quantity <= 0) {
+        if ($quantity <= 0 || $quantity > self::MAX_QUANTITY) {
             throw new \InvalidArgumentException('Kirim miqdori 0 dan katta butun son bo\'lishi shart.');
         }
 
         if ($unitCost < 0) {
             throw new \InvalidArgumentException('Tannarx manfiy bo\'lishi mumkin emas.');
+        }
+
+        if ($unitCost > intdiv(PHP_INT_MAX, $quantity)) {
+            throw new \InvalidArgumentException('Kirim qiymati ruxsat etilgan chegaradan oshdi.');
         }
 
         $warehouseId = $warehouseId ?: $this->getDefaultWarehouseId();
@@ -60,9 +66,13 @@ class InventoryLedgerService
             $oldQuantity = (int) $balance->quantity;
             $oldTotalValue = (int) $balance->total_value;
 
+            if ($oldQuantity < 0 || $oldQuantity > self::MAX_QUANTITY - $quantity || $oldTotalValue < 0 || $oldTotalValue > PHP_INT_MAX - $inflowTotalValue) {
+                throw new \InvalidArgumentException('Ombor qoldig‘i ruxsat etilgan chegaradan oshdi.');
+            }
+
             $newQuantity = $oldQuantity + $quantity;
             $newTotalValue = $oldTotalValue + $inflowTotalValue;
-            $newWac = $newQuantity > 0 ? (int) round($newTotalValue / $newQuantity) : 0;
+            $newWac = $this->roundRatio($newTotalValue, $newQuantity);
 
             $balance->quantity = $newQuantity;
             $balance->total_value = $newTotalValue;
@@ -114,7 +124,7 @@ class InventoryLedgerService
         ?int $referenceId = null,
         ?int $userId = null
     ): array {
-        if ($quantity <= 0) {
+        if ($quantity <= 0 || $quantity > self::MAX_QUANTITY) {
             throw new \InvalidArgumentException('Chiqim miqdori 0 dan katta butun son bo\'lishi shart.');
         }
 
@@ -126,6 +136,9 @@ class InventoryLedgerService
             ->first();
 
         $currentStock = $balance ? (int) $balance->quantity : 0;
+        if ($currentStock > self::MAX_QUANTITY) {
+            throw new \InvalidArgumentException('Ombor miqdori ruxsat etilgan chegaradan oshdi.');
+        }
         if ($currentStock < $quantity) {
             throw new InsufficientStockException(
                 "Omborda yetarli qoldiq mavjud emas! So'ralgan: {$quantity} dona, mavjud: {$currentStock} dona."
@@ -142,12 +155,11 @@ class InventoryLedgerService
             $remainingValue = 0;
             $newWac = 0;
         } else {
-            $outflowCost = (int) round($quantity * $currentWac);
-            if ($outflowCost > $oldTotalValue) {
-                $outflowCost = $oldTotalValue;
-            }
+            // Split the product to preserve integer accuracy and avoid bigint overflow.
+            $outflowCost = $quantity * intdiv($oldTotalValue, $currentStock)
+                + $this->roundRatio($quantity * ($oldTotalValue % $currentStock), $currentStock);
             $remainingValue = $oldTotalValue - $outflowCost;
-            $newWac = $remainingQuantity > 0 ? (int) round($remainingValue / $remainingQuantity) : 0;
+            $newWac = $this->roundRatio($remainingValue, $remainingQuantity);
         }
 
         $balance->quantity = $remainingQuantity;
@@ -157,7 +169,7 @@ class InventoryLedgerService
         $balance->save();
 
         // Chiqim uchun 1 dona tannarxi (hisoblash oson bo'lishi uchun)
-        $actualUnitCost = $quantity > 0 ? (int) round($outflowCost / $quantity) : $currentWac;
+        $actualUnitCost = $this->roundRatio($outflowCost, $quantity);
 
         // Ledger yozuvi
         $movement = InventoryMovement::create([
@@ -234,6 +246,12 @@ class InventoryLedgerService
     /**
      * Standart ombor ID sini olish.
      */
+    private function roundRatio(int $numerator, int $denominator): int
+    {
+        return intdiv($numerator, $denominator)
+            + (($numerator % $denominator) >= intdiv($denominator, 2) + ($denominator % 2) ? 1 : 0);
+    }
+
     protected function getDefaultWarehouseId(): int
     {
         $warehouse = Warehouse::where('is_default', true)->first();

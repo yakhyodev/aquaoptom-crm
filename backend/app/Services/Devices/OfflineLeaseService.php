@@ -50,10 +50,6 @@ class OfflineLeaseService
                     $userPerms[] = $perm;
                 }
             }
-            // Kamida offline_sales bo'lishi kerak
-            if (! in_array('offline_sales', $userPerms, true)) {
-                $userPerms[] = 'offline_sales';
-            }
             $permissions = $userPerms;
         }
 

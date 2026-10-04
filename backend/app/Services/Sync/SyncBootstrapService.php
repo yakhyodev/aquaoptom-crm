@@ -2,6 +2,7 @@
 
 namespace App\Services\Sync;
 
+use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\Device;
 use App\Models\DeviceCursor;
@@ -24,6 +25,8 @@ class SyncBootstrapService
      */
     public function getBootstrapData(Device $device, User $user): array
     {
+        abort_unless($user->isActive() && $user->hasPermission('offline_sales')
+            && ($device->assigned_user_id === $user->id || $user->hasRole(['OWNER', 'ADMIN'])), 403);
         // 1. Agar change log bo'sh bo'lsa, mavjud katalog ma'lumotlarini yuklaymiz
         if (SyncChangeLog::count() === 0) {
             $this->changeLogService->populateInitialChanges();
@@ -126,6 +129,7 @@ class SyncBootstrapService
                     'product_id' => $variant->product_id,
                     'product_name' => $variant->product?->name,
                     'volume_name' => $variant->volume?->name,
+                    'volume_ml' => $variant->volume?->value_ml,
                     'volume_litres' => $variant->volume ? (string) ($variant->volume->litres) : '1.000',
                     'sku' => $variant->sku,
                     'barcode' => $variant->barcode,
@@ -171,6 +175,7 @@ class SyncBootstrapService
             ],
             'stock_allocations' => $stockAllocations,
             'credit_allocations' => $creditAllocations,
+            'cash_accounts' => CashAccount::select(['id', 'name', 'type', 'is_default', 'is_active'])->get()->toArray(),
             'catalog' => $catalog,
             'customers' => $customers,
             'current_cursor' => $latestCursor,

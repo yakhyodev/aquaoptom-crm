@@ -20,6 +20,8 @@ class OperationApiController extends Controller
      */
     public function execute(Request $request): JsonResponse
     {
+        abort_unless(app()->environment(['local', 'testing']), 404);
+
         $operationId = $request->header('X-Operation-Id')
             ?? $request->input('operation_id')
             ?? (string) Str::uuid();

@@ -41,6 +41,7 @@ class SaleOperationTest extends TestCase
         $this->owner = User::factory()->owner()->create([
             'email' => 'owner_sale_test@aquaoptom.uz',
         ]);
+        $this->actingAs($this->owner);
 
         $this->warehouse = Warehouse::firstOrCreate(
             ['name' => 'Asosiy Ombor'],
@@ -90,6 +91,36 @@ class SaleOperationTest extends TestCase
     /**
      * TEST 1: Qabul mezoni: 60 × 6500 jami 390 000 / cost 300 000 / paid 140 000 / debt 250 000 / gross 90 000.
      */
+    public function test_audit_sale_retry_preserves_price_after_catalog_changes(): void
+    {
+        app(InventoryLedgerService::class)->recordInflow($this->variantFanta05->id, 10, 5000, warehouseId: $this->warehouse->id);
+        $id = (string) Str::uuid();
+        $items = [['variant_id' => $this->variantFanta05->id, 'quantity' => 2, 'is_system_price' => true, 'price_version' => 1]];
+        $service = app(CreateSaleService::class);
+        $sale = $service->execute(null, $items, $id, userId: $this->owner->id);
+        $this->variantFanta05->update(['default_sale_price' => 7500, 'version' => 2]);
+        $retry = $service->execute(null, $items, $id, userId: $this->owner->id);
+        $this->assertSame($sale->id, $retry->id);
+        $this->assertSame(13000, (int) $retry->total_amount);
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertSame(8, (int) $this->variantFanta05->inventoryBalances()->value('quantity'));
+    }
+
+    public function test_audit_fractional_sale_price_is_rejected_before_posting(): void
+    {
+        $this->expectException(OperationValidationException::class);
+        $this->expectExceptionMessage('butun');
+        app(CreateSaleService::class)->execute(null, [['variant_id' => $this->variantFanta05->id, 'quantity' => 1, 'sale_price' => 6500.5, 'is_system_price' => false]], userId: $this->owner->id);
+    }
+
+    public function test_audit_mobile_rejects_fractional_quantity_price_and_packages(): void
+    {
+        foreach ([['quantity' => 0.5], ['sale_price' => 6500.5], ['package_name' => 'blok']] as $invalid) {
+            $this->actingAs($this->owner, 'sanctum')->postJson('/api/sales', ['items' => [array_merge(['variant_id' => $this->variantFanta05->id, 'quantity' => 1, 'sale_price' => 6500], $invalid)]])->assertUnprocessable();
+        }
+        $this->assertDatabaseCount('sales', 0);
+    }
+
     public function test_sale_exact_acceptance_specification(): void
     {
         $invService = app(InventoryLedgerService::class);

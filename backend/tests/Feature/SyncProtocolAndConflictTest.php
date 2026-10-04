@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\Device;
+use App\Models\OperationResult;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sale;
@@ -110,6 +111,33 @@ class SyncProtocolAndConflictTest extends TestCase
     /**
      * Test 1: Device Bootstrap Endpoint: Snapshot, Leases, Allocations, Initial Cursor
      */
+    public function test_audit_sync_cannot_use_another_sellers_device(): void
+    {
+        $other = User::factory()->salesManager()->create();
+        $this->actingAs($other, 'sanctum')->postJson('/api/sync/bootstrap', ['device_uuid' => $this->device->device_uuid])->assertForbidden();
+        $this->actingAs($other, 'sanctum')->postJson('/api/sync/push', ['device_uuid' => $this->device->device_uuid, 'operations' => []])->assertForbidden();
+    }
+
+    public function test_audit_sync_fractional_price_and_quantity_are_not_truncated(): void
+    {
+        foreach ([['quantity' => 1.5, 'sale_price' => 6500], ['quantity' => 1, 'sale_price' => 6500.5]] as $item) {
+            $results = $this->pushService->pushBatch($this->device, $this->cashier, [['operation_id' => (string) Str::uuid(), 'type' => 'CREATE_SALE',
+                'payload' => ['items' => [array_merge(['variant_id' => $this->variant->id], $item)], 'payment_type' => 'DEBT']]]);
+            $this->assertSame('FAILED', $results[0]['status']);
+        }
+        $this->assertDatabaseCount('sales', 0);
+    }
+
+    public function test_audit_operation_status_is_actor_scoped_and_cost_masked_recursively(): void
+    {
+        $id = (string) Str::uuid();
+        OperationResult::create(['operation_id' => $id, 'operation_type' => 'CREATE_SALE', 'payload_fingerprint' => 'test', 'actor_id' => $this->cashier->id,
+            'status' => 'PROCESSED', 'result_payload' => ['gross_profit' => 1000, 'receipt_data' => ['items' => [['unit_cost' => 5000]]]]]);
+        $this->actingAs($this->owner, 'sanctum')->getJson('/api/sync/status/'.$id)->assertNotFound();
+        $response = $this->actingAs($this->cashier, 'sanctum')->getJson('/api/sync/status/'.$id)->assertOk();
+        $response->assertJsonPath('result_payload.gross_profit', null)->assertJsonPath('result_payload.receipt_data.items.0.unit_cost', null);
+    }
+
     public function test_device_bootstrap_endpoint_returns_snapshot_lease_allocations_and_initial_cursor(): void
     {
         // 100 dona boshlang'ich ombor qoldig'i

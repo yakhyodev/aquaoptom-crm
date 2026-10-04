@@ -178,12 +178,14 @@ class SyncChangeLogService
     /**
      * Maxfiy maydonlarni (tannarx, o'rtacha tannarx) yashirish.
      */
-    protected function maskSensitiveFields(array $payload): array
+    public function maskSensitiveFields(array $payload): array
     {
-        $sensitiveKeys = ['cost_price', 'average_cost', 'total_cost', 'unit_cost'];
-        foreach ($sensitiveKeys as $key) {
-            if (array_key_exists($key, $payload)) {
+        $sensitiveKeys = ['cost_price', 'average_cost', 'total_cost', 'unit_cost', 'gross_profit', 'net_profit', 'profit', 'total_value'];
+        foreach ($payload as $key => $value) {
+            if (in_array($key, $sensitiveKeys, true)) {
                 $payload[$key] = null;
+            } elseif (is_array($value)) {
+                $payload[$key] = $this->maskSensitiveFields($value);
             }
         }
 

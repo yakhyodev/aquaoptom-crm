@@ -23,6 +23,7 @@ use App\Services\Ledger\SupplierLedgerService;
 use App\Services\Opening\OpeningBalanceService;
 use App\Services\Operations\Exceptions\OperationConflictException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -140,6 +141,47 @@ class LedgerAndOpeningBalancesTest extends TestCase
         $this->assertTrue($audit['is_consistent']);
         $this->assertEquals(200, $audit['cached_quantity']);
         $this->assertEquals(200, $audit['ledger_quantity']);
+    }
+
+    public function test_audit_opening_import_is_read_only_on_dry_run_and_idempotent(): void
+    {
+        $path = storage_path('framework/testing/opening-audit-'.Str::uuid().'.json');
+        File::ensureDirectoryExists(dirname($path));
+        $data = ['import_id' => (string) Str::uuid(), 'cash_accounts' => [['account_type' => 'CASH', 'name' => 'Asosiy Naqd Kassa', 'amount' => 10000]],
+            'inventory' => [['product_name' => 'Audit Drink', 'volume_ml' => 500, 'quantity_units' => 3, 'unit_cost' => 5000, 'sale_price' => 6500]]];
+        try {
+            file_put_contents($path, json_encode($data));
+            $warehouses = Warehouse::count();
+            $this->artisan('app:import-opening-balances', ['--file' => $path, '--dry-run' => true])->assertSuccessful();
+            $this->assertSame($warehouses, Warehouse::count());
+            $this->assertDatabaseMissing('products', ['normalized_name' => 'audit drink']);
+            $this->artisan('app:import-opening-balances', ['--file' => $path])->assertSuccessful();
+            $this->artisan('app:import-opening-balances', ['--file' => $path])->assertSuccessful();
+            $this->assertSame(1, Warehouse::where('is_default', true)->count());
+            $this->assertSame(3, (int) InventoryBalance::whereHas('variant.product', fn ($q) => $q->where('normalized_name', 'audit drink'))->value('quantity'));
+            $this->assertSame(10000, (int) $this->cashAccount->fresh()->balance);
+            $data['inventory'][0]['quantity_units'] = 4;
+            file_put_contents($path, json_encode($data));
+            $this->artisan('app:import-opening-balances', ['--file' => $path])->assertFailed();
+            $this->assertSame(3, (int) InventoryBalance::whereHas('variant.product', fn ($q) => $q->where('normalized_name', 'audit drink'))->value('quantity'));
+        } finally {
+            File::delete($path);
+        }
+    }
+
+    public function test_audit_outflow_uses_proportional_value_instead_of_rounded_unit_cost(): void
+    {
+        $service = app(InventoryLedgerService::class);
+        $service->recordInflow($this->variantFanta->id, 1, 4);
+        $service->recordInflow($this->variantFanta->id, 2, 3);
+
+        $outflow = $service->recordOutflow($this->variantFanta->id, 2);
+        $this->assertSame(7, $outflow['total_cost']);
+        $this->assertSame(3, $outflow['remaining_total_value']);
+
+        $last = $service->recordOutflow($this->variantFanta->id, 1);
+        $this->assertSame(3, $last['total_cost']);
+        $this->assertSame(0, $last['remaining_total_value']);
     }
 
     /**

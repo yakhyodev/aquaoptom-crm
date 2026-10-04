@@ -201,10 +201,11 @@ class ApiController extends Controller
             'notes' => 'nullable|string',
             'items' => 'required|array|min:1',
             'items.*.variant_id' => 'required|exists:product_variants,id',
-            'items.*.quantity' => 'required|numeric|min:0.1',
-            'items.*.package_name' => 'nullable|string|in:dona,blok,yashik',
-            'items.*.unit_price' => 'nullable|numeric',
-            'items.*.sale_price' => 'nullable|numeric',
+            'items.*.quantity' => 'required|integer|min:1|max:2147483647',
+            'items.*.package_name' => 'nullable|string|in:dona',
+            'items.*.unit_price' => 'nullable|integer|min:1',
+            'items.*.sale_price' => 'nullable|integer|min:1',
+            'items.*.price_version' => 'nullable|integer|min:1',
             'items.*.is_system_price' => 'nullable|boolean',
         ]);
 
@@ -232,8 +233,8 @@ class ApiController extends Controller
                 $package = $variant->packages->firstWhere('name', $pkgName);
                 $unitsPerPkg = $package ? $package->units_per_package : 1;
 
-                $inputQty = (float) $item['quantity'];
-                $totalUnits = (float) round($inputQty * $unitsPerPkg, 3);
+                $inputQty = (int) $item['quantity'];
+                $totalUnits = $inputQty;
 
                 $salePrice = (int) ($item['sale_price'] ?? $item['unit_price'] ?? $variant->default_sale_price ?? 0);
                 $isSystemPrice = $item['is_system_price'] ?? ($salePrice === (int) $variant->default_sale_price);
@@ -245,6 +246,7 @@ class ApiController extends Controller
                     'quantity' => $totalUnits,
                     'sale_price' => $salePrice,
                     'is_system_price' => $isSystemPrice,
+                    'price_version' => $item['price_version'] ?? null,
                 ];
             }
 
@@ -259,7 +261,8 @@ class ApiController extends Controller
                 notes: $notes,
                 warehouseId: null,
                 userId: auth()->id(),
-                source: 'Flutter Mobile / API'
+                source: 'Flutter Mobile / API',
+                rawPayload: $validated
             );
 
             $sale->load(['customer', 'items.variant.product', 'items.variant.volume']);

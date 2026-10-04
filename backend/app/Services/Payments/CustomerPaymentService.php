@@ -78,7 +78,7 @@ class CustomerPaymentService
             'payment_method' => strtoupper($paymentMethod),
         ];
 
-        return $this->operationService->execute(
+        $result = $this->operationService->execute(
             operationId: $operationId,
             operationType: 'CUSTOMER_PAYMENT',
             payload: $rawPayload ?? $canonicalPayload,

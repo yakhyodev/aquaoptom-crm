@@ -243,6 +243,6 @@ class OfflinePwaAndPosTest extends TestCase
 
         $outputText = implode("\n", $output);
         $this->assertEquals(0, $exitCode, "IndexedDB testlari muvaffaqiyatsiz bo'ldi:\n{$outputText}");
-        $this->assertStringContainsString('ALL 7 AQUADB TESTS PASSED WITH 100% SUCCESS', $outputText);
+        $this->assertStringContainsString('ALL AQUADB TESTS PASSED', $outputText);
     }
 }

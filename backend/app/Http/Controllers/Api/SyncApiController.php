@@ -68,10 +68,11 @@ class SyncApiController extends Controller
         $deviceUuid = $request->header('X-Device-UUID') ?: $request->input('device_uuid');
 
         if (! $deviceUuid) {
-            return response()->json([
-                'success' => false,
-                'message' => 'device_uuid parametri yoki X-Device-UUID headeri talab qilinadi!',
-            ], 422);
+            $assigned = Device::where('assigned_user_id', $user->id)->where('is_active', true)->limit(2)->get();
+            if ($assigned->count() !== 1) {
+                return response()->json(['success' => false, 'message' => 'Bitta faol qurilma biriktiring yoki device_uuid yuboring.'], 422);
+            }
+            $deviceUuid = $assigned->first()->device_uuid;
         }
 
         $device = Device::where('device_uuid', $deviceUuid)->first();
@@ -196,20 +197,20 @@ class SyncApiController extends Controller
      */
     public function status(string $operationId): JsonResponse
     {
-        $op = OperationResult::where('operation_id', $operationId)->first();
+        $op = OperationResult::where('operation_id', $operationId)->where('actor_id', auth()->id())->first();
         if ($op) {
             return response()->json([
                 'success' => true,
                 'operation_id' => $op->operation_id,
                 'status' => $op->status,
                 'operation_type' => $op->operation_type,
-                'result_payload' => $op->result_payload,
+                'result_payload' => auth()->user()->hasPermission('view_cost_price') ? $op->result_payload : $this->changeLogService->maskSensitiveFields($op->result_payload ?? []),
                 'error_code' => $op->error_code,
                 'processed_at' => $op->processed_at?->format('Y-m-d\TH:i:s\Z'),
             ]);
         }
 
-        $conflict = SyncConflict::where('operation_id', $operationId)->first();
+        $conflict = SyncConflict::where('operation_id', $operationId)->where('user_id', auth()->id())->first();
         if ($conflict) {
             return response()->json([
                 'success' => true,

@@ -27,7 +27,10 @@ class AppDatabase {
 
   static void initializeFfiIfNeeded() {
     if (!_ffiInitialized) {
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS || kIsWeb) {
+      if (Platform.isWindows ||
+          Platform.isLinux ||
+          Platform.isMacOS ||
+          kIsWeb) {
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
       }
@@ -35,7 +38,9 @@ class AppDatabase {
     }
   }
 
-  Future<Database> _initDatabase({String dbName = 'aquaoptom_offline.db'}) async {
+  Future<Database> _initDatabase({
+    String dbName = 'aquaoptom_offline.db',
+  }) async {
     initializeFfiIfNeeded();
 
     String path;
@@ -53,10 +58,7 @@ class AppDatabase {
         await db.execute('PRAGMA foreign_keys = ON');
       },
       onCreate: (db, version) async {
-        await _createTablesV1(db);
-        if (version >= 2) {
-          await _upgradeV1ToV2(db);
-        }
+        await createSchema(db, version);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -64,6 +66,12 @@ class AppDatabase {
         }
       },
     );
+  }
+
+  @visibleForTesting
+  static Future<void> createSchema(DatabaseExecutor db, int version) async {
+    await _createTablesV1(db);
+    if (version >= 2) await _upgradeV1ToV2(db);
   }
 
   static Future<void> _createTablesV1(DatabaseExecutor db) async {
@@ -229,10 +237,18 @@ class AppDatabase {
   /// Version 2 ga yangilash (navbatdagi ma'lumotlarni saqlagan holda)
   static Future<void> _upgradeV1ToV2(DatabaseExecutor db) async {
     // Indekslar qo'shish (agar avval mavjud bo'lmasa)
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sync_queue_user_status ON sync_queue (user_id, status)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_sync_queue_created ON sync_queue (device_created_at)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_stock_alloc_variant ON stock_allocations (variant_id)');
-    await db.execute('CREATE INDEX IF NOT EXISTS idx_credit_alloc_cust ON credit_allocations (customer_id)');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sync_queue_user_status ON sync_queue (user_id, status)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_sync_queue_created ON sync_queue (device_created_at)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_stock_alloc_variant ON stock_allocations (variant_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_credit_alloc_cust ON credit_allocations (customer_id)',
+    );
   }
 
   /// Bazani tozalash (faqat testlar uchun)
