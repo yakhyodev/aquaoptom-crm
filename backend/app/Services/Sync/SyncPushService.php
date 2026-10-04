@@ -2,12 +2,16 @@
 
 namespace App\Services\Sync;
 
+use App\Models\AuditLog;
 use App\Models\CashAccount;
+use App\Models\CashMovement;
 use App\Models\CashSession;
 use App\Models\Customer;
+use App\Models\CustomerLedger;
 use App\Models\Device;
 use App\Models\OperationResult;
 use App\Models\ProductVariant;
+use App\Models\Sale;
 use App\Models\SyncConflict;
 use App\Models\User;
 use App\Services\Devices\Exceptions\DeviceRevokedException;
@@ -15,6 +19,7 @@ use App\Services\Devices\Exceptions\LeaseExpiredException;
 use App\Services\Devices\OfflineLeaseService;
 use App\Services\Ledger\Exceptions\InsufficientAllocationException;
 use App\Services\Ledger\Exceptions\InsufficientCreditAllocationException;
+use App\Services\Ledger\InventoryLedgerService;
 use App\Services\Operations\Exceptions\OperationException;
 use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Operations\PayloadFingerprint;
@@ -30,7 +35,8 @@ class SyncPushService
         protected CreateSaleService $createSaleService,
         protected CustomerPaymentService $customerPaymentService,
         protected OfflineLeaseService $leaseService,
-        protected SyncChangeLogService $changeLogService
+        protected SyncChangeLogService $changeLogService,
+        protected InventoryLedgerService $inventoryLedgerService
     ) {}
 
     /**
@@ -134,6 +140,8 @@ class SyncPushService
                     $res = $this->handleCreateSale($device, $user, $opId, $payload, $canonicalFingerprint, $deviceCreatedAt, $receivedAt);
                 } elseif ($type === 'CUSTOMER_PAYMENT') {
                     $res = $this->handleCustomerPayment($device, $user, $opId, $payload, $canonicalFingerprint, $deviceCreatedAt, $receivedAt);
+                } elseif ($type === 'VOID_SALE' || $type === 'CANCEL_SALE') {
+                    $res = $this->handleVoidSale($device, $user, $opId, $payload, $canonicalFingerprint, $deviceCreatedAt, $receivedAt);
                 } else {
                     throw new \InvalidArgumentException("Noma'lum operatsiya turi: '{$type}'");
                 }
@@ -585,6 +593,198 @@ class SyncPushService
             'data' => $res,
             'error_code' => null,
             'message' => null,
+        ];
+    }
+
+    /**
+     * Offline bekor qilingan savdoni serverda rasmiylashtirish (originalga bog'langan tuzatish).
+     */
+    protected function handleVoidSale(
+        Device $device,
+        User $user,
+        string $operationId,
+        array $payload,
+        string $fingerprint,
+        Carbon $deviceCreatedAt,
+        Carbon $receivedAt
+    ): array {
+        $originalOpId = $payload['original_operation_id'] ?? null;
+        $reason = $payload['reason'] ?? 'Offline bekor qilindi';
+
+        if (! $originalOpId) {
+            throw new OperationValidationException(
+                $operationId,
+                "Bekor qilinayotgan savdoning original_operation_id ko'rsatilishi shart!",
+                ['payload' => $payload],
+                'ORIGINAL_OPERATION_REQUIRED'
+            );
+        }
+
+        // Asl savdoni topish
+        $sale = Sale::where('operation_id', $originalOpId)->with('items')->first();
+
+        if (! $sale) {
+            // Agar asl savdo serverda hali topilmasa:
+            $conflict = SyncConflict::where('operation_id', $originalOpId)->first();
+            if ($conflict) {
+                $conflict->update([
+                    'status' => 'CANCELLED',
+                    'resolution_action' => 'CANCELLED_BY_CLIENT',
+                    'resolved_at' => Carbon::now(),
+                ]);
+            }
+
+            OperationResult::create([
+                'operation_id' => $operationId,
+                'operation_type' => 'VOID_SALE',
+                'payload_fingerprint' => $fingerprint,
+                'actor_id' => $user->id,
+                'device_id' => $device->id,
+                'source' => $device->device_type ?: 'pwa',
+                'status' => 'PROCESSED',
+                'result_payload' => [
+                    'original_operation_id' => $originalOpId,
+                    'status' => 'VOIDED_BEFORE_POSTING',
+                    'reason' => $reason,
+                ],
+                'processed_at' => Carbon::now(),
+            ]);
+
+            return [
+                'operation_id' => $operationId,
+                'status' => 'APPLIED',
+                'original_operation_id' => $originalOpId,
+                'server_document_id' => null,
+                'server_document_number' => null,
+                'entity_type' => 'Sale',
+                'entity_id' => null,
+                'message' => 'Savdo serverga yetib kelmasdan bekor qilingan deb qayd etildi.',
+                'error_code' => null,
+            ];
+        }
+
+        // Agar savdo allaqachon bekor qilingan bo'lsa (idempotent replay)
+        if ($sale->status === 'CANCELLED' || $sale->status === 'VOID') {
+            return [
+                'operation_id' => $operationId,
+                'status' => 'RETRY_SUCCESS',
+                'original_operation_id' => $originalOpId,
+                'server_document_id' => $sale->id,
+                'server_document_number' => $sale->invoice_number,
+                'entity_type' => 'Sale',
+                'entity_id' => $sale->id,
+                'message' => 'Savdo avval bekor qilingan.',
+                'error_code' => null,
+            ];
+        }
+
+        // Savdo posted bo'lgan: tovarlarni omborga qaytarish va ledgerni tuzatish
+        foreach ($sale->items as $item) {
+            $this->inventoryLedgerService->recordInflow(
+                productVariantId: $item->product_variant_id,
+                quantity: $item->quantity,
+                unitCost: (int) ($item->purchase_cost_snapshot ?? 0),
+                movementType: 'SALE_RETURN',
+                warehouseId: $sale->warehouse_id,
+                operationId: $operationId,
+                referenceType: Sale::class,
+                referenceId: $sale->id,
+                userId: $user->id
+            );
+        }
+
+        // Agar nasiya bo'lgan bo'lsa, mijoz qarzini kamaytirish
+        if ($sale->debt_amount > 0 && $sale->customer_id) {
+            $customer = Customer::find($sale->customer_id);
+            if ($customer) {
+                CustomerLedger::create([
+                    'customer_id' => $customer->id,
+                    'operation_id' => $operationId,
+                    'type' => 'SALE_CANCEL',
+                    'payment_method' => $sale->payment_method,
+                    'debit' => 0,
+                    'credit' => $sale->debt_amount,
+                    'balance_after' => $customer->current_debt - $sale->debt_amount,
+                    'notes' => "Savdo #{$sale->invoice_number} bekor qilindi: {$reason}",
+                    'created_at' => Carbon::now(),
+                ]);
+                $customer->decrement('current_debt', $sale->debt_amount);
+            }
+        }
+
+        // Agar naqd to'langan bo'lsa va kassa hisobi bo'lsa, kassa chiqimi (refund)
+        if ($sale->paid_amount > 0 && $sale->cash_account_id) {
+            $cashAccount = CashAccount::find($sale->cash_account_id);
+            if ($cashAccount) {
+                CashMovement::create([
+                    'cash_account_id' => $cashAccount->id,
+                    'operation_id' => $operationId,
+                    'type' => 'REFUND',
+                    'direction' => 'OUT',
+                    'debit' => 0,
+                    'credit' => $sale->paid_amount,
+                    'amount' => $sale->paid_amount,
+                    'balance_after' => $cashAccount->balance - $sale->paid_amount,
+                    'description' => "Savdo #{$sale->invoice_number} bekor qilindi (qaytarish): {$reason}",
+                    'created_at' => Carbon::now(),
+                ]);
+                $cashAccount->decrement('balance', $sale->paid_amount);
+            }
+        }
+
+        $sale->update([
+            'status' => 'CANCELLED',
+            'notes' => trim(($sale->notes ?? '')." | Bekor qilindi: {$reason}"),
+        ]);
+
+        // AuditLog
+        AuditLog::create([
+            'user_id' => $user->id,
+            'action' => 'SALE_CANCEL',
+            'auditable_type' => Sale::class,
+            'auditable_id' => $sale->id,
+            'old_values' => ['status' => 'COMPLETED'],
+            'new_values' => ['status' => 'CANCELLED', 'reason' => $reason],
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+
+        // ChangeLog
+        $this->changeLogService->logChange('SALE', $sale->id, 'CANCELLED', [
+            'id' => $sale->id,
+            'invoice_number' => $sale->invoice_number,
+            'status' => 'CANCELLED',
+            'reason' => $reason,
+        ]);
+
+        OperationResult::create([
+            'operation_id' => $operationId,
+            'operation_type' => 'VOID_SALE',
+            'payload_fingerprint' => $fingerprint,
+            'actor_id' => $user->id,
+            'device_id' => $device->id,
+            'source' => $device->device_type ?: 'pwa',
+            'status' => 'PROCESSED',
+            'result_payload' => [
+                'original_operation_id' => $originalOpId,
+                'sale_id' => $sale->id,
+                'invoice_number' => $sale->invoice_number,
+                'status' => 'CANCELLED',
+                'reason' => $reason,
+            ],
+            'processed_at' => Carbon::now(),
+        ]);
+
+        return [
+            'operation_id' => $operationId,
+            'status' => 'APPLIED',
+            'original_operation_id' => $originalOpId,
+            'server_document_id' => $sale->id,
+            'server_document_number' => $sale->invoice_number,
+            'entity_type' => 'Sale',
+            'entity_id' => $sale->id,
+            'message' => "Savdo #{$sale->invoice_number} muvaffaqiyatli bekor qilindi.",
+            'error_code' => null,
         ];
     }
 }

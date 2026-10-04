@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-// Public Authentication
+// Public Authentication & Health Ping
+Route::get('/health', [SyncApiController::class, 'ping']);
 Route::post('/auth/login', [AuthApiController::class, 'login']);
 
 // Protected API Routes (Sanctum Token + Active User Check)
@@ -38,7 +39,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Generic Idempotent Operation Runner
     Route::post('/operations/execute', [OperationApiController::class, 'execute']);
 
-    // Sync Protocol Endpoints (Prompt 12)
+    // Sync Protocol Endpoints (Prompt 12 & 14)
+    Route::get('/sync/health', [SyncApiController::class, 'health']);
     Route::post('/sync/bootstrap', [SyncApiController::class, 'bootstrap']);
     Route::get('/sync/pull', [SyncApiController::class, 'pull']);
     Route::post('/sync/push', [SyncApiController::class, 'push']);

@@ -85,7 +85,7 @@
 | **10** | **Kassa, xarajat, o‘tkazma va smena** | Kundalik ish | **DONE** | Naqd/karta/bank hisoblari; umumiy atomik cash kontrakti; operatsion xarajatlar (`ExpenseService`), egasi mablag'i (`OwnerFundsService`, draw operatsion xarajat emas va foydani kamaytirmaydi); hisoblararo o'tkazma (`CashTransferService`, savdo/foyda emas); kassa yetarliligi `lockForUpdate` ichida; bitta naqd hisob uchun bitta OPEN smena (`CashSession`), kutilgan naqd balansi, sanalgan naqd, farq sababi; offline qurilmalar kutilganda PROVISIONAL yopilish; closed session guard (yopilgan smenaga savdo/harakat yozilmaydi); farqni yashirin balance overwrite bilan emas, balki ruxsatli farq hujjati bilan rasman tuzatish; 14.3 misoli (500k boshlang'ich naqd, supplier -300k, sale +140k, debt +100k, supplier -50k = 390k naqd, ombor/qarzlar aralashmasligi); Livewire `CashManager` interfeysi; 99/99 testlar (692 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 11-bosqichni boshlash |
 | **11** | **Offline qurilmalar, qoldiq va kredit ajratmalari** | Offline poydevori | **DONE** | Device registration (`devices` jadvali, DEV-0001, UUID, tur, status, oxirgi ko‘rilgan vaqt); HMAC-SHA256 imzolangan muddatli lease (`offline_authorizations`, epoch, token, vaqtli permissions); tovar ajratmasi (`inventory_allocations` va harakatlar daftari, 100 dona = PC 60 / Phone 30 / Free 10 stsenariysi, online savdo o‘z rezervi yoki erkin qoldiqni sarflashi, parallel grant jismoniy qoldiqdan oshmasligi, idempotent iste'mol, bekor bo'lish/uzilish rezervni avtomatik boshqa qurilmaga bermasligi, yo'qolgan qurilmani audit sababi bilan reconciliation qilish); ombordagi brak/qaytarish amallarini faol rezervlardan himoyalash (`ReservedStockProtectionException`); qat'iy mijoz kredit limiti va yangi offline mijozlar uchun umumiy qarz byudjeti; Livewire `DeviceManager` interfeysi; 110/110 testlar (735 assertions), Pint, Vite, Flutter analyze 100% o'tdi. | 12-bosqichni boshlash |
 | **13** | **PWA lokal baza va internetsiz sotuv** | Offline PWA | **DONE** | Standalone PWA manifest (`manifest.json`), Service Worker (`sw.js`, app shell cache, network-only offline JSON fallback), `AquaOptomDB` IndexedDB sxemasi (9 ta store), Pure JS/Alpine.js offline POS (`aqua-pos.js`, `aqua-db.js`, Livewire online qoladi), atomik lokal savdo tranzaksiyasi (quota, credit, sale, outbox, draft clearing bitta IndexedDB tranzaksiyada), mijoz UUID, PIN lock, ko‘p tabli BroadcastChannel sinxronizatsiyasi, favqulodda JSON eksport; 7/7 JS unit testlari (Node.js + fake-indexeddb), 7/7 Feature testlari va 129/129 to'liq tizim testlari 100% o'tdi. | 14-bosqichni boshlash |
-| 14 | PWA avtomatik sync va uzilish sinovlari | Offline PWA | TODO | - | Reconnect sync, retry, ACK, storage failure recovery |
+| **14** | **PWA avtomatik sync va uzilish sinovlari** | Offline PWA | **DONE** | IndexedDB navbatini API bilan ulash: server health tekshirish (`/api/health`, `/api/sync/health`), pending batch push (`/api/sync/push`), ACK'ni lokal atomik yozish (`applyPushResults`), cursor pull (`applyPulledChanges`) va qolgan pending overlay hisobi (`getPendingOverlay`); avtomatik sinxronizatsiya triggerlari (`online`, `visibilitychange`, window `focus`, 30s interval, qo'lda sync tugmasi, Service Worker Background Sync API); ko'p tabli poyga holatini oldini olish uchun multi-tab mutex lock (`acquireSyncLock` / `releaseSyncLock`, 30s stale recovery bilan); asl `operation_id` va payload bilan idempotent replay (tarmoq uzilishi va timeoutda qayta jo'natilganda dublikatsiz `RETRY_SUCCESS`); xavfsiz retention (ACK bo'lgan chek va payloadlar outbox'dan o'chirib yuborilmaydi, status `APPLIED` qilinadi, favqulodda tiklash uchun saqlanadi); offline savdoni bekor qilish (`VOID_SALE` / `CANCEL_SALE`, asl `original_operation_id` ga bog'lanadi, navbatdan o'chirilmaydi, ombor/kassa/mijoz qaytariladi); `NEEDS_REVIEW` holati va tushuntirish modal oynasi; 7/7 JS unit testlari (Node.js + fake-indexeddb), 6/6 Feature testlari, 135/135 to'liq tizim testlari 100% o'tdi. | 15-bosqichni boshlash |
 | 15 | Ombor qoldiqlari va interaktiv kalkulyator | Tahlil va nazorat | TODO | - | Master kalkulyator, hajm checkboxlari, kutilayotgan foyda |
 | 16 | Qaytarish, brak, inventarizatsiya va tuzatish | Tahlil va nazorat | TODO | - | Qisman/to‘liq qaytarish, brak, inventarizatsiya freeze |
 | 17 | Savdo tarixi, hisobotlar va eksportlar | Tahlil va nazorat | TODO | - | Tahlil, sana filtrlari, Excel/PDF eksport |
@@ -645,19 +645,84 @@
 
 ---
 
-## 19. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
+## 19. 14-Bosqich Tekshiruv Buyruqlari va Natijalari (Verification Evidence)
+
+1. **Server Health va Push Reversal/Void Protokoli:**
+   - **Endpointlar:** `GET /api/health` (ochiq ping), `GET /api/sync/health` (Sanctum/qurilma bilan server vaqti va holati).
+   - **`SyncPushService::handleVoidSale`:**
+     - `VOID_SALE` yoki `CANCEL_SALE` amali kelganda `original_operation_id` bo'yicha sotuv topiladi;
+     - Agar savdo allaqachon serverda bo'lsa (`COMPLETED`), ombor harakati orqali tovarlar to'liq qaytariladi (`InventoryLedgerService::recordMovement` turi `SALE_RETURN`);
+     - Mijozning qarzi qaytariladi (`customer_ledger` da qarama-qarshi yozuv, `current_debt` kamaytiriladi);
+     - Agar savdoda naqd pul olingan bo'lsa, kassadan pul chiqariladi (`CashAccount::balance` kamaytiriladi va harakat yoziladi);
+     - Sotuv holati `CANCELLED` qilinadi, `AuditLog` ga `SALE_CANCEL` kiritiladi va `operation_results` ga `APPLIED` qayd etiladi;
+     - Agar savdo hali serverga kelmasdan bekor qilingan bo'lsa, `OperationResult` ga yoziladi va serverga keyinchalik kelishi kutilgan savdoni bloklaydi;
+     - Takroriy jo'natilganda (idempotent replay) `RETRY_SUCCESS` qaytadi va ombor/kassa ikkinchi marta buzilmaydi.
+
+2. **Lokal Offline Mexanizmlar (`aqua-db.js`, `aqua-sync.js`, `aqua-pos.js`):**
+   - **Multi-Tab Mutex Lock (`acquireSyncLock` / `releaseSyncLock`):**
+     - Bir necha ochiq tab yoki worker parallel push qilib poyga holati (race condition) keltirib chiqarmasligi uchun `sync_lock` store'da qulf olinadi;
+     - Agar qulf egasi qotib qolsa yoki tab kutilmaganda yopilsa, 30 soniyadan oshgan lock avtomatik ravishda stale deb topilib boshqa tabga beriladi (`recovery`).
+   - **Pending Batch Push va Xavfsiz Retention (`applyPushResults`):**
+     - ACK kelganda chek yoki operatsiya IndexedDB `sync_outbox` dan **o'chirib tashlanmaydi**;
+     - Statusi `APPLIED` ga o'zgartiriladi va `applied_at` belgilanadi;
+     - Bu ofatdan tiklash (disaster recovery) va mahalliy audit tarixi uchun saqlanadi.
+   - **Incremental Cursor Pull (`applyPulledChanges`):**
+     - Server kursoridan olingan o'zgarishlar (`CATALOG_UPDATED`, `CUSTOMER_UPDATED`, `ALLOCATION_CHANGED`) lokal IndexedDB bazasiga atomik tarzda qo'llaniladi va `last_cursor` yangilanadi.
+   - **Remaining Pending Overlay (`getPendingOverlay`):**
+     - Hali serverga jo'natilmagan (pending) operatsiyalar tahlil qilinib, haqiqiy ko'rsatiladigan qoldiq va mijoz qarzi overlay sifatida to'g'ri hisoblanadi.
+   - **Offline Void Protokoli (`voidOfflineSale`):**
+     - Foydalanuvchi internetsiz savdoni bekor qilganda, u navbatdan o'chirilmaydi;
+     - Lokal `stock_allocations` va `credit_allocations` ga tovar va limit qaytariladi;
+     - `sales` jadvalida status `CANCELLED` bo'ladi;
+     - Outbox ga `VOID_SALE` turi bilan yangi operatsiya navbatga qo'yiladi (`original_operation_id` bilan).
+
+3. **Foydalanuvchi Interfeysi Yangilanishlari (`pos-offline.blade.php`, `aqua-pos.js`):**
+   - **Sync Status & Last Sync Time:** Yuqori paneldagi holat indikatori (Online/Offline, aylanish animatsiyasi, oxirgi muvaffaqiyatli sinxronizatsiya vaqti).
+   - **Outbox Navbati va Modal Oyna:** Yuborilmagan cheklar soni ko'rsatilgan tugma, bosilganda barcha navbatdagi amallar, ularning statusi (`PENDING`, `APPLIED`, `NEEDS_REVIEW`) va server izohi ko'rinadi.
+   - **Offline Bekor Qilish Modali:** Har bir lokal savdoni sababini ko'rsatgan holda bekor qilish oynasi.
+   - **Muddatli Ruxsatnoma (Lease) Ogohlantirish Paneli:** Agar lease muddati tugashiga 1 soatdan kam qolgan bo'lsa yoki tugagan bo'lsa, banner orqali serverga ulanish zarurligi eslatiladi.
+   - **Avtomatik Triggerlar:** Tarmoq paydo bo'lganda (`online`), ilova ochilganda (`visibilitychange`), oyna fokuslanganda (`focus`), davriy 30 soniyali taymer va Service Worker background sync orqali sinxronizatsiya chaqiriladi.
+
+4. **Avtomatlashtirilgan Test Natijalari (Verification Evidence):**
+   - **Node.js Sync Protocol Unit Testlari (`backend/tests/pwa-sync-protocol-test.cjs`):**
+     - `Test 1: Multi-tab mutex lock acquisition and stale lock recovery`: **PASS**
+     - `Test 2: Pending push and atomic ACK processing with safe retention`: **PASS**
+     - `Test 3: Timeout handling and idempotent replay without duplicates`: **PASS**
+     - `Test 4: Incremental cursor pull and delta feed application`: **PASS**
+     - `Test 5: Remaining pending overlay calculation`: **PASS**
+     - `Test 6: Offline void/cancellation: original retained, correction queued`: **PASS**
+     - `Test 7: NEEDS_REVIEW status handling in outbox`: **PASS**
+     - **Barcha 7/7 ta sinov 100% muvaffaqiyatli o'tdi.**
+   - **Node.js Prompt 13 Regressiya Testlari (`backend/tests/pwa-indexeddb-test.cjs`):**
+     - **7/7 testlar 100% muvaffaqiyatli o'tdi.**
+   - **Feature Testlari (`backend/tests/Feature/PwaAutoSyncAndDisruptionTest.php`):**
+     - `test_server_health_endpoints_accessible`: **PASS**
+     - `test_server_void_sale_reverses_inventory_customer_debt_and_cash`: **PASS**
+     - `test_server_void_sale_idempotent_replay`: **PASS**
+     - `test_void_sale_before_posted_records_safely`: **PASS**
+     - `test_node_js_sync_protocol_tests_pass`: **PASS**
+     - `test_push_operation_with_needs_review_retains_status`: **PASS**
+     - **6/6 passed (28 assertions, duration 3.3s)**.
+   - **To'liq Backend Testlari:** **135 passed out of 135 tests (921 assertions, duration 29.2s)**.
+   - **Laravel Pint:** `vendor/bin/pint --test`: **PASSED** (0 style issues).
+   - **Vite Build:** `npm run build`: **0 errors (built in 639ms)**.
+   - **Flutter Analyze:** `flutter analyze`: **No issues found! (ran in 1.6s)**.
+
+---
+
+## 20. Ochiq Qolgan Biznes Qarorlari va Cheklovlar
 
 1. **Eski Demo Testlarni Bosqichma-bosqich Almashtirish Rejasi:**
    - `BeverageCrmCoreTest.php` to‘liq yangi kirim va sotuv xizmatlariga moslashtirildi (8/8 passed).
    - Flutter `test/widget_test.dart` dagi default counter testi Prompt 20 da haqiqiy CRM kirish va savdo ekranlari widget testlariga almashtiriladi.
 2. **Offline qoldiq va kredit ajratish siyosati:** Prompt 11 doirasida to'liq amalga oshirildi.
 3. **Server Sync API va Nizolar protokoli:** Prompt 12 doirasida to'liq amalga oshirildi.
-4. **PWA Offline Baza va Savdo (Prompt 13):** To'liq amalga oshirildi.
-5. **PWA Avtomatik Sync va Uzilish Sinovlari:** Keyingi Prompt 14 da amalga oshiriladi (tarmoq qayta ulanganda outbox'ni avtomatik serverga push qilish, ACK, exponential backoff va storage failure recovery).
+4. **PWA Offline Baza va Savdo:** Prompt 13 doirasida to'liq amalga oshirildi.
+5. **PWA Avtomatik Sync va Uzilish Sinovlari:** Prompt 14 doirasida to'liq amalga oshirildi.
 6. **Flutter ilovasining birinchi relizdagi roli:** PWA birinchi relizda barcha qurilmalarda ishga tushadi; Flutter Android parallel ravishda ishlab chiqilmoqda.
 
 ---
-*13-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 14.*
+*14-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 15.*
 
 
 

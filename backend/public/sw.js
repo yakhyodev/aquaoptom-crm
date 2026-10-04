@@ -124,3 +124,17 @@ self.addEventListener('fetch', (event) => {
         })
     );
 });
+
+// 4. Background Sync event (agar brauzer qo'llab-quvvatlasa)
+// "mavjud bo‘lsa background sync, yopiq appda barcha platforma uchun darhol yuborish va’dasi yo‘q"
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'aqua-sync') {
+        event.waitUntil(
+            self.clients.matchAll({ type: 'window' }).then((clientList) => {
+                for (const client of clientList) {
+                    client.postMessage({ type: 'BACKGROUND_SYNC_TRIGGERED' });
+                }
+            })
+        );
+    }
+});

@@ -342,7 +342,9 @@ export class AquaDB {
 
                 const outboxPayload = {
                     items: salePayloadItems,
+                    total_amount: parseInt(totalAmount) || 0,
                     paid_amount: parseInt(paidAmount) || 0,
+                    debt_amount: parseInt(debtAmount) || 0,
                     payment_method: paymentMethod || 'CASH',
                     notes: notes || ''
                 };
@@ -511,5 +513,380 @@ export class AquaDB {
         };
 
         return exportObj;
+    }
+
+    /**
+     * Offline bekor qilingan haqiqiy savdoni rasmiylashtirish (originalga bog'langan tuzatish).
+     * Navbatdan aslo DELETE qilinmaydi! Original saqlanadi, yangi VOID_SALE yozuvi navbatga qo'shiladi.
+     */
+    async voidOfflineSale(operationId, reason = 'Kassir tomonidan offline bekor qilindi') {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['sales', 'stock_allocations', 'credit_allocations', 'customers', 'sync_outbox'], 'readwrite');
+            let isAborted = false;
+            const abort = (msg) => {
+                if (!isAborted) {
+                    isAborted = true;
+                    try { tx.abort(); } catch (e) {}
+                    reject(new Error(msg));
+                }
+            };
+            tx.onerror = (e) => {
+                if (!isAborted) reject(new Error("Bekor qilishda saqlash xatosi: " + (e.target.error?.message || 'Storage error')));
+            };
+
+            const salesStore = tx.objectStore('sales');
+            const stockStore = tx.objectStore('stock_allocations');
+            const creditStore = tx.objectStore('credit_allocations');
+            const customerStore = tx.objectStore('customers');
+            const outboxStore = tx.objectStore('sync_outbox');
+
+            const salesIndex = salesStore.index('operation_id');
+            const saleReq = salesIndex.get(operationId);
+
+            saleReq.onsuccess = () => {
+                if (isAborted) return;
+                const sale = saleReq.result;
+                if (!sale) {
+                    return abort(`Savdo (#${operationId}) lokal bazada topilmadi!`);
+                }
+                if (sale.sync_status === 'CANCELLED' || sale.status === 'CANCELLED') {
+                    return abort(`Savdo allaqachon bekor qilingan!`);
+                }
+
+                // 1. Tovar ajratmalarini (quota) qaytarish
+                for (const item of (sale.items || [])) {
+                    const vid = parseInt(item.variant_id);
+                    const qty = parseInt(item.quantity) || 0;
+                    const stReq = stockStore.get(vid);
+                    stReq.onsuccess = () => {
+                        if (stReq.result) {
+                            const alloc = stReq.result;
+                            alloc.consumed_quantity = Math.max(0, (alloc.consumed_quantity || 0) - qty);
+                            stockStore.put(alloc);
+                        }
+                    };
+                }
+
+                // 2. Kredit ajratmasini qaytarish (agar nasiya bo'lsa)
+                if (sale.debt_amount > 0 && sale.customer_id) {
+                    const crReq = creditStore.get(sale.customer_id);
+                    crReq.onsuccess = () => {
+                        if (crReq.result) {
+                            const cred = crReq.result;
+                            cred.consumed_credit = Math.max(0, (cred.consumed_credit || 0) - sale.debt_amount);
+                            creditStore.put(cred);
+                        }
+                    };
+                    const cuReq = customerStore.get(sale.customer_id);
+                    cuReq.onsuccess = () => {
+                        if (cuReq.result) {
+                            const cust = cuReq.result;
+                            cust.current_debt = Math.max(0, (cust.current_debt || 0) - sale.debt_amount);
+                            customerStore.put(cust);
+                        }
+                    };
+                }
+
+                // 3. Savdo holatini yangilash
+                sale.status = 'CANCELLED';
+                sale.sync_status = 'CANCELLED_LOCALLY';
+                sale.cancelled_at = new Date().toISOString();
+                sale.cancellation_reason = reason;
+                salesStore.put(sale);
+
+                // 4. Outbox ga VOID_SALE yozish (Original CREATE_SALE o'chirilmaydi!)
+                const voidOpId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : this.generateUuidFallback();
+                const nowIso = new Date().toISOString();
+                const voidOutboxItem = {
+                    operation_id: voidOpId,
+                    type: 'VOID_SALE',
+                    device_created_at: nowIso,
+                    payload: {
+                        original_operation_id: operationId,
+                        reason: reason
+                    },
+                    status: 'PENDING',
+                    retry_count: 0,
+                    error_code: null,
+                    error_message: null,
+                    created_at: nowIso
+                };
+                outboxStore.put(voidOutboxItem);
+
+                tx.oncomplete = () => resolve({
+                    success: true,
+                    void_operation_id: voidOpId,
+                    original_operation_id: operationId,
+                    sale: sale
+                });
+            };
+            saleReq.onerror = () => abort("Savdoni qidirishda xatolik.");
+        });
+    }
+
+    /**
+     * ACK ni lokal atomik yozish (Server push javobini qayd etish).
+     * Barcha natijalar bitta tranzaksiyada saqlanadi. Outbox yozuvlari o'chirilmaydi!
+     */
+    async applyPushResults(results) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['sync_outbox', 'sales', 'customers', 'meta'], 'readwrite');
+            tx.onerror = (e) => reject(new Error("ACK saqlashda xatolik: " + (e.target.error?.message || 'Storage error')));
+
+            const outboxStore = tx.objectStore('sync_outbox');
+            const salesStore = tx.objectStore('sales');
+            const customerStore = tx.objectStore('customers');
+            const salesIndex = salesStore.index('operation_id');
+
+            const stats = { applied: 0, retrySuccess: 0, needsReview: 0, conflict: 0, failed: 0 };
+            const nowIso = new Date().toISOString();
+
+            for (const res of results) {
+                const opId = res.operation_id;
+                const status = res.status;
+
+                const obReq = outboxStore.get(opId);
+                obReq.onsuccess = () => {
+                    const item = obReq.result;
+                    if (!item) return;
+
+                    item.last_sync_attempt = nowIso;
+                    item.raw_response = res;
+
+                    if (status === 'APPLIED' || status === 'RETRY_SUCCESS') {
+                        item.status = 'APPLIED'; // Xavfsiz retention: navbatdan o'chirilmaydi!
+                        item.server_document_id = res.server_document_id || res.data?.server_document_id || null;
+                        item.server_document_number = res.server_document_number || res.data?.server_document_number || null;
+                        item.applied_at = nowIso;
+                        item.error_code = null;
+                        item.error_message = null;
+
+                        if (status === 'APPLIED') stats.applied++;
+                        else stats.retrySuccess++;
+
+                        // Tegishli savdo entitetini yangilash
+                        if (item.type === 'CREATE_SALE' || item.type === 'VOID_SALE') {
+                            const sReq = salesIndex.get(opId);
+                            sReq.onsuccess = () => {
+                                const sale = sReq.result;
+                                if (sale) {
+                                    sale.sync_status = 'SERVER_SYNCED';
+                                    sale.server_document_id = item.server_document_id;
+                                    sale.server_document_number = item.server_document_number;
+                                    sale.server_posted_at = res.data?.posted_at || nowIso;
+                                    salesStore.put(sale);
+                                }
+                            };
+                        } else if (item.type === 'CREATE_CUSTOMER') {
+                            // Lokal mijozni server ID bilan yangilash
+                            const cReq = customerStore.get(`local_${opId}`);
+                            cReq.onsuccess = () => {
+                                const cust = cReq.result;
+                                if (cust) {
+                                    cust.is_local = false;
+                                    cust.server_id = res.server_document_id;
+                                    customerStore.put(cust);
+                                }
+                            };
+                        }
+                    } else if (status === 'NEEDS_REVIEW') {
+                        item.status = 'NEEDS_REVIEW';
+                        item.conflict_id = res.conflict_id;
+                        item.error_code = res.error_code;
+                        item.error_message = res.message;
+                        stats.needsReview++;
+
+                        const sReq = salesIndex.get(opId);
+                        sReq.onsuccess = () => {
+                            const sale = sReq.result;
+                            if (sale) {
+                                sale.sync_status = 'NEEDS_REVIEW';
+                                sale.conflict_id = res.conflict_id;
+                                sale.error_message = res.message;
+                                salesStore.put(sale);
+                            }
+                        };
+                    } else if (status === 'CONFLICT') {
+                        item.status = 'CONFLICT';
+                        item.error_code = res.error_code;
+                        item.error_message = res.message;
+                        stats.conflict++;
+
+                        const sReq = salesIndex.get(opId);
+                        sReq.onsuccess = () => {
+                            const sale = sReq.result;
+                            if (sale) {
+                                sale.sync_status = 'CONFLICT';
+                                sale.error_message = res.message;
+                                salesStore.put(sale);
+                            }
+                        };
+                    } else {
+                        item.status = 'FAILED';
+                        item.error_code = res.error_code || 'FAILED';
+                        item.error_message = res.message;
+                        item.retry_count = (item.retry_count || 0) + 1;
+                        stats.failed++;
+
+                        const sReq = salesIndex.get(opId);
+                        sReq.onsuccess = () => {
+                            const sale = sReq.result;
+                            if (sale) {
+                                sale.sync_status = 'FAILED';
+                                sale.error_message = res.message;
+                                salesStore.put(sale);
+                            }
+                        };
+                    }
+
+                    outboxStore.put(item);
+                };
+            }
+
+            tx.oncomplete = () => resolve(stats);
+        });
+    }
+
+    /**
+     * Kursor bo'yicha serverdagi o'zgarishlarni lokal bazaga qo'llash (Pull delta feed)
+     */
+    async applyPulledChanges(events, nextCursor) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(['catalog', 'customers', 'meta'], 'readwrite');
+            tx.onerror = (e) => reject(new Error("Pull o'zgarishlarini saqlashda xatolik: " + (e.target.error?.message || 'Storage error')));
+
+            const catalogStore = tx.objectStore('catalog');
+            const customerStore = tx.objectStore('customers');
+            const metaStore = tx.objectStore('meta');
+
+            for (const ev of (events || [])) {
+                const type = (ev.aggregate_type || '').toUpperCase();
+                const action = (ev.action || '').toUpperCase();
+                const data = ev.payload || {};
+
+                if (type === 'PRODUCT' || type === 'VARIANT') {
+                    if (action === 'DELETED' || ev.is_tombstone) {
+                        if (data.id) catalogStore.delete(data.id);
+                    } else if (data.id) {
+                        catalogStore.put(data);
+                    }
+                } else if (type === 'CUSTOMER') {
+                    if (action === 'DELETED' || ev.is_tombstone) {
+                        if (data.id) customerStore.delete(data.id);
+                    } else if (data.id) {
+                        customerStore.put(data);
+                    }
+                }
+            }
+
+            if (nextCursor !== undefined && nextCursor !== null) {
+                metaStore.put({ key: 'last_cursor', value: nextCursor });
+            }
+            metaStore.put({ key: 'last_synced_at', value: new Date().toISOString() });
+
+            tx.oncomplete = () => resolve({ appliedEventsCount: events?.length || 0, nextCursor });
+        });
+    }
+
+    /**
+     * Ko'p tabli/worker konkurentsiyasi uchun lokal lock/lease olish.
+     * Agar lock band bo'lsa false qaytaradi; agar eski (stale > 30s) bo'lsa auto-recovery qiladi.
+     */
+    async acquireSyncLock(tabId = 'tab_1', timeoutMs = 30000) {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('meta', 'readwrite');
+            const metaStore = tx.objectStore('meta');
+            const req = metaStore.get('sync_lock');
+
+            req.onsuccess = () => {
+                const currentLock = req.result;
+                const now = Date.now();
+
+                if (currentLock) {
+                    const age = now - (currentLock.acquired_at || 0);
+                    if (age < timeoutMs && currentLock.holder_id !== tabId) {
+                        return resolve(false); // Band, boshqa tab ishlayapti
+                    }
+                    // Aks holda avtomatik tiklanish (Stale lock recovery)
+                }
+
+                metaStore.put({
+                    key: 'sync_lock',
+                    holder_id: tabId,
+                    acquired_at: now
+                });
+                tx.oncomplete = () => resolve(true);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Lokal lock/lease ni bo'shatish
+     */
+    async releaseSyncLock(tabId = 'tab_1') {
+        const db = await this.open();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('meta', 'readwrite');
+            const metaStore = tx.objectStore('meta');
+            const req = metaStore.get('sync_lock');
+
+            req.onsuccess = () => {
+                const currentLock = req.result;
+                if (currentLock && currentLock.holder_id === tabId) {
+                    metaStore.delete('sync_lock');
+                }
+                tx.oncomplete = () => resolve(true);
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+
+    /**
+     * Qolgan pending operatsiyalar overlayi:
+     * Server qoldiqlari ustiga hali ACK olinmagan lokal savdolarni qo'llab to'g'ri ko'rsatish
+     */
+    async getPendingOverlay() {
+        const outbox = await this.getAll('sync_outbox');
+        const pendingSales = outbox.filter(item => item.status === 'PENDING' && item.type === 'CREATE_SALE');
+
+        const pendingStockConsumed = new Map();
+        const pendingCustomerDebt = new Map();
+
+        for (const item of pendingSales) {
+            const payload = item.payload || {};
+            for (const line of (payload.items || [])) {
+                const vid = parseInt(line.variant_id);
+                const qty = parseInt(line.quantity) || 0;
+                pendingStockConsumed.set(vid, (pendingStockConsumed.get(vid) || 0) + qty);
+            }
+            if (payload.customer_id) {
+                const cid = parseInt(payload.customer_id);
+                const total = parseInt(payload.total_amount) || 0;
+                const paid = parseInt(payload.paid_amount) || 0;
+                const debt = parseInt(payload.debt_amount) || Math.max(0, total - paid);
+                if (debt > 0) {
+                    pendingCustomerDebt.set(cid, (pendingCustomerDebt.get(cid) || 0) + debt);
+                }
+            }
+        }
+
+        return {
+            pendingStockConsumed,
+            pendingCustomerDebt,
+            pendingCount: pendingSales.length
+        };
+    }
+
+    generateUuidFallback() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
     }
 }

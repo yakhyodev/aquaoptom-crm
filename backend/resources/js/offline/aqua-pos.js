@@ -4,14 +4,19 @@
  */
 
 import { AquaDB } from './aqua-db.js';
+import { AquaSync } from './aqua-sync.js';
 
 export function aquaPos() {
     return {
         // Asosiy holatlar
         db: new AquaDB(),
+        syncEngine: null,
         isOnline: navigator.onLine,
         isProcessing: false,
         isBootstrapping: false,
+        isSyncing: false,
+        lastSyncTime: null,
+        leaseWarning: null,
 
         // Xavfsizlik va PIN qulf
         isLocked: false,
@@ -51,6 +56,18 @@ export function aquaPos() {
             store_name: ''
         },
 
+        // Bekor qilish (Void) modali
+        showVoidModal: false,
+        voidSaleTarget: null,
+        voidReason: 'Mijoz tovardan voz kechdi',
+
+        // Outbox (Navbat) modali
+        showOutboxModal: false,
+        outboxItems: [],
+        outboxFilter: 'all',
+        needsReviewCount: 0,
+        recentSales: [],
+
         // Tizim xabarlari va Navbat
         outboxCount: 0,
         storageInfo: { usedMB: 0, totalMB: 0, percent: 0, isPersistent: false },
@@ -65,25 +82,59 @@ export function aquaPos() {
         async init() {
             try {
                 await this.db.open();
+                this.syncEngine = new AquaSync(this.db);
 
-                // Tarmoq holatini kuzatish
+                // Tarmoq holatini kuzatish va avto-sync
                 window.addEventListener('online', () => {
                     this.isOnline = true;
-                    this.showAlert('info', "Internet aloqasi tiklandi. Offline savdolarni sinxronlashingiz mumkin.");
+                    this.showAlert('info', "Internet aloqasi tiklandi. Avtomatik sinxronlash boshlanmoqda...");
+                    this.triggerAutoSync('online_reconnect');
                 });
                 window.addEventListener('offline', () => {
                     this.isOnline = false;
                     this.showAlert('warning', "Internet uzildi. Offline rejim faol: Barcha savdolar lokal saqlanadi.");
                 });
 
+                // App reopen / visibility change
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible' && this.isOnline) {
+                        this.triggerAutoSync('visibility_change');
+                    }
+                });
+                window.addEventListener('focus', () => {
+                    if (this.isOnline) {
+                        this.triggerAutoSync('window_focus');
+                    }
+                });
+
                 // Multi-tab sinxronlash (BroadcastChannel)
                 if (window.BroadcastChannel) {
                     this.broadcastChannel = new BroadcastChannel('aqua_pos_channel');
-                    this.broadcastChannel.onmessage = (event) => {
-                        if (event.data?.type === 'ALLOCATIONS_UPDATED' || event.data?.type === 'SALE_COMPLETED') {
-                            this.loadLocalData(false);
+                    this.broadcastChannel.onmessage = async (event) => {
+                        if (event.data?.type === 'SYNC_COMPLETED' || event.data?.type === 'ALLOCATIONS_UPDATED' || event.data?.type === 'SALE_COMPLETED') {
+                            await this.loadLocalData(false);
+                            await this.updateOutboxCount();
                         }
                     };
+                }
+
+                // Periodic auto-sync (har 30 soniyada, agar online bo'lsa)
+                setInterval(() => {
+                    if (this.isOnline && !this.isSyncing) {
+                        this.triggerAutoSync('periodic_interval');
+                    }
+                }, 30000);
+
+                // Background Sync API (agar brauzerda mavjud bo'lsa)
+                if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+                    navigator.serviceWorker.ready.then((reg) => {
+                        reg.sync.register('aqua-sync').catch(() => {});
+                    }).catch(() => {});
+                    navigator.serviceWorker.addEventListener('message', (event) => {
+                        if (event.data?.type === 'BACKGROUND_SYNC_TRIGGERED') {
+                            this.triggerAutoSync('background_sync');
+                        }
+                    });
                 }
 
                 // PIN tekshiruvi (meta'dan)
@@ -120,6 +171,20 @@ export function aquaPos() {
                 this.deviceLease = lease;
                 this.warehouseName = lease.warehouse_name || 'Asosiy Ombor';
                 this.permissions = lease.permissions || [];
+
+                // Lease muddati ogohlantirishi
+                if (lease.expires_at) {
+                    const expiresAt = new Date(lease.expires_at).getTime();
+                    const now = Date.now();
+                    const diffHours = (expiresAt - now) / (1000 * 60 * 60);
+                    if (diffHours < 0) {
+                        this.leaseWarning = "Qurilma ruxsat (lease) muddati tugagan! Iltimos, serverdan yangilang.";
+                    } else if (diffHours < 4) {
+                        this.leaseWarning = `Diqqat: Qurilma ruxsat muddati ${Math.ceil(diffHours)} soatda tugaydi.`;
+                    } else {
+                        this.leaseWarning = null;
+                    }
+                }
             }
 
             // B. Tovar ajratmalari (Stock Allocations)
@@ -142,6 +207,17 @@ export function aquaPos() {
 
             // E. Mijozlar
             this.customers = await this.db.getAll('customers');
+
+            // F. Oxirgi savdolar
+            const allSales = await this.db.getAll('sales');
+            allSales.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            this.recentSales = allSales.slice(0, 10);
+
+            // G. Oxirgi muvaffaqiyatli sync vaqti
+            const lastSync = await this.db.get('meta', 'last_successful_sync');
+            if (lastSync) {
+                this.lastSyncTime = lastSync.value;
+            }
 
             // Agar birinchi marta kirayotgan bo'lsa va katalog bo'sh bo'lsa, avtomatik bootstrap chaqiramiz
             if (initial && this.catalog.length === 0 && this.isOnline) {
@@ -675,6 +751,107 @@ export function aquaPos() {
 
         clearPin() {
             this.pinInput = '';
+        },
+
+        /**
+         * 14. Qo'lda (Manual) Sinxronizatsiya chaqirish
+         */
+        async syncNow() {
+            if (!this.syncEngine) this.syncEngine = new AquaSync(this.db);
+            if (this.isSyncing) return;
+
+            this.isProcessing = true;
+            this.isSyncing = true;
+            try {
+                const res = await this.syncEngine.syncNow('manual');
+                if (res.status === 'SUCCESS') {
+                    await this.loadLocalData(false);
+                    await this.updateOutboxCount();
+                    const pushed = res.pushResult?.pushedCount || 0;
+                    const pulled = res.pullResult?.pulledCount || 0;
+                    this.showAlert('success', `Sinxronlash yakunlandi: ${pushed} ta yuborildi, ${pulled} ta o'zgarish yangilandi.`);
+                } else if (res.status === 'OFFLINE') {
+                    this.showAlert('warning', res.message);
+                } else if (res.status === 'LOCKED') {
+                    this.showAlert('info', res.message);
+                } else {
+                    this.showAlert('error', res.message || 'Sinxronlashda xatolik yuz berdi.');
+                }
+            } catch (err) {
+                console.error("Manual sync xatolik:", err);
+                this.showAlert('error', "Sinxronlash xatosi: " + err.message);
+            } finally {
+                this.isProcessing = false;
+                this.isSyncing = false;
+            }
+        },
+
+        /**
+         * 15. Avtomatik Fon Sinxronlash (Reconnect, Reopen, Periodic)
+         */
+        async triggerAutoSync(source = 'auto') {
+            if (!this.isOnline || this.isSyncing) return;
+            if (!this.syncEngine) this.syncEngine = new AquaSync(this.db);
+
+            try {
+                const res = await this.syncEngine.syncNow(source);
+                if (res.status === 'SUCCESS') {
+                    await this.loadLocalData(false);
+                    await this.updateOutboxCount();
+                }
+            } catch (e) {
+                console.warn(`Auto sync (${source}) xatolik:`, e.message);
+            }
+        },
+
+        /**
+         * 16. Outbox Navbati Modali
+         */
+        async openOutboxModal() {
+            await this.refreshOutboxItems();
+            this.showOutboxModal = true;
+        },
+
+        async refreshOutboxItems() {
+            const allItems = await this.db.getAll('sync_outbox');
+            allItems.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            this.outboxItems = allItems;
+            this.outboxCount = allItems.filter(i => i.status === 'PENDING').length;
+            this.needsReviewCount = allItems.filter(i => i.status === 'NEEDS_REVIEW').length;
+        },
+
+        filteredOutboxItems() {
+            if (this.outboxFilter === 'all') return this.outboxItems;
+            return this.outboxItems.filter(i => i.status === this.outboxFilter);
+        },
+
+        /**
+         * 17. Offline Savdoni Bekor Qilish (Void)
+         */
+        openVoidModal(sale) {
+            this.voidSaleTarget = sale;
+            this.voidReason = 'Mijoz tovardan voz kechdi';
+            this.showVoidModal = true;
+        },
+
+        async confirmVoidSale() {
+            if (!this.voidSaleTarget) return;
+            try {
+                this.isProcessing = true;
+                const res = await this.db.voidOfflineSale(this.voidSaleTarget.operation_id, this.voidReason);
+                this.showVoidModal = false;
+                this.voidSaleTarget = null;
+                await this.loadLocalData(false);
+                await this.updateOutboxCount();
+                if (this.broadcastChannel) {
+                    this.broadcastChannel.postMessage({ type: 'SALE_COMPLETED' });
+                }
+                this.showAlert('info', `Savdo bekor qilindi va tuzatish navbatga olindi.`);
+            } catch (err) {
+                this.showAlert('error', "Bekor qilishda xatolik: " + err.message);
+            } finally {
+                this.isProcessing = false;
+            }
         },
 
         /**

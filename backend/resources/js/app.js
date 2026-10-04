@@ -1,8 +1,10 @@
 import Alpine from 'alpinejs';
 import { aquaPos } from './offline/aqua-pos.js';
 import { AquaDB } from './offline/aqua-db.js';
+import { AquaSync } from './offline/aqua-sync.js';
 
 window.AquaDB = AquaDB;
+window.AquaSync = AquaSync;
 window.aquaPos = aquaPos;
 
 if (typeof window.Alpine === 'undefined') {

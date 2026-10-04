@@ -61,26 +61,35 @@
                 <span x-text="isOnline ? 'ONLINE' : 'OFFLINE'" class="tracking-wide"></span>
             </div>
 
-            <!-- Outbox queue counter -->
+            <!-- Outbox queue counter & modal trigger -->
             <button type="button"
-                    @click="showAlert('info', `Lokal navbatda ${outboxCount} ta amal kutilmoqda. Internet ulanganda avtomatik sinxronlanadi.`)"
-                    class="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors"
-                    :class="outboxCount > 0 ? 'bg-amber-950/60 text-amber-300 border-amber-800 hover:bg-amber-900/60' : 'bg-slate-800/60 text-slate-400 border-slate-700/60'">
-                <span>⏳</span>
+                    @click="openOutboxModal()"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors"
+                    :class="outboxCount > 0 ? 'bg-amber-950/70 text-amber-300 border-amber-800 hover:bg-amber-900/60' : 'bg-slate-800/60 text-slate-300 border-slate-700/60 hover:bg-slate-800'"
+                    title="Navbatdagi amallar va sinxronlash holati">
+                <span>📦</span>
                 <span class="hidden sm:inline">Navbat:</span>
                 <span class="font-bold font-mono" x-text="outboxCount"></span>
+                <template x-if="needsReviewCount > 0">
+                    <span class="bg-rose-600 text-white text-[10px] px-1 rounded-full font-bold animate-pulse" title="Admin tekshiruvi kutilmoqda" x-text="`! ${needsReviewCount}`"></span>
+                </template>
             </button>
 
-            <!-- Sync / Refresh from Server (Only if online) -->
+            <!-- Sync Now Button -->
             <button type="button"
-                    x-show="isOnline"
-                    @click="bootstrapFromServer()"
-                    :disabled="isBootstrapping"
-                    class="px-2.5 py-1 rounded-lg bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 font-medium transition-colors flex items-center gap-1 disabled:opacity-50"
-                    title="Serverdan katalog va ruxsatlarni yangilash">
-                <span :class="isBootstrapping ? 'animate-spin' : ''">🔄</span>
-                <span class="hidden md:inline" x-text="isBootstrapping ? 'Yuklanmoqda...' : 'Yangilash'"></span>
+                    @click="syncNow()"
+                    :disabled="isSyncing || !isOnline"
+                    class="px-2.5 py-1 rounded-lg bg-cyan-600/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-600/30 font-medium transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Hozir sinxronlash (Push + Pull)">
+                <span :class="isSyncing ? 'animate-spin' : ''">🔄</span>
+                <span class="hidden md:inline" x-text="isSyncing ? 'Sinxronlanmoqda...' : 'Sinxronlash'"></span>
             </button>
+
+            <!-- Last Sync Timestamp (desktop) -->
+            <div x-show="lastSyncTime" class="hidden xl:flex items-center gap-1 text-[11px] text-slate-400">
+                <span>🕒</span>
+                <span x-text="`Sync: ${new Date(lastSyncTime).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}`"></span>
+            </div>
 
             <!-- Storage Quota Badge -->
             <div class="hidden lg:flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/40 text-slate-400 border border-slate-800 text-[11px]"
@@ -107,6 +116,17 @@
             </button>
         </div>
     </header>
+
+    <!-- 1.1 LEASE EXPIRY WARNING BANNER -->
+    <div x-show="leaseWarning"
+         x-transition
+         class="bg-amber-950 text-amber-200 border-b border-amber-800 px-4 py-2 text-xs font-semibold flex items-center justify-between z-20">
+        <div class="flex items-center gap-2">
+            <span>⚠️</span>
+            <span x-text="leaseWarning"></span>
+        </div>
+        <button type="button" @click="syncNow()" class="underline text-amber-300 hover:text-white">Yangilash</button>
+    </div>
 
     <!-- 2. GLOBAL ALERT BANNER -->
     <div x-show="alertMessage"
@@ -553,6 +573,242 @@
                         @click="createOfflineCustomer()"
                         class="flex-1 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold">
                     Saqlash va Tanlash
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5.1 SYNC OUTBOX & AUDIT MODAL -->
+    <div x-show="showOutboxModal"
+         x-transition
+         class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-lg">📦</span>
+                    <div>
+                        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                            Lokal Navbat va Sinxronlash
+                            <span class="text-xs px-2 py-0.5 rounded-full font-mono font-semibold"
+                                  :class="outboxCount > 0 ? 'bg-amber-950 text-amber-300 border border-amber-800' : 'bg-emerald-950 text-emerald-300 border border-emerald-800'"
+                                  x-text="`${outboxCount} ta kutilmoqda`"></span>
+                        </h3>
+                        <p class="text-[11px] text-slate-400">
+                            Har bir amal barqaror <code class="font-mono text-cyan-400">operation_id</code> bilan saqlanadi va server tasdig'idan (ACK) keyin ham arxivlanadi.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" @click="showOutboxModal = false" class="text-slate-400 hover:text-white p-1">✕</button>
+            </div>
+
+            <!-- Filter tabs -->
+            <div class="px-5 py-2.5 bg-slate-950/30 border-b border-slate-800 flex flex-wrap gap-1.5 text-xs">
+                <button type="button"
+                        @click="outboxFilter = 'all'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors"
+                        :class="outboxFilter === 'all' ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400 hover:text-white'">
+                    Barchasi (<span x-text="outboxItems.length"></span>)
+                </button>
+                <button type="button"
+                        @click="outboxFilter = 'PENDING'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors"
+                        :class="outboxFilter === 'PENDING' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-800 text-amber-300 hover:text-white'">
+                    Kutilmoqda (<span x-text="outboxItems.filter(i => i.status === 'PENDING').length"></span>)
+                </button>
+                <button type="button"
+                        @click="outboxFilter = 'APPLIED'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors"
+                        :class="outboxFilter === 'APPLIED' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-800 text-emerald-300 hover:text-white'">
+                    Yuborildi (<span x-text="outboxItems.filter(i => i.status === 'APPLIED').length"></span>)
+                </button>
+                <button type="button"
+                        @click="outboxFilter = 'NEEDS_REVIEW'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors"
+                        :class="outboxFilter === 'NEEDS_REVIEW' ? 'bg-rose-600 text-white font-bold' : 'bg-slate-800 text-rose-300 hover:text-white'">
+                    Tekshiruvda (<span x-text="outboxItems.filter(i => i.status === 'NEEDS_REVIEW').length"></span>)
+                </button>
+                <button type="button"
+                        @click="outboxFilter = 'FAILED'"
+                        class="px-2.5 py-1 rounded-lg font-medium transition-colors"
+                        :class="outboxFilter === 'FAILED' ? 'bg-red-600 text-white font-bold' : 'bg-slate-800 text-red-300 hover:text-white'">
+                    Xatolik (<span x-text="outboxItems.filter(i => i.status === 'FAILED').length"></span>)
+                </button>
+            </div>
+
+            <!-- Outbox items list -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-2.5 divide-y divide-slate-800/40">
+                <template x-if="filteredOutboxItems().length === 0">
+                    <div class="text-center py-10 text-slate-500 text-xs">
+                        Ushbu filtr bo'yicha amallar mavjud emas.
+                    </div>
+                </template>
+
+                <template x-for="item in filteredOutboxItems()" :key="item.operation_id">
+                    <div class="pt-2.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded font-mono font-bold text-[10px]"
+                                      :class="{
+                                          'bg-blue-950 text-blue-300 border border-blue-800': item.type === 'CREATE_SALE',
+                                          'bg-purple-950 text-purple-300 border border-purple-800': item.type === 'VOID_SALE',
+                                          'bg-emerald-950 text-emerald-300 border border-emerald-800': item.type === 'CREATE_CUSTOMER',
+                                          'bg-amber-950 text-amber-300 border border-amber-800': item.type === 'CUSTOMER_PAYMENT'
+                                      }"
+                                      x-text="item.type"></span>
+
+                                <span class="font-mono text-[11px] text-slate-400" x-text="`ID: ${item.operation_id.slice(0, 8)}...`"></span>
+
+                                <span class="text-[11px] text-slate-500" x-text="new Date(item.created_at).toLocaleTimeString('uz-UZ')"></span>
+                            </div>
+
+                            <!-- Details description -->
+                            <div class="text-slate-300 text-xs">
+                                <template x-if="item.type === 'CREATE_SALE'">
+                                    <span>
+                                        Savdo: <span class="font-semibold text-white" x-text="`${(item.payload.items || []).reduce((acc, i) => acc + (i.quantity || 0), 0)} dona`"></span> •
+                                        To'lov: <span class="font-semibold text-white" x-text="item.payload.payment_method"></span>
+                                        <template x-if="item.payload.paid_amount">
+                                            <span x-text="`(${parseInt(item.payload.paid_amount).toLocaleString('uz-UZ')} so'm)`"></span>
+                                        </template>
+                                    </span>
+                                </template>
+                                <template x-if="item.type === 'VOID_SALE'">
+                                    <span class="text-rose-300">
+                                        Asl savdo (#<span x-text="(item.payload.original_operation_id || '').slice(0, 8)"></span>...) bekor qilindi. Sabab: <span x-text="item.payload.reason"></span>
+                                    </span>
+                                </template>
+                                <template x-if="item.type === 'CREATE_CUSTOMER'">
+                                    <span>
+                                        Yangi mijoz: <strong class="text-white" x-text="item.payload.name"></strong> (<span x-text="item.payload.phone || 'telefonsiz'"></span>)
+                                    </span>
+                                </template>
+                            </div>
+
+                            <!-- Error / Needs Review details -->
+                            <template x-if="item.status === 'NEEDS_REVIEW'">
+                                <div class="bg-rose-950/60 border border-rose-900 rounded-lg p-2 text-[11px] text-rose-300 space-y-0.5">
+                                    <div class="font-bold flex items-center gap-1">
+                                        <span>⚠️</span> Admin tekshiruvi kutilmoqda: <span x-text="item.error_code || 'NEEDS_REVIEW'"></span>
+                                    </div>
+                                    <div x-text="item.error_message || 'Kech yopilgan smena yoki ajratma chegarasi sababli admin tasdig\'iga o\'tkazildi.'"></div>
+                                </div>
+                            </template>
+                            <template x-if="item.status === 'FAILED'">
+                                <div class="text-[11px] text-red-400">
+                                    Xatolik: <span x-text="item.error_message"></span> (Retry: <span x-text="item.retry_count"></span>)
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Status badge & actions -->
+                        <div class="flex items-center gap-2 self-end sm:self-center">
+                            <template x-if="item.status === 'PENDING'">
+                                <span class="px-2.5 py-1 rounded-full bg-amber-950/80 text-amber-400 border border-amber-800 text-[10px] font-bold">
+                                    ⏳ Kutilmoqda
+                                </span>
+                            </template>
+                            <template x-if="item.status === 'APPLIED'">
+                                <div class="text-right">
+                                    <span class="px-2.5 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800 text-[10px] font-bold">
+                                        ✅ Yuborildi
+                                    </span>
+                                    <div class="text-[10px] text-slate-400 font-mono mt-0.5" x-text="item.server_document_number"></div>
+                                </div>
+                            </template>
+                            <template x-if="item.status === 'NEEDS_REVIEW'">
+                                <span class="px-2.5 py-1 rounded-full bg-rose-950/80 text-rose-400 border border-rose-800 text-[10px] font-bold">
+                                    🔍 Ko'rib chiqilmoqda
+                                </span>
+                            </template>
+                            <template x-if="item.status === 'CONFLICT'">
+                                <span class="px-2.5 py-1 rounded-full bg-purple-950/80 text-purple-400 border border-purple-800 text-[10px] font-bold">
+                                    ⚡ Mojaro
+                                </span>
+                            </template>
+
+                            <!-- Void action for CREATE_SALE items if not yet voided -->
+                            <template x-if="item.type === 'CREATE_SALE' && !outboxItems.some(o => o.type === 'VOID_SALE' && o.payload?.original_operation_id === item.operation_id)">
+                                <button type="button"
+                                        @click="openVoidModal({ operation_id: item.operation_id, invoice_number: item.server_document_number || 'Lokal chek', total_amount: item.payload.total_amount })"
+                                        class="px-2 py-1 rounded bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800 text-[10px] font-semibold transition-colors"
+                                        title="Ushbu savdoni bekor qilish">
+                                    Bekor qilish
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-5 py-3 border-t border-slate-800 bg-slate-950/50 flex flex-wrap items-center justify-between gap-3">
+                <button type="button"
+                        @click="exportPendingBackup()"
+                        class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition-colors">
+                    <span>📥</span> JSON zaxirani yuklash
+                </button>
+
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            @click="syncNow()"
+                            :disabled="isSyncing || !isOnline"
+                            class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 transition-colors">
+                        <span :class="isSyncing ? 'animate-spin' : ''">🔄</span>
+                        <span x-text="isSyncing ? 'Sinxronlanmoqda...' : 'Hozir sinxronlash'"></span>
+                    </button>
+                    <button type="button"
+                            @click="showOutboxModal = false"
+                            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+                        Yopish
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5.2 VOID / CANCEL OFFLINE SALE MODAL -->
+    <div x-show="showVoidModal"
+         x-transition
+         class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 class="text-sm font-bold text-rose-400 flex items-center gap-2">
+                    <span>🛑</span> Savdoni Bekor Qilish
+                </h3>
+                <button type="button" @click="showVoidModal = false; voidSaleTarget = null" class="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+                <div class="bg-slate-950/60 p-3 rounded-xl border border-slate-800 space-y-1">
+                    <div class="text-slate-400">Bekor qilinayotgan chek:</div>
+                    <div class="font-mono font-bold text-white text-sm" x-text="voidSaleTarget ? (voidSaleTarget.local_invoice_number || voidSaleTarget.invoice_number || voidSaleTarget.operation_id) : ''"></div>
+                </div>
+
+                <div class="bg-amber-950/40 border border-amber-900/60 p-2.5 rounded-xl text-[11px] text-amber-200">
+                    ℹ️ <strong>Arxitektura qoidasi:</strong> Haqiqiy savdo navbatdan o'chirilmaydi! Original saqlanadi, unga bog'langan <code>VOID_SALE</code> tuzatish amali serverga yuboriladi va sarflangan ombor rezervi darhol tiklanadi.
+                </div>
+
+                <div>
+                    <label class="block text-slate-400 mb-1 font-medium">Bekor qilish sababi *</label>
+                    <input type="text"
+                           x-model="voidReason"
+                           placeholder="Masalan: Mijoz tovardan voz kechdi"
+                           class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-rose-500">
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-800">
+                <button type="button"
+                        @click="showVoidModal = false; voidSaleTarget = null"
+                        class="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold">
+                    Qaytish
+                </button>
+                <button type="button"
+                        @click="confirmVoidSale()"
+                        :disabled="isProcessing"
+                        class="flex-1 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold disabled:opacity-50">
+                    Bekor qilishni tasdiqlash
                 </button>
             </div>
         </div>

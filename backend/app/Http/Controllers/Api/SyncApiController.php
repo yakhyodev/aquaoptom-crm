@@ -10,6 +10,7 @@ use App\Services\Sync\SyncBootstrapService;
 use App\Services\Sync\SyncChangeLogService;
 use App\Services\Sync\SyncConflictResolutionService;
 use App\Services\Sync\SyncPushService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,6 +22,34 @@ class SyncApiController extends Controller
         protected SyncPushService $pushService,
         protected SyncConflictResolutionService $conflictResolutionService
     ) {}
+
+    /**
+     * GET /api/health
+     * Ommaviy server health ping (tarmoq ulanishini tekshirish uchun)
+     */
+    public function ping(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'status' => 'OK',
+            'server_time' => Carbon::now()->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * GET /api/sync/health
+     * Himoyalangan sync server health tekshiruvi
+     */
+    public function health(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'status' => 'OK',
+            'server_time' => Carbon::now()->toIso8601String(),
+            'database' => 'connected',
+            'user_id' => $request->user()?->id,
+        ]);
+    }
 
     /**
      * POST /api/sync/bootstrap
