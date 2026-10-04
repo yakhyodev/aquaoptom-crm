@@ -605,7 +605,7 @@ class StockManager extends Component
         foreach ($this->auditCountInputs as $variantId => $countedQty) {
             $counts[] = [
                 'product_variant_id' => $variantId,
-                'counted_quantity' => (int) $countedQty,
+                'counted_quantity' => $countedQty,
                 'reason' => $this->auditItemReasons[$variantId] ?? null,
             ];
         }

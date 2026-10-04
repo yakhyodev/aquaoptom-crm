@@ -41,6 +41,9 @@ class InventoryAuditService
         ?int $userId = null,
         ?string $operationId = null
     ): InventoryAudit {
+        $actor = User::find($userId ?? auth()->id());
+        abort_unless($actor && $actor->hasPermission('stock_adjustment'), 403);
+        $userId = $actor->id;
         $operationId = $operationId ?: (string) Str::uuid();
 
         return DB::transaction(function () use (
@@ -59,7 +62,7 @@ class InventoryAuditService
 
             // Agar variantlar berilmagan bo'lsa, ombordagi barcha variantlar olinadi
             if (empty($variantIds)) {
-                $variantIds = ProductVariant::where('status', 'active')->pluck('id')->toArray();
+                $variantIds = ProductVariant::whereRaw('UPPER(status) = ?', ['ACTIVE'])->pluck('id')->toArray();
             }
 
             // Faol rezervga ega qurilmalarni tekshirish
@@ -182,6 +185,16 @@ class InventoryAuditService
      */
     public function recordCounts(InventoryAudit $audit, array $counts, ?string $notes = null): InventoryAudit
     {
+        abort_unless(auth()->user()?->hasPermission('stock_adjustment'), 403);
+        $seen = [];
+        foreach ($counts as $count) {
+            $id = $count['product_variant_id'] ?? null;
+            $qty = $count['counted_quantity'] ?? null;
+            if (! is_numeric($qty) || $qty != (int) $qty || $qty < 0 || isset($seen[$id])) {
+                throw new OperationValidationException($audit->operation_id, 'Sanalgan dona butun, manfiy bo‘lmagan va takrorlanmagan bo‘lishi kerak.', errorCode: 'INVALID_COUNT');
+            }
+            $seen[$id] = true;
+        }
         if (in_array($audit->status, ['COMPLETED', 'CANCELLED'], true)) {
             throw new OperationValidationException(
                 $audit->operation_id,
@@ -192,6 +205,10 @@ class InventoryAuditService
         }
 
         return DB::transaction(function () use ($audit, $counts, $notes) {
+            $audit = InventoryAudit::whereKey($audit->id)->lockForUpdate()->firstOrFail();
+            if (in_array($audit->status, ['COMPLETED', 'CANCELLED'], true)) {
+                throw new OperationValidationException($audit->operation_id, 'Inventarizatsiya yopilgan.', errorCode: 'AUDIT_ALREADY_CLOSED');
+            }
             $totalCounted = 0;
             $totalDiscrepancyQty = 0;
             $totalDiscrepancyVal = 0;
@@ -250,6 +267,8 @@ class InventoryAuditService
         bool $forceIfFreezePending = false,
         ?string $reason = null
     ): array {
+        abort_unless($actor->hasPermission('stock_adjustment'), 403);
+        abort_unless(! $forceIfFreezePending || $actor->hasRole('OWNER'), 403);
         if ($audit->status === 'COMPLETED') {
             return [
                 'success' => true,
@@ -300,6 +319,13 @@ class InventoryAuditService
         }
 
         return DB::transaction(function () use ($audit, $actor, $forceIfFreezePending, $reason) {
+            $audit = InventoryAudit::whereKey($audit->id)->lockForUpdate()->firstOrFail();
+            if ($audit->status === 'COMPLETED') {
+                return ['success' => true, 'is_replay' => true, 'audit' => $audit, 'total_discrepancy_qty' => $audit->total_discrepancy_qty, 'total_discrepancy_value' => $audit->total_discrepancy_value];
+            }
+            if ($audit->status === 'CANCELLED') {
+                throw new OperationValidationException($audit->operation_id, 'Inventarizatsiya bekor qilingan.', errorCode: 'AUDIT_CANCELLED');
+            }
             $items = $audit->items()->lockForUpdate()->get();
 
             foreach ($items as $item) {

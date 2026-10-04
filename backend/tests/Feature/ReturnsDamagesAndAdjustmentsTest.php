@@ -8,6 +8,7 @@ use App\Models\CashMovement;
 use App\Models\Customer;
 use App\Models\Device;
 use App\Models\InventoryBalance;
+use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -616,6 +617,20 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
     /**
      * Test 12: Inventarizatsiya jarayoni: Prepare -> Count -> Apply va farq tuzatishlari.
      */
+    public function test_audit_inventory_stale_model_cannot_apply_adjustment_twice(): void
+    {
+        $this->purchaseStock($this->variantA->id, 10, 5000);
+        $audit = $this->inventoryAuditService->prepareAudit($this->warehouse->id, [$this->variantA->id], userId: $this->owner->id);
+        $audit = $this->inventoryAuditService->recordCounts($audit, [['product_variant_id' => $this->variantA->id, 'counted_quantity' => 12]]);
+        $stale = clone $audit;
+        $this->inventoryAuditService->applyAudit($audit, $this->owner);
+        $count = InventoryMovement::count();
+        $replay = $this->inventoryAuditService->applyAudit($stale, $this->owner);
+        $this->assertTrue($replay['is_replay']);
+        $this->assertSame($count, InventoryMovement::count());
+        $this->assertEquals(12, InventoryBalance::where('product_variant_id', $this->variantA->id)->first()->quantity);
+    }
+
     public function test_inventory_audit_workflow_prepare_counting_apply_with_adjustments(): void
     {
         $this->purchaseStock($this->variantA->id, 10, 5000);
