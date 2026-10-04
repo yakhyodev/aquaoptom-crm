@@ -88,10 +88,10 @@
 | **14** | **PWA avtomatik sync va uzilish sinovlari** | Offline PWA | **DONE** | IndexedDB navbatini API bilan ulash: server health tekshirish (`/api/health`, `/api/sync/health`), pending batch push (`/api/sync/push`), ACK'ni lokal atomik yozish (`applyPushResults`), cursor pull (`applyPulledChanges`) va qolgan pending overlay hisobi (`getPendingOverlay`); avtomatik sinxronizatsiya triggerlari (`online`, `visibilitychange`, window `focus`, 30s interval, qo'lda sync tugmasi, Service Worker Background Sync API); ko'p tabli poyga holatini oldini olish uchun multi-tab mutex lock (`acquireSyncLock` / `releaseSyncLock`, 30s stale recovery bilan); asl `operation_id` va payload bilan idempotent replay (tarmoq uzilishi va timeoutda qayta jo'natilganda dublikatsiz `RETRY_SUCCESS`); xavfsiz retention (ACK bo'lgan chek va payloadlar outbox'dan o'chirib yuborilmaydi, status `APPLIED` qilinadi, favqulodda tiklash uchun saqlanadi); offline savdoni bekor qilish (`VOID_SALE` / `CANCEL_SALE`, asl `original_operation_id` ga bog'lanadi, navbatdan o'chirilmaydi, ombor/kassa/mijoz qaytariladi); `NEEDS_REVIEW` holati va tushuntirish modal oynasi; 7/7 JS unit testlari (Node.js + fake-indexeddb), 6/6 Feature testlari, 135/135 to'liq tizim testlari 100% o'tdi. | 15-bosqichni boshlash |
 | **16** | **Qaytarish, brak, inventarizatsiya va tuzatish** | Tahlil va nazorat | **DONE** | Original savdo/kirimga bog'langan qisman/to'liq return, sotilgandan ko'p qaytarish yo'qligi, original narx va snapshot tannarx, kasrli rounding yopilishi, brak tovar sotiladigan qoldiqqa qo'shilmasligi; mijoz signed balansi va refund/cash qayta hisobi (naqd va qarzni bir vaqtda kamaytirmaslik); ta'minotchi qaytarishida commercial credit va WAC chiqimi farqi; brak faqat WAC tannarx yo'qotishi (kassa harakati/xarajati emas); inventarizatsiya prepare->freeze ACK->sanash->apply sikli, uzilgan qurilma freeze guard (`DeviceFreezePendingException`), ortiqcha/kamomad tuzatish daftari, posted hujjatlar o'zgarmasligi (`DocumentImmutableException`); 16/16 Feature testlari (57 assertions) va 164/164 to'liq backend testlari (1064 assertions) 100% o'tdi. | 17-bosqichni boshlash |
 | **17** | **Savdo tarixi, hisobotlar va eksportlar** | Tahlil va nazorat | **DONE** | Bugun/kecha/hafta/oy/sana-oraliq/yil+oy (UTC saqlash, Asia/Tashkent kun chegaralari); dastlabki paid/debt snapshot bilan keyingi to'lov aralashmasligi, soxta invoice paid allocation taqiqlanishi (sentabr savdosi 100k qarz va oktabr 100k qarz to'lovi ikki davrda aniq ajratilishi, cash/debt double-count yo'qligi); umumiy hisobotlar so'rov kontrakti (Savdo tahlili, P&L, Kirim/Ta'minotchi, Ombor qoldig'i/Valuation ledgerdan, Taraf ko'chirmalari, Kassa/Smenalar, Xodimlar, Qurilma sync); paginatsiya va eksport totals 100% bir xilligi; CSV formula inyeksiyasidan himoya ('=, +, -, @, \t, \r); ruxsatli (/exports/download/{uuid}) CSV va DomPDF oqimli eksport; 12/12 Feature testlari va 176/176 to'liq backend testlari 100% o'tdi. | 18-bosqichni boshlash |
-| 18 | Dashboard, Admin va real vaqt yangilanishlari | Boshqaruv | TODO | - | Reverb/Echo real-vaqt, dashboard kartalari, audit |
-| 19 | Telegram orqali ko‘rish, kirim, sotuv va to‘lov | Telegram | TODO | - | Bot webhook, xodim bog‘lash, tugmali operatsiyalar |
-| 20 | Flutter Android: kirish va online biznes oynalari | Mobil ilova | TODO | - | API client, offline smoke test, counter test almashtirish |
-| 21 | Flutter offline savdo, sync va reliz paketi | Mobil ilova | TODO | - | SQLite offline storage, sync adapter, signed APK |
+| **18** | **Dashboard, Admin va real vaqt yangilanishlari** | Boshqaruv | **DONE** | Rolga mos boshqaruv paneli (flow vs as-of balansi, ochiq smenalar, past qoldiq, qarzlar, offline to'liqlik belgisi); Admin boshqaruvi (foydalanuvchilar, ruxsatlar, tizim sozlamalari, qurilmalar va oflayn ajratmalar, audit jurnali, NEEDS_REVIEW nizolari va ularni sababli hal qilish); Reverb/Echo xususiy kanallari (`private-store.updates`, `private-user.{id}`); Flutter uchun event invalidation API (`/api/events/cursor`); 12/12 Feature testlari va 188/188 to'liq backend testlari 100% o'tdi. | 19-bosqichni boshlash |
+| **19** | **Telegram orqali ko‘rish, kirim, sotuv va to‘lov** | Telegram | **DONE** | Webhook xavfsiz secret headeri; Telegram chat ID'ni ruxsatli xodimga bog'lash (`/link`); ko'p qatorli savdo va kirim yaratish (draft, tovar/hajm/taraf inline qo'shish, to'lov turi, tasdiqlash); qarz to'lash va kassa balansi; ruxsatli bildirishnomalar tarqatish outbox orqali; 8/8 Feature testlari va 196/196 to'liq backend testlari 100% o'tdi. | 20-bosqichni boshlash |
+| **20** | **Flutter Android: kirish va online biznes oynalari** | Mobil ilova | **DONE** | Mavjud `mobile/` loyihasi arxitekturaga moslashtirildi; Sanctum sessiya va rolga mos navigatsiya; Dashboard, Katalog, Kassa/POS, Kirim, Qarzlar, Kalkulyator, Savdo tarixi, Hisobotlar, Admin Web ko'rinishlari; inline tovar/hajm/taraf yaratish; narxlar va pullar integer tiyinlarda; xatoliklar typed `ApiException` bilan; 6/6 Flutter testlari (100%) va 196/196 backend testlari 100% o'tdi. | 21-bosqichni boshlash |
+| **21** | **Flutter offline savdo, sync va reliz paketi** | Mobil ilova | **DONE** | SQLite lokal katalog/qoldiq/ajratma/navbat modeli (`AppDatabase`, 10 jadval, v1->v2 migratsiya saqlanishi); atomik lokal confirm (`confirmSaleOffline`, ajratmadan ayirish, `#OFF-...` vaqtinchalik chek, `sync_queue` PENDING); PWA/Backend bilan 100% bir xil kanonik SHA-256 fingerprint (`PayloadFingerprint`); worker lease lock va restart/duplicate-worker dedup; user isolation (sessiya almashganda navbat xavfsiz ajratilgan); offline customer UUID parent mapping; ACK saqlash va `NEEDS_REVIEW` klassifikatsiyasi; void/cancel tuzatish amali; Android ruxsatlari, release signing konfigi va release APK build (`app-release.apk`, 55.5MB); 19/19 Flutter testlari va 196/196 backend testlari 100% o'tdi. | 22-bosqichni boshlash |
 | 22 | To‘liq tizim testlari, xavfsizlik va yuklama | Release sifati | TODO | - | Concurrency, E2E, 14.3 misoli to‘liq regression |
 | 23 | Production paketi, backup va tiklash rejasi | Ishga chiqarish | TODO | - | Docker/Nginx/Supervisord konfig, backup/restore sinovi |
 | 24 | Staging deploy va haqiqiy qurilmalarda qabul sinovi | Ishga chiqarish | TODO | - | Real qurilmalarda tarmoq uzilishi va kassa tekshiruvi |
@@ -1287,6 +1287,121 @@ Prompt 16 bo'yicha sotuv qaytarishlari (Sale Returns), ta'minotchiga qaytarishla
 
 ---
 *20-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 21.*
+
+---
+
+## 41. 21-Bosqich: Flutter offline savdo, sync va reliz paketi — DONE
+
+### 1. Bajarilgan Ishlar Xulosasi:
+- **SQLite Lokal Relyatsion Baza Modeli (`AppDatabase`):**
+  - Android, Desktop va test muhitlari uchun `sqflite` va `sqflite_common_ffi` asosida FFI initialization (`sqfliteFfiInit()`) joriy qilindi.
+  - 10 ta to'liq SQLite jadvallari yaratildi:
+    1. `products` (tovarlar katalogi)
+    2. `product_variants` (hajmlar, narxlar, qoldiq)
+    3. `customers` (mijozlar, kredit limiti, joriy qarz, offline yaratilgan belgisi)
+    4. `suppliers` (ta'minotchilar)
+    5. `cash_accounts` (kassa hisoblari)
+    6. `offline_leases` (HMAC imzolangan token, amal qilish muddati, permissions)
+    7. `stock_allocations` (qurilmaga berilgan tovar ajratmasi va uning sarflanishi)
+    8. `credit_allocations` (qurilmaga berilgan mijoz kredit limiti va sarflanishi)
+    9. `sync_queue` (oflayn amallar navbati, idempotent fingerprint, lifecycle statuslari)
+    10. `sync_cursor` va `app_meta` (delta pull va sinxronizatsiya kursori).
+  - **Sxema migratsiyasida navbat saqlanishi:** Baza v1 dan v2 ga yangilanganda (`_upgradeV1ToV2`) `sync_queue` dagi kutilayotgan yoki ACK bo'lgan birorta yozuv yo'qolmaydi, faqat zarur indekslar qo'shiladi.
+
+- **Kanonik Payload Fingerprint (`PayloadFingerprint`):**
+  - Backend `App\Services\Operations\PayloadFingerprint::compute($payload)` va PWA bilan 100% bir xil kanonik rekursiv saralash (ksort), transport maydonlarini chiqarish (`_token`, `request_id`, `client_time`, `nonce`), bo'shliqlarni tozalash (trim), floatlarni 4 xonagacha formatlash va SHA-256 hisoblash.
+  - Test fixture testi backend bilan aniq bir xil SHA-256 heshni tasdiqladi (`07f9f20bf995cc2e5ac5aec9353295186d34b2c5e979e15c0206ecd3362d294d`).
+
+- **Atomik Mahalliy Savdo Tasdiqlash (`OfflineSalesService.confirmSaleOffline`):**
+  - Tranzaksiya ichida faol lease tekshiriladi (`getActiveLease`), muddati o'tgan bo'lsa darhol rad etiladi.
+  - Qurilmaga ajratilgan tovar zaxirasi (`stock_allocations`) tekshiriladi va kamaytiriladi; ajratmadan ko'p sotishga urinishda `ValidationException` beriladi.
+  - Nasiya/qisman savdoda mijoz kredit ajratmasi (`credit_allocations`) tekshiriladi va kamaytiriladi, lokal mijoz qarzi oshiriladi.
+  - Vaqtinchalik mahalliy chek raqami (`#OFF-...`) shakllantiriladi.
+  - Navbatga `status = 'PENDING'`, barqaror UUID `operation_id` va kanonik fingerprint bilan yozuv kiritiladi.
+  - Oflayn mijoz yaratish (`createCustomerOffline`) va oflayn savdoni bekor qilish (`voidSaleOffline` - original operatsiyani o'chirmasdan unga bog'langan VOID yozuv kiritish) amalga oshirildi.
+
+- **Sinxronizatsiya Menejeri va Jarayonlar Xavfsizligi (`OfflineSyncService`):**
+  - **Worker Lease Lock:** Process kill yoki ilova to'satdan yopilganda navbatdagi elementlar yo'qolmaydi; `locked_until` muddati (30 sek) o'tgach boshqa worker yoki restartdan keyingi jarayon xavfsiz qayta oladi.
+  - **User Isolation (Foydalanuvchilar o'rtasida izolyatsiya):** Sessiyadan chiqish (logout) yoki boshqa xodim kirishi (user switch) vaqtida har bir xodim faqat o'ziga tegishli `user_id` navbatini ko'radi va push qiladi; boshqa xodimning navbati SQLite'da xavfsiz saqlanadi, uning tokeni orqali yuborilmaydi.
+  - **Dependency Tartibi:** Oflayn yangi mijoz ochilgan bo'lsa (`CREATE_CUSTOMER`), u bog'liq savdodan (`CREATE_SALE`) oldin serverga push qilinadi; serverdan qaytgan haqiqiy ID lar ACK da bog'lanadi.
+  - **ACK Payload Retention:** Serverdan muvaffaqiyatli javob (`SUCCESS` / `RETRY_SUCCESS`) kelganda yozuv navbatdan o'chirilmaydi, status `ACKNOWLEDGED` ga o'tadi, server hujjati raqami va ACK payload saqlanadi.
+  - **NEEDS_REVIEW Klassifikatsiyasi:** Serverda nizo yoki ombor nomuvofiqligi yuz berganda status `NEEDS_REVIEW` ga o'tadi, xatolik kodi va sababi saqlanadi.
+  - **Idempotent Duplicate Replay:** Bir xil operatsiya qayta yuborilganda server va lokalda dublikat savdo yaratilmaydi.
+
+- **UI va Tarmoq Uzilishi Integratsiyasi:**
+  - `PosScreen`: Onlayn checkoutda tarmoq uzilsa (`SocketException`, timeout), avtomatik tarzda `OfflineSalesService.confirmSaleOffline` chaqiriladi, foydalanuvchiga `#OFF-...` vaqtinchalik cheki va "Lokal saqlandi" modali ko'rsatiladi.
+  - `MainNavigationScreen`: AppBar'da sinxronizatsiya holati ikonkasi, pastdan chiquvchi modal oynada kutilayotgan, tasdiqlangan, ko'rib chiqishdagi va nizoli amallar hisoblagichlari, "Hozir Sinxronlash" va "Katalog va Leaselarni Yuklash (Bootstrap)" tugmalari qo'shildi.
+
+- **Android Release Konfiguratsiyasi va Paketlash:**
+  - `AndroidManifest.xml`: `android.permission.INTERNET` va `android.permission.ACCESS_NETWORK_STATE` ruxsatlari qo'shildi, ilova nomi `AquaOptom CRM` ga yangilandi.
+  - `build.gradle.kts`: Release signing xavfsiz sozlandi: `key.properties` fayli yoki `AQUAOPTOM_STORE_FILE` / `AQUAOPTOM_STORE_PASSWORD` / `AQUAOPTOM_KEY_ALIAS` / `AQUAOPTOM_KEY_PASSWORD` muhit o'zgaruvchilari orqali haqiqiy keystore yuklanadi. Agar signing kalitlari taqdim etilmasa, **debug key bilan soxta release build qilinmaydi**.
+  - `.gitignore`: `key.properties`, `*.jks`, `*.keystore` Git reposiga kirmasligi kafolatlandi.
+  - Release APK to'liq build qilindi: `build\app\outputs\flutter-apk\app-release.apk` (55.5MB).
+
+---
+
+### 2. O‘zgargan va Yangi Fayllar:
+- `mobile/lib/database/app_database.dart` (yangi)
+- `mobile/lib/utils/payload_fingerprint.dart` (yangi)
+- `mobile/lib/models/offline_lease_model.dart` (yangi)
+- `mobile/lib/models/stock_allocation_model.dart` (yangi)
+- `mobile/lib/models/credit_allocation_model.dart` (yangi)
+- `mobile/lib/models/sync_queue_item.dart` (yangi)
+- `mobile/lib/services/offline_sales_service.dart` (yangi)
+- `mobile/lib/services/offline_sync_service.dart` (yangi)
+- `mobile/test/offline_sync_test.dart` (yangi - 13 ta chuqur testlar)
+- `mobile/lib/screens/pos_screen.dart` (tahrirlandi)
+- `mobile/lib/screens/main_navigation_screen.dart` (tahrirlandi)
+- `mobile/android/app/src/main/AndroidManifest.xml` (tahrirlandi)
+- `mobile/android/app/build.gradle.kts` (tahrirlandi)
+- `mobile/pubspec.yaml` va `mobile/pubspec.lock` (tahrirlandi)
+- `mobile/.gitignore` (tahrirlandi)
+- `QURILISH_HOLATI.md` (tahrirlandi)
+
+---
+
+### 3. Tekshiruv Buyruqlari va Natijalari (Verification Evidence):
+1. **Flutter Statik Tahlil:**
+   - Buyruq: `flutter analyze`
+   - Natija: **No issues found!** (ran in 1.5s, 0 errors, 0 warnings).
+2. **Flutter Test Suite (Barcha testlar):**
+   - Buyruq: `flutter test`
+   - Natija: **19/19 testlar 100% PASS** (0 failures, duration 4.5s):
+     - `1. Canonical PayloadFingerprint (Backend/PWA Parity) SHA-256 fingerprint matches backend test vector exactly`: PASS
+     - `1. Canonical PayloadFingerprint (Backend/PWA Parity) Floating point values are canonicalized up to 4 decimal places`: PASS
+     - `2. SQLite Schema & Migration Preservation Migration v1 -> v2 preserves pending sync_queue rows without data loss`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm confirmSaleOffline deducts stock allocation and creates sync_queue row`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm Throws ValidationException if selling more than available stock allocation`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm Debt sale deducts customer credit allocation and updates local customer debt`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm Throws ForbiddenException when offline lease is expired`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm voidSaleOffline creates linked correction without deleting original row`: PASS
+     - `3. Offline Sales Service: Stock Allocation & Atomic Confirm createCustomerOffline generates temp UUID and parent dependency queue item`: PASS
+     - `4. OfflineSyncService: User Isolation, Idempotency & Conflict Resolution User Isolation: Pending operations are isolated per user on user switch`: PASS
+     - `4. OfflineSyncService: User Isolation, Idempotency & Conflict Resolution Push handles ACK, updates server document number, and retains ACK payload`: PASS
+     - `4. OfflineSyncService: User Isolation, Idempotency & Conflict Resolution Push handles NEEDS_REVIEW error classification without queue deletion`: PASS
+     - `4. OfflineSyncService: User Isolation, Idempotency & Conflict Resolution Duplicate-worker & Idempotent retry yields identical single operation without duplication`: PASS
+     - `AquaOptom API Contract & Flow Tests Full business flow`: PASS
+     - `AquaOptom API Contract & Flow Tests Cost price is masked for unprivileged roles without leaking data`: PASS
+     - `AquaOptom API Contract & Flow Tests Typed API Exceptions handle 401, 403, and 422 cleanly without exposing tokens`: PASS
+     - `AquaOptomApp UI Smoke Tests Unauthenticated user sees LoginScreen and can open Server Settings`: PASS
+     - `AquaOptomApp UI Smoke Tests Owner role renders MainNavigationScreen with all tabs`: PASS
+     - `AquaOptomApp UI Smoke Tests Cashier role renders restricted tabs without dashboard`: PASS
+3. **Flutter Release Build Pipeline:**
+   - Buyruq: `flutter build apk --release`
+   - Natija: **Built build\app\outputs\flutter-apk\app-release.apk (55.5MB)** (0 errors, duration 522.7s).
+   - *Signing xavfsizligi qaydi:* Debug key ishlatilmadi. Production signing uchun `key.properties` yoki environment o'zgaruvchilari orqali xavfsiz inject qilinadi.
+4. **Backend Test Suite (Regressiya yo'qligi tekshiruvi):**
+   - Buyruq: `php artisan test`
+   - Natija: **196/196 testlar 100% PASS** (1264 assertions, duration 58.7s, 0 failures, 0 errors).
+
+---
+
+### 4. Qolgan Cheklovlar va Keyingi Qadam:
+- Flutter mobil ilovasining offline savdo, SQLite navbati, sinxronizatsiya va reliz paketlash bosqichi to'liq muvaffaqiyatli yakunlandi.
+- Keyingi bosqich: **Prompt 22 — To‘liq tizim testlari, xavfsizlik va yuklama** (Group: Release sifati).
+
+---
+*21-bosqich muvaffaqiyatli yakunlandi. Keyingi bosqich: Prompt 22.*
 
 
 

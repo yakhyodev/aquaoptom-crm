@@ -11,6 +11,7 @@ import 'login_screen.dart';
 import 'pos_screen.dart';
 import 'reports_screen.dart';
 import 'sales_history_screen.dart';
+import '../services/offline_sync_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final UserModel user;
@@ -170,6 +171,135 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     }
   }
 
+  void _showSyncModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          final syncService = OfflineSyncService();
+          return FutureBuilder<SyncStatusSummary>(
+            future: syncService.getStatusSummary(),
+            builder: (context, snapshot) {
+              final summary = snapshot.data ?? const SyncStatusSummary();
+              return Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(Icons.sync, color: Colors.cyanAccent),
+                            SizedBox(width: 8),
+                            Text(
+                              'Offline & Sinxronlash',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.blueGrey),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatusBadge('Kutilmoqda', summary.pendingCount, Colors.blueAccent),
+                        _buildStatusBadge('Yuborildi', summary.acknowledgedCount, Colors.greenAccent),
+                        _buildStatusBadge('Tekshiruv', summary.needsReviewCount, Colors.amberAccent),
+                        _buildStatusBadge('Mojaro', summary.conflictCount, Colors.redAccent),
+                      ],
+                    ),
+                    if (summary.lastError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Xatolik: ${summary.lastError}',
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: summary.isSyncing
+                                ? null
+                                : () async {
+                                    setModalState(() {});
+                                    await syncService.syncNow();
+                                    if (ctx.mounted) setModalState(() {});
+                                  },
+                            icon: const Icon(Icons.cloud_upload),
+                            label: Text(summary.isSyncing ? 'Sinxronlanmoqda...' : 'Hozir Sinxronlash'),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: summary.isSyncing
+                              ? null
+                              : () async {
+                                  try {
+                                    await syncService.bootstrap();
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        const SnackBar(content: Text('Bootstrap muvaffaqiyatli yuklandi!')),
+                                      );
+                                      setModalState(() {});
+                                    }
+                                  } catch (e) {
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(content: Text('Bootstrap xatosi: $e'), backgroundColor: Colors.redAccent),
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.download),
+                          label: const Text('Bootstrap'),
+                          style: OutlinedButton.styleFrom(foregroundColor: Colors.cyanAccent),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(String title, int count, Color color) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          title,
+          style: const TextStyle(color: Colors.blueGrey, fontSize: 11),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.user;
@@ -181,6 +311,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         backgroundColor: const Color(0xFF1E293B),
         elevation: 0,
         actions: [
+          // Sync & Offline Status Button
+          IconButton(
+            icon: const Icon(Icons.sync, color: Colors.cyanAccent),
+            tooltip: 'Sinxronlash holati',
+            onPressed: _showSyncModal,
+          ),
+
           // Role Badge
           Center(
             child: Container(

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
 import '../models/product_model.dart';
 import '../models/sale_model.dart';
+import '../services/api_exceptions.dart';
 import '../services/api_service.dart';
+import '../services/offline_sales_service.dart';
 import '../utils/formatters.dart';
 import '../utils/operation_id.dart';
 
@@ -534,6 +536,142 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  void _showOfflineReceiptDialog(LocalSaleConfirmResult result) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Row(
+          children: [
+            const Icon(Icons.cloud_off, color: Colors.amberAccent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Chek #${result.tempInvoiceNumber}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.amberAccent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.amberAccent),
+                ),
+                child: const Text(
+                  'Offline saqlandi. Internet qaytganda serverga yuboriladi va server chek raqamiga yangilanadi.',
+                  style: TextStyle(color: Colors.amberAccent, fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Mijoz: ${_isQuickSale ? "Tezkor Xaridor" : (_selectedCustomer?.name ?? "Tezkor")}',
+                style: const TextStyle(color: Colors.cyanAccent, fontSize: 13),
+              ),
+              Text(
+                'Vaqt: ${Formatters.formatDateTime(DateTime.now())}',
+                style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
+              ),
+              const Divider(color: Color(0xFF334155), height: 20),
+              ...((result.receipt['items'] as List<dynamic>?) ?? []).map((it) {
+                final item = it as Map<String, dynamic>;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item['product_name']} x${item['quantity']}',
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ),
+                      Text(
+                        Formatters.formatMoney((item['total_price'] as num).toInt()),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const Divider(color: Color(0xFF334155), height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Jami:',
+                      style: TextStyle(color: Colors.blueGrey, fontSize: 13)),
+                  Text(
+                    Formatters.formatMoney(result.totalAmount),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('To\'landi:',
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 13)),
+                  Text(
+                    Formatters.formatMoney(result.paidAmount),
+                    style: const TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14),
+                  ),
+                ],
+              ),
+              if (result.debtAmount > 0) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Nasiya Qarz:',
+                        style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    Text(
+                      Formatters.formatMoney(result.debtAmount),
+                      style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _resetDraft();
+              });
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            child: const Text('Yangi savdo ochish'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitSale() async {
     if (_cart.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -570,9 +708,9 @@ class _PosScreenState extends State<PosScreen> {
       _errorMessage = null;
     });
 
-    try {
-      final itemsPayload = _cart.map((it) => it.toPayload()).toList();
+    final itemsPayload = _cart.map((it) => it.toPayload()).toList();
 
+    try {
       // Bir xil qoralama qayta yuborilsa (retry/timeout) aynan shu operation_id ketadi.
       final sale = await _api.createSale(
         customerId: _isQuickSale ? null : _selectedCustomer?.id,
@@ -591,6 +729,41 @@ class _PosScreenState extends State<PosScreen> {
       });
       _showReceiptDialog(sale);
     } catch (e) {
+      // Agar tarmoq xatosi bo'lsa, avtomatik offline saqlash
+      if (e is NetworkException) {
+        try {
+          final offlineService = OfflineSalesService();
+          final offlineResult = await offlineService.confirmSaleOffline(
+            items: itemsPayload,
+            customerId: _isQuickSale ? null : _selectedCustomer?.id,
+            customerName: _isQuickSale ? 'Tezkor Mijoz' : _selectedCustomer?.name,
+            paymentType: _paymentMode == 'FULL'
+                ? _paymentMethod
+                : (_paymentMode == 'DEBT' ? 'DEBT' : 'PARTIAL'),
+            paymentMethod: _paymentMethod,
+            paidAmount: _calculatedPaidAmount,
+            operationId: _currentOperationId,
+          );
+
+          if (!mounted) return;
+          setState(() {
+            _isLoading = false;
+          });
+          _showOfflineReceiptDialog(offlineResult);
+          return;
+        } catch (offlineErr) {
+          if (!mounted) return;
+          setState(() {
+            _errorMessage = offlineErr.toString();
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Offline savdo xatosi: $offlineErr'), backgroundColor: Colors.redAccent),
+          );
+          return;
+        }
+      }
+
       if (!mounted) return;
       setState(() {
         _errorMessage = e.toString();
