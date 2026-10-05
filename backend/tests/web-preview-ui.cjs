@@ -42,7 +42,8 @@ const fs = require('node:fs');
         await page.waitForFunction(value => document.querySelector('.trade-total > strong')?.textContent.replace(/\D/g, '') === value, String(value));
     }
     async function screenshot(name) {
-        await page.screenshot({ path: 'ui-evidence/' + name + '.png', fullPage: true });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.screenshot({ path: 'ui-evidence/' + name + '.png', fullPage: true, animations: 'disabled' });
     }
     try {
         await page.goto(process.env.PREVIEW_URL + '/login');
@@ -134,7 +135,7 @@ const fs = require('node:fs');
         assert.match(await page.locator('[data-testid="dashboard-cash"]').textContent(), /15 000/);
         assert.match(await page.locator('[data-testid="dashboard-expenses"]').textContent(), /5 000/);
         await screenshot('dashboard-after-operations');
-        const sections = ['/dashboard', '/savdo', '/qarzdorliklar', '/kassa', '/hisobotlar', '/admin', '/admin/opening-balances', '/yordam'];
+        const sections = ['/dashboard', '/savdo', '/qarzdorliklar', '/kassa', '/hisobotlar', '/admin', '/admin/opening-balances', '/catalog', '/mijozlar', '/yetkazuvchilar', '/yordam'];
         for (const route of sections) {
             await page.setViewportSize({ width: 390, height: 844 });
             const response = await page.goto(process.env.PREVIEW_URL + route);
@@ -157,4 +158,4 @@ const fs = require('node:fs');
         fs.writeFileSync('ui-evidence/contrast.json', JSON.stringify(evidence, null, 2));
         await browser.close();
     }
-})().catch(error => { console.error(error.message); process.exitCode = 1; });
+})().catch(error => { console.error(error.stack); process.exitCode = 1; });

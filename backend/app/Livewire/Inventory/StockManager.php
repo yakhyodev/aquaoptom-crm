@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Inventory;
 
+use App\Models\CashAccount;
 use App\Models\DamageRecord;
 use App\Models\Device;
 use App\Models\InventoryAudit;
+use App\Models\InventoryBalance;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Purchase;
@@ -13,6 +15,7 @@ use App\Models\Sale;
 use App\Models\SaleReturn;
 use App\Models\SaleReturnItem;
 use App\Models\Volume;
+use App\Models\Warehouse;
 use App\Services\Inventory\DamageDisposalService;
 use App\Services\Inventory\InventoryAuditService;
 use App\Services\Inventory\InventoryCalculatorService;
@@ -22,6 +25,7 @@ use App\Services\Inventory\SupplierReturnService;
 use App\Services\Operations\Exceptions\OperationPermissionException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -29,6 +33,18 @@ use Livewire\WithPagination;
 class StockManager extends Component
 {
     use WithPagination;
+
+    #[Locked]
+    public string $saleReturnOperationId = '';
+
+    #[Locked]
+    public string $supplierReturnOperationId = '';
+
+    #[Locked]
+    public string $damageOperationId = '';
+
+    #[Locked]
+    public array $lastOperationOutcome = [];
 
     // Asosiy faol tab
     #[Url(as: 'tab')]
@@ -175,6 +191,9 @@ class StockManager extends Component
 
     public function mount(): void
     {
+        $this->saleReturnOperationId = (string) Str::uuid();
+        $this->supplierReturnOperationId = (string) Str::uuid();
+        $this->damageOperationId = (string) Str::uuid();
         // Standart kalkulyator: barcha hajmlarni tanlangan qilib boshlash
         $this->calcSelectedVolumeIds = Volume::pluck('id')->map(fn ($id) => (int) $id)->toArray();
     }
@@ -356,6 +375,7 @@ class StockManager extends Component
     // --- 4. Sotuv Qaytarish Amallari (Sale Return) ---
     public function openSaleReturnModal(int $saleId): void
     {
+        $this->saleReturnOperationId = (string) Str::uuid();
         $this->saleReturnSuccess = null;
         $this->saleReturnError = null;
         $this->returnSaleId = $saleId;
@@ -416,12 +436,13 @@ class StockManager extends Component
                 saleId: $this->selectedSaleForReturn->id,
                 items: $itemsToReturn,
                 reason: $this->saleReturnReason ?: 'Mijoz tovar qaytardi',
-                operationId: (string) Str::uuid(),
+                operationId: $this->saleReturnOperationId,
                 refundAmount: (int) $this->saleReturnRefundAmount,
                 cashAccountId: $this->selectedSaleForReturn->cash_account_id,
                 userId: Auth::id()
             );
 
+            $this->captureOutcome($this->selectedSaleForReturn->items->pluck('product_variant_id')->all(), 'Mijoz qaytarishidan keyingi holat');
             $this->saleReturnSuccess = "Sotuv muvaffaqiyatli qaytarildi! Hujjat: #{$res['return_number']}. Jami summa: ".number_format($res['total_amount'])." so'm.";
             $this->showSaleReturnModal = false;
         } catch (\Throwable $e) {
@@ -432,6 +453,7 @@ class StockManager extends Component
     // --- 5. Ta'minotchiga Qaytarish Amallari (Supplier Return) ---
     public function openSupplierReturnModal(int $purchaseId): void
     {
+        $this->supplierReturnOperationId = (string) Str::uuid();
         $this->supplierReturnSuccess = null;
         $this->supplierReturnError = null;
         $this->returnPurchaseId = $purchaseId;
@@ -485,10 +507,11 @@ class StockManager extends Component
                 purchaseId: $this->selectedPurchaseForReturn->id,
                 items: $itemsToReturn,
                 reason: $this->supplierReturnReason ?: "Ta'minotchiga tovar qaytarildi",
-                operationId: (string) Str::uuid(),
+                operationId: $this->supplierReturnOperationId,
                 userId: Auth::id()
             );
 
+            $this->captureOutcome($this->selectedPurchaseForReturn->items->pluck('product_variant_id')->all(), 'Yetkazuvchiga qaytarishdan keyingi holat');
             $this->supplierReturnSuccess = "Ta'minotchiga muvaffaqiyatli qaytarildi! Hujjat: #{$res['return_number']}. Majburiyat kamaydi: ".number_format($res['total_credit_amount'])." so'm.";
             $this->showSupplierReturnModal = false;
         } catch (\Throwable $e) {
@@ -499,6 +522,7 @@ class StockManager extends Component
     // --- 6. Brak va Yaroqsiz tovar chiqimi (Damage Disposal) ---
     public function openDamageModal(?int $variantId = null): void
     {
+        $this->damageOperationId = (string) Str::uuid();
         $this->damageSuccess = null;
         $this->damageError = null;
         $this->damageVariantId = $variantId;
@@ -527,7 +551,7 @@ class StockManager extends Component
 
         try {
             $res = $this->damageDisposalService->recordDamage(
-                warehouseId: 1, // Asosiy ombor
+                warehouseId: (int) Warehouse::where('is_default', true)->value('id'),
                 items: [
                     [
                         'product_variant_id' => $this->damageVariantId,
@@ -536,11 +560,12 @@ class StockManager extends Component
                     ],
                 ],
                 reason: $this->damageReason,
-                operationId: (string) Str::uuid(),
+                operationId: $this->damageOperationId,
                 userId: Auth::id(),
                 notes: $this->damageNotes
             );
 
+            $this->captureOutcome([$this->damageVariantId], 'Yaroqsiz mahsulot chiqarilgandan keyingi holat');
             $this->damageSuccess = "Brak chiqimi muvaffaqiyatli yozildi! Hujjat: #{$res['damage_number']}. Tannarx yo'qotishi: ".number_format($res['total_loss_value'])." so'm (Kassa xarajati emas).";
             $this->showDamageModal = false;
         } catch (\Throwable $e) {
@@ -637,6 +662,7 @@ class StockManager extends Component
             );
 
             $this->selectedAudit = $res['audit'];
+            $this->captureOutcome($this->selectedAudit->items->pluck('product_variant_id')->all(), 'Sanab tekshirishdan keyingi holat');
             $this->auditSuccess = 'Inventarizatsiya tasdiqlandi va ombor qoldiqlari muvofiqlashtirildi! Jami farq: '.number_format($res['total_discrepancy_qty']).' dona.';
         } catch (\Throwable $e) {
             $this->auditError = 'Xatolik: '.$e->getMessage();
@@ -690,6 +716,22 @@ class StockManager extends Component
             null,
             $this->canViewCost
         );
+    }
+
+    protected function captureOutcome(array $variantIds, string $title): void
+    {
+        $variants = ProductVariant::with(['product', 'volume'])->whereIn('id', $variantIds)->get();
+        $this->lastOperationOutcome = [
+            'title' => $title,
+            'stock' => $variants->map(fn ($variant) => [
+                'name' => $variant->product->name.' — '.$variant->volume->name,
+                'quantity' => (int) InventoryBalance::where('product_variant_id', $variant->id)->sum('quantity'),
+            ])->all(),
+        ];
+        if (Auth::user()?->hasPermission('view_cash') || Auth::user()?->isOwner()) {
+            $this->lastOperationOutcome['cash'] = (int) CashAccount::sum('balance');
+        }
+        $this->dispatch('refresh-dashboard');
     }
 
     public function render()

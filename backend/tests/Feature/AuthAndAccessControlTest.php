@@ -377,4 +377,15 @@ class AuthAndAccessControlTest extends TestCase
         $owner = User::where('email', 'owner@preview.aquaoptom.test')->firstOrFail();
         $this->assertTrue(Hash::check('admin1', $owner->password));
     }
+
+    public function test_management_directories_keep_owner_and_employee_access_separate(): void
+    {
+        $owner = User::factory()->owner()->create();
+        $seller = User::factory()->salesManager()->create();
+        foreach (['/mijozlar', '/yetkazuvchilar'] as $path) {
+            $this->actingAs($owner)->get($path)->assertOk();
+            $this->actingAs($seller)->get($path)->assertForbidden();
+        }
+        $this->actingAs($owner)->get('/catalog')->assertOk()->assertSee('Mahsulotlar va narxlar');
+    }
 }

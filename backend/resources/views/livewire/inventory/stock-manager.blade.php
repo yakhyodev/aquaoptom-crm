@@ -46,6 +46,8 @@
         </div>
     </div>
 
+    @if($lastOperationOutcome)<div class="operation-outcome" role="status"><h3>{{ $lastOperationOutcome['title'] }}</h3>@foreach($lastOperationOutcome['stock'] as $stock)<p><span>{{ $stock['name'] }} — omborda</span><strong>{{ number_format($stock['quantity'], 0, '.', ' ') }} dona</strong></p>@endforeach @if(isset($lastOperationOutcome['cash']))<p><span>Hozir barcha hisoblarda bor pul</span><strong>{{ number_format($lastOperationOutcome['cash'], 0, '.', ' ') }} so‘m</strong></p>@endif<button wire:click="$set('activeTab', 'balances')" class="trade-button trade-button-secondary">Ombor qoldiqlarini ko‘rish →</button></div>@endif
+
     @if($activeTab === 'balances')
         <!-- TAB 1: OMBOR QOLDIQLARI -->
         <div class="space-y-6">
@@ -836,7 +838,7 @@
                                 Ro'yxatga Qaytish
                             </button>
                             @if($selectedAudit->status !== 'COMPLETED')
-                                <button wire:click="saveAuditCounts" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-slate-900 rounded-lg text-xs font-semibold shadow-xs">
+                                <button wire:click="saveAuditCounts" wire:loading.attr="disabled" wire:target="saveAuditCounts" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-slate-900 rounded-lg text-xs font-semibold shadow-xs">
                                     Natijalarni Saqlash
                                 </button>
                                 <button wire:click="executeApplyAudit(false)" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-slate-900 rounded-lg text-xs font-semibold shadow-xs">
@@ -1063,7 +1065,7 @@
                 </div>
                 <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
                     <button wire:click="closeSaleReturnModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
-                    <button wire:click="submitSaleReturn" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Qaytarishni Tasdiqlash</button>
+                    <button wire:click="submitSaleReturn" wire:loading.attr="disabled" wire:target="submitSaleReturn" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Qaytarishni Tasdiqlash</button>
                 </div>
             </div>
         </div>
@@ -1111,7 +1113,7 @@
                 </div>
                 <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
                     <button wire:click="closeSupplierReturnModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
-                    <button wire:click="submitSupplierReturn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Ta'minotchiga Qaytarish</button>
+                    <button wire:click="submitSupplierReturn" wire:loading.attr="disabled" wire:target="submitSupplierReturn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Ta'minotchiga Qaytarish</button>
                 </div>
             </div>
         </div>
@@ -1150,7 +1152,7 @@
                 </div>
                 <div class="p-4 bg-slate-50 border-t flex justify-end gap-2">
                     <button wire:click="closeDamageModal" class="px-4 py-2 border rounded-xl text-xs font-semibold hover:bg-slate-100">Bekor qilish</button>
-                    <button wire:click="submitDamageDisposal" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Brakka Chiqarish</button>
+                    <button wire:click="submitDamageDisposal" wire:loading.attr="disabled" wire:target="submitDamageDisposal" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-slate-900 rounded-xl text-xs font-semibold shadow-xs">Brakka Chiqarish</button>
                 </div>
             </div>
         </div>

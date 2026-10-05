@@ -79,7 +79,9 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/returns', fn () => redirect()->route('inventory.index', ['tab' => 'returns']));
     Route::get('/damages', fn () => redirect()->route('inventory.index', ['tab' => 'damages']));
     Route::get('/audits', fn () => redirect()->route('inventory.index', ['tab' => 'audits']));
-    Route::get('/catalog', fn () => redirect()->route('inventory.index'));
+    Route::get('/catalog', fn () => view('pages.catalog'))->name('catalog.index')->middleware('permission:manage_prices');
+    Route::get('/mijozlar', fn () => view('pages.customers'))->name('customers.index')->middleware('role:OWNER,ADMIN');
+    Route::get('/yetkazuvchilar', fn () => view('pages.suppliers'))->name('suppliers.index')->middleware('role:OWNER,ADMIN');
     Route::get('/finance', fn () => redirect()->route('cash.index'));
 });
 

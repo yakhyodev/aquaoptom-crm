@@ -6,6 +6,7 @@ use App\Livewire\Inventory\StockManager;
 use App\Models\CashAccount;
 use App\Models\CashMovement;
 use App\Models\Customer;
+use App\Models\DamageRecord;
 use App\Models\Device;
 use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
@@ -839,5 +840,19 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
             ->assertSee('Yangi Sanash Boshlash')
             ->call('prepareNewAudit')
             ->assertSee('PREPARED');
+    }
+
+    public function test_damage_form_retry_keeps_one_document_and_shows_remaining_stock(): void
+    {
+        $this->purchaseStock($this->variantA->id, 100, 3000);
+        $form = Livewire::actingAs($this->owner)->test(StockManager::class)
+            ->call('openDamageModal', $this->variantA->id)
+            ->set('damageQuantity', 2)->call('submitDamageDisposal')
+            ->assertSet('damageError', null)
+            ->assertSet('lastOperationOutcome.stock.0.quantity', 98)
+            ->assertDispatched('refresh-dashboard');
+        $form->call('submitDamageDisposal');
+        $this->assertSame(1, DamageRecord::count());
+        $this->assertSame(98, (int) InventoryBalance::where('product_variant_id', $this->variantA->id)->sum('quantity'));
     }
 }

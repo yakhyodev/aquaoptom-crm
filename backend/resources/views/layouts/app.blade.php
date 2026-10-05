@@ -77,6 +77,12 @@
             @if(auth()->user()?->hasRole(['OWNER', 'ADMIN']))
                 <a href="{{ route('admin.index') }}" class="app-nav-link {{ request()->routeIs('admin.*') ? 'is-active' : '' }}"><span>⚙</span><span>Sozlamalar<small>Xodimlar va qurilmalar</small></span></a>
             @endif
+            @if(auth()->user()?->hasRole(['OWNER', 'ADMIN']) || auth()->user()?->can('manage_prices'))
+                <details class="app-nav-lists" @if(request()->routeIs('catalog.*', 'customers.*', 'suppliers.*')) open @endif><summary>📋 Ro‘yxatlarni boshqarish</summary>
+                    @can('manage_prices')<a href="{{ route('catalog.index') }}">Mahsulotlar va narxlar</a>@endcan
+                    @if(auth()->user()?->hasRole(['OWNER', 'ADMIN']))<a href="{{ route('customers.index') }}">Mijozlar</a><a href="{{ route('suppliers.index') }}">Yetkazuvchilar</a>@endif
+                </details>
+            @endif
             <a href="{{ route('guide') }}" class="app-nav-link app-nav-help {{ request()->routeIs('guide') ? 'is-active' : '' }}"><span>?</span><span>Qanday ishlaydi?<small>Do‘kon xaritasi va yordam</small></span></a>
         </nav>
 

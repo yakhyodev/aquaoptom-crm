@@ -276,3 +276,12 @@
 .operation-outcome { border: 1px solid #a8d9c6; background: #f0fdf7; padding: 22px; border-radius: 18px; margin-bottom: 22px; }
 .operation-outcome h3 { font-weight: 750; font-size: 16px; margin-bottom: 12px; }.operation-outcome p { display: flex; justify-content: space-between; gap: 14px; padding: 6px 0; font-size: 13px; color: #34445e; }.operation-outcome strong { white-space: nowrap; font-weight: 750; }.operation-outcome a { display: inline-block; margin: 13px 18px 0 0; color: #047857; font-size: 13px; font-weight: 750; }
 @media(max-width:700px) { .operation-outcome p { flex-wrap: wrap; } }
+
+.app-main .grid > *, .app-main .flex > * { min-width: 0; }
+@media(max-width:700px) {
+    .app-main .flex.items-center.gap-2.text-xs { flex-wrap: wrap; }
+    .app-main input[type=date], .app-main input[type=month] { max-width: 100%; }
+    .app-main .flex.items-center.gap-2.text-xs input[type=date] { flex: 1 1 135px; width: 135px; }
+}
+
+.app-nav-lists { margin-top: 12px; color: #d7e1ef; font-size: 13px; }.app-nav-lists summary { cursor: pointer; padding: 10px 12px; }.app-nav-lists a { display: block; padding: 9px 15px 9px 30px; color: #adbed4; border-radius: 10px; }.app-nav-lists a:hover { color: #fff; background: #1d2d48; }.guide-directory-links { flex-wrap: wrap; }

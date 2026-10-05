@@ -12,18 +12,18 @@ $widthClasses = [
 
 <div
     id="{{ $id }}"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm hidden"
     role="dialog"
     aria-modal="true"
 >
-    <div class="relative w-full {{ $widthClasses }} bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div class="relative w-full {{ $widthClasses }} bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
         @if ($title)
-            <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-                <h3 class="text-sm font-semibold text-white">{{ $title }}</h3>
+            <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-slate-900">{{ $title }}</h3>
                 <button
                     type="button"
                     onclick="document.getElementById('{{ $id }}').classList.add('hidden')"
-                    class="text-slate-400 hover:text-white text-lg leading-none p-1 rounded-lg hover:bg-slate-800"
+                    class="text-slate-600 hover:text-slate-900 text-lg leading-none p-1 rounded-lg hover:bg-slate-100"
                 >
                     &times;
                 </button>
