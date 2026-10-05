@@ -24,6 +24,7 @@ use App\Models\Warehouse;
 use App\Services\Admin\SystemSettingsService;
 use App\Services\Admin\UserManagementService;
 use App\Services\Dashboard\DashboardQueryService;
+use App\Services\Purchase\ReceivePurchaseService;
 use App\Services\Sales\CreateSaleService;
 use App\Services\Sync\SyncConflictResolutionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -475,5 +476,24 @@ class DashboardAdminAndRealtimeTest extends TestCase
             ->assertSet('draftNote', 'Xaridorga 10 blok suv yetkazish rejalashtirildi')
             ->assertSet('showDraftModal', true)
             ->assertSee('Xaridorga 10 blok suv yetkazish rejalashtirildi');
+    }
+
+    public function test_dashboard_keeps_working_after_real_purchase_is_received(): void
+    {
+        $this->actingAs($this->owner);
+        $supplier = Supplier::create(['name' => 'Water Supplier', 'balance' => 0, 'status' => 'active']);
+        app(ReceivePurchaseService::class)->execute(
+            supplierId: $supplier->id,
+            items: [['variant_id' => $this->variant->id, 'quantity' => 10, 'unit_cost' => 3000]],
+            operationId: (string) Str::uuid(),
+            paidAmount: 0,
+            userId: $this->owner->id
+        );
+        $data = app(DashboardQueryService::class)->getDashboardData($this->owner);
+        $this->assertSame(110, $data['balances']['stock_units']);
+        $this->assertSame(30000, $data['balances']['supplier_payables']);
+        $purchase = collect($data['recent_activities'])->firstWhere('type', 'PURCHASE');
+        $this->assertSame($this->owner->name, $purchase['actor']);
+        $this->get('/dashboard')->assertOk()->assertSee('Water Supplier');
     }
 }

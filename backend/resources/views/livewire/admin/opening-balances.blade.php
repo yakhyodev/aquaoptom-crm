@@ -68,7 +68,7 @@
     <!-- 1. Ombor tovarlari TAB -->
     @if ($activeTab === 'stock')
         <x-card title="Mavjud mahsulot variantlari va ombor qoldig‘i">
-            <x-slot:subtitle>Har bir variant uchun donabay qoldiq, jami qiymat va o‘rtacha tannarx (WAC).</x-slot:subtitle>
+            <x-slot:subtitle>Har bir variant uchun donabay qoldiq, jami qiymat va o‘rtacha tannarx (O‘rtacha kirim narxi).</x-slot:subtitle>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-slate-700">
@@ -78,7 +78,7 @@
                             <th class="px-4 py-3">Hajm</th>
                             <th class="px-4 py-3">SKU</th>
                             <th class="px-4 py-3 text-right">Qoldiq (Dona)</th>
-                            <th class="px-4 py-3 text-right">WAC Tannarx</th>
+                            <th class="px-4 py-3 text-right">O‘rtacha kirim narxi Tannarx</th>
                             <th class="px-4 py-3 text-right">Jami Qiymat</th>
                             <th class="px-4 py-3 text-right">Amal</th>
                         </tr>
@@ -143,7 +143,7 @@
 
     <!-- 3. Mijozlar qarzdorligi TAB -->
     @if ($activeTab === 'customers')
-        <x-card title="Mijozlar hisob-kitoblari (Signed Balance)">
+        <x-card title="Mijozlar hisob-kitoblari">
             <x-slot:subtitle>Musbat qiymat = Mijoz qarzi (qizil). Manfiy qiymat = Mijoz avansi / oldindan to‘lovi (yashil).</x-slot:subtitle>
 
             <div class="overflow-x-auto">
@@ -153,7 +153,7 @@
                             <th class="px-4 py-3">Mijoz</th>
                             <th class="px-4 py-3">Telefon</th>
                             <th class="px-4 py-3">Do‘kon / Manzil</th>
-                            <th class="px-4 py-3 text-right">Signed Balans</th>
+                            <th class="px-4 py-3 text-right">Qarz yoki oldindan to‘lov</th>
                             <th class="px-4 py-3 text-right">Holat</th>
                             <th class="px-4 py-3 text-right">Amal</th>
                         </tr>
@@ -200,7 +200,7 @@
 
     <!-- 4. Ta’minotchilar TAB -->
     @if ($activeTab === 'suppliers')
-        <x-card title="Ta’minotchilar oldidagi majburiyatlar (Signed Balance)">
+        <x-card title="Ta’minotchilar oldidagi majburiyatlar">
             <x-slot:subtitle>Musbat qiymat = Bizning qarzimiz (qizil). Manfiy qiymat = Bizning avansimiz / haqdorligimiz (yashil).</x-slot:subtitle>
 
             <div class="overflow-x-auto">
@@ -210,7 +210,7 @@
                             <th class="px-4 py-3">Ta’minotchi</th>
                             <th class="px-4 py-3">Kompaniya</th>
                             <th class="px-4 py-3">Telefon</th>
-                            <th class="px-4 py-3 text-right">Signed Balans</th>
+                            <th class="px-4 py-3 text-right">Qarz yoki oldindan to‘lov</th>
                             <th class="px-4 py-3 text-right">Holat</th>
                             <th class="px-4 py-3 text-right">Amal</th>
                         </tr>

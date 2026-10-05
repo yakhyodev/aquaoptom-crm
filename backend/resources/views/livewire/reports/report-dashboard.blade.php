@@ -226,7 +226,7 @@
                         <span class="text-2xl font-bold text-slate-700 font-mono mt-1 block">
                             {{ number_format($pnlReport['cogs']) }}
                         </span>
-                        <span class="text-xs text-slate-600">WAC bo'yicha hisoblangan</span>
+                        <span class="text-xs text-slate-600">O‘rtacha kirim narxi bo'yicha hisoblangan</span>
                     </div>
 
                     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
@@ -252,7 +252,7 @@
                 <div class="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
                     <div class="p-4 border-b border-slate-100">
                         <h3 class="text-sm font-bold text-slate-800">
-                            Moliyaviy Natijalar Tuzilishi (P&L Breakdown)
+                            Moliyaviy Natijalar Tuzilishi
                         </h3>
                     </div>
                     <div class="overflow-x-auto">
@@ -283,10 +283,10 @@
                                 <tr>
                                     <td class="p-3 font-sans font-medium text-slate-700">3. Sotilgan Mahsulotlar Tannarxi (COGS)</td>
                                     <td class="p-3 text-right font-bold text-slate-700">-{{ number_format($pnlReport['cogs']) }}</td>
-                                    <td class="p-3 font-sans text-slate-600">WAC o'rtacha xarid qiymati (yaroqli qaytarishlar ayirilgan)</td>
+                                    <td class="p-3 font-sans text-slate-600">O‘rtacha kirim narxi o'rtacha xarid qiymati (yaroqli qaytarishlar ayirilgan)</td>
                                 </tr>
                                 <tr class="bg-emerald-50/50">
-                                    <td class="p-3 font-sans font-bold text-emerald-900">= Yalpi Foyda (Gross Profit)</td>
+                                    <td class="p-3 font-sans font-bold text-emerald-900">= Yalpi Foyda</td>
                                     <td class="p-3 text-right font-bold text-emerald-700">{{ number_format($pnlReport['gross_profit']) }}</td>
                                     <td class="p-3 font-sans text-emerald-700 font-semibold">Yalpi marja: {{ $pnlReport['gross_margin_percent'] }}%</td>
                                 </tr>
@@ -391,7 +391,7 @@
                     <span class="text-lg font-bold text-purple-700 font-mono mt-1 block">
                         {{ number_format($inventoryReport['summary']['total_closing_valuation']) }}
                     </span>
-                    <span class="text-xs text-slate-600">{{ number_format($inventoryReport['summary']['total_closing_units']) }} dona (WAC qiymati)</span>
+                    <span class="text-xs text-slate-600">{{ number_format($inventoryReport['summary']['total_closing_units']) }} dona (O‘rtacha kirim narxi qiymati)</span>
                 </div>
             </div>
 
@@ -412,7 +412,7 @@
                                 <th class="p-3 text-right">Chiqim</th>
                                 <th class="p-3 text-right">Tuzatish</th>
                                 <th class="p-3 text-right font-bold">Yakuniy Qoldiq</th>
-                                <th class="p-3 text-right">WAC Tannarx</th>
+                                <th class="p-3 text-right">O‘rtacha kirim narxi Tannarx</th>
                                 <th class="p-3 text-right font-bold">Yakuniy Qiymat</th>
                             </tr>
                         </thead>

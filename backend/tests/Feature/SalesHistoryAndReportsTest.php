@@ -607,7 +607,7 @@ class SalesHistoryAndReportsTest extends TestCase
     {
         Livewire::actingAs($this->owner)
             ->test(ReportDashboard::class)
-            ->assertSee('Tahlil va Boshqaruv Hisobotlari')
+            ->assertSee('Do‘kon hisobotlari')
             ->set('activeTab', 'sales')
             ->assertSee('Mahsulotlar va Hajmlar Kesimida Savdo Aylanmasi')
             ->set('activeTab', 'profit_loss')

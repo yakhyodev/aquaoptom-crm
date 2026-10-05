@@ -132,7 +132,7 @@
                 <div class="absolute -right-2 -bottom-2 text-slate-800/40 text-5xl font-black select-none pointer-events-none">📑</div>
             </div>
 
-            <!-- Savdodan foyda (Gross Profit) -->
+            <!-- Savdodan foyda -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative overflow-hidden">
                 <div class="text-xs font-semibold text-cyan-700 ">Savdodan foyda</div>
                 <div class="text-xl sm:text-2xl font-black text-cyan-700 mt-2">
@@ -200,7 +200,7 @@
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-semibold text-slate-600">Mijozlar Balansi</span>
-                    <span class="text-xs text-slate-600 uppercase font-mono">Signed</span>
+                    <span class="text-xs text-slate-600 uppercase font-mono">Qarz / oldindan to‘lov</span>
                 </div>
                 <div class="space-y-3">
                     <div>
@@ -224,7 +224,7 @@
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-semibold text-slate-600">Ta'minotchilar Balansi</span>
-                    <span class="text-xs text-slate-600 uppercase font-mono">Signed</span>
+                    <span class="text-xs text-slate-600 uppercase font-mono">Qarz / oldindan to‘lov</span>
                 </div>
                 <div class="space-y-3">
                     <div>
@@ -248,7 +248,7 @@
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-xs font-semibold text-slate-600">Ombor Qoldig'i</span>
-                    <span class="text-xs text-blue-700 font-bold">WAC</span>
+                    <span class="text-xs text-blue-700 font-bold">O‘rtacha kirim narxi</span>
                 </div>
                 <div class="text-2xl font-black text-slate-900">
                     {{ number_format($dashboard['balances']['stock_units'], 0, '.', ' ') }} <span class="text-xs text-slate-600 font-normal">dona</span>

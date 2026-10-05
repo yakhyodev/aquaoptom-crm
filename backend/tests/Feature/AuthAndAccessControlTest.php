@@ -328,7 +328,7 @@ class AuthAndAccessControlTest extends TestCase
         $response->assertSee('Qarzlar va to‘lovlar');
         $response->assertSee('Hisobotlar');
         $response->assertSee('Kassa va xarajatlar');
-        $response->assertSee('Admin panel');
+        $response->assertSee('Sozlamalar');
     }
 
     public function test_preview_admin_alias_uses_the_actual_user_password(): void

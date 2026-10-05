@@ -650,14 +650,14 @@ class InventoryStockAndCalculatorTest extends TestCase
         $test = Livewire::actingAs($this->owner)
             ->test(StockManager::class)
             ->assertStatus(200)
-            ->assertSee('Zaxiralar Boshqaruvi')
+            ->assertSee('Ombordagi mahsulotlar')
             ->assertSee('Asu')
             ->assertSee('ASU-05');
 
         // Switch to calculator tab
         $test->set('activeTab', 'calculator')
             ->assertSee('Sotilsa tushadigan pul')
-            ->assertSee('Narx Simulyatsiyasi');
+            ->assertSee('Narxlarni solishtirish');
 
         // Switch to inward tab
         $test->set('activeTab', 'inward')

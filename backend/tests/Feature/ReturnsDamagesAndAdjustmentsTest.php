@@ -829,13 +829,13 @@ class ReturnsDamagesAndAdjustmentsTest extends TestCase
 
         Livewire::test(StockManager::class)
             ->set('activeTab', 'returns')
-            ->assertSee('Mijoz Qaytarishlari (Sale Returns)')
-            ->assertSee('Supplier Returns')
+            ->assertSee('Mijozdan qaytgan mahsulotlar')
+            ->assertSee('Yetkazuvchiga qaytarilgan mahsulotlar')
             ->set('activeTab', 'damages')
-            ->assertSee('Brak & Yaroqsiz Tovar Chiqimlari Jurnali', false)
+            ->assertSee('Yaroqsiz mahsulotlar tarixi', false)
             ->assertSee('Brakka Chiqarish')
             ->set('activeTab', 'audits')
-            ->assertSee('Inventarizatsiya & Sanash Tarixi', false)
+            ->assertSee('Omborni sanab tekshirish tarixi', false)
             ->assertSee('Yangi Sanash Boshlash')
             ->call('prepareNewAudit')
             ->assertSee('PREPARED');

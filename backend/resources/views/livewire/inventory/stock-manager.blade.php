@@ -437,7 +437,7 @@
                             <div class="text-xs font-medium text-slate-600">Kirim narxidagi qiymat</div>
                             <div class="text-2xl font-black text-indigo-700 mt-1">{{ number_format($calcResults['total_cost_value']) }} <span class="text-sm font-normal text-slate-600">so'm</span></div>
                             <div class="text-xs text-slate-600 mt-2">
-                                Joriy o'rtacha (WAC) asosida
+                                Joriy o'rtacha (O‘rtacha kirim narxi) asosida
                             </div>
                         </div>
                     @endif
@@ -605,7 +605,7 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                                Mijoz Qaytarishlari (Sale Returns)
+                                Mijozdan qaytgan mahsulotlar
                             </h2>
                             <p class="text-xs text-slate-600 mt-0.5">Original sotuv narxi va cost snapshot asosida</p>
                         </div>
@@ -667,9 +667,9 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                                Ta'minotchi Qaytarishlari (Supplier Returns)
+                                Yetkazuvchiga qaytarilgan mahsulotlar
                             </h2>
-                            <p class="text-xs text-slate-600 mt-0.5">Tijoriy kredit va joriy WAC chiqimi farqi bilan</p>
+                            <p class="text-xs text-slate-600 mt-0.5">Qaytarilgan dona va yetkazuvchi bilan hisob o‘zgarishi</p>
                         </div>
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-slate-900 rounded-lg text-xs font-semibold shadow-xs flex items-center gap-1.5">
@@ -697,7 +697,7 @@
                                     <th class="p-2.5">Kirim Nakladnoy</th>
                                     <th class="p-2.5">Ta'minotchi</th>
                                     <th class="p-2.5 text-right">Tijoriy Kredit</th>
-                                    <th class="p-2.5 text-right">WAC Chiqim</th>
+                                    <th class="p-2.5 text-right">O‘rtacha kirim narxi Chiqim</th>
                                     <th class="p-2.5 text-right">Farq</th>
                                     <th class="p-2.5">Sana</th>
                                 </tr>
@@ -743,7 +743,7 @@
             <div class="bg-rose-50/70 border border-rose-200 rounded-xl p-4 flex items-start gap-3 text-rose-900 text-sm">
                 <svg class="w-5 h-5 text-rose-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                 <div>
-                    <strong class="font-semibold">Muhim qoida:</strong> Brak chiqimi faqat ombordagi WAC tannarx yo'qotishi hisoblanadi. U kassa harakati (Cash movement) yoki kassa operatsion xarajati (Cash expense) EMAS! Zaxira ajratmalariga daxl qilolmaydi.
+                    <strong class="font-semibold">Muhim qoida:</strong> Brak chiqimi faqat ombordagi O‘rtacha kirim narxi tannarx yo'qotishi hisoblanadi. U kassa harakati (Cash movement) yoki kassa operatsion xarajati (Cash expense) EMAS! Zaxira ajratmalariga daxl qilolmaydi.
                 </div>
             </div>
 
@@ -752,7 +752,7 @@
                     <div>
                         <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                             <span class="w-2.5 h-2.5 rounded-full bg-rose-600"></span>
-                            Yaroqsiz mahsulotlar Tovar Chiqimlari Jurnali
+                            Yaroqsiz mahsulotlar tarixi
                         </h2>
                         <p class="text-xs text-slate-600 mt-0.5">Yaroqsiz idishlar, sinishlar va yo'qotishlar hisobi</p>
                     </div>
@@ -768,7 +768,7 @@
                                 <th class="p-3">Hujjat #</th>
                                 <th class="p-3">Tovarlar</th>
                                 <th class="p-3 text-right">Jami Dona</th>
-                                <th class="p-3 text-right">Tannarx Yo'qotishi (WAC)</th>
+                                <th class="p-3 text-right">Tannarx Yo'qotishi (O‘rtacha kirim narxi)</th>
                                 <th class="p-3">Sabab</th>
                                 <th class="p-3">Mas'ul</th>
                                 <th class="p-3">Sana</th>
@@ -942,7 +942,7 @@
                         <div>
                             <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
                                 <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span>
-                                Sanab tekshirish & Sanash Tarixi
+                                Omborni sanab tekshirish tarixi
                             </h2>
                             <p class="text-xs text-slate-600 mt-0.5">Ombor qoldiqlarini haqiqiy sanash va farqlarni muvofiqlashtirish</p>
                         </div>
@@ -1205,7 +1205,7 @@
                         </div>
                         @if($this->canViewCost)
                             <div>
-                                <span class="text-slate-600 block">WAC O'rtacha Tannarx:</span>
+                                <span class="text-slate-600 block">O‘rtacha kirim narxi O'rtacha Tannarx:</span>
                                 <strong class="text-sm font-bold text-slate-900 font-mono">{{ $variantDetail['wac_cost'] ? number_format($variantDetail['wac_cost']) . ' so\'m' : '-' }}</strong>
                             </div>
                             <div>
