@@ -327,7 +327,7 @@ class CashManager extends Component
         $this->validate([
             'transferFromAccountId' => 'required|exists:cash_accounts,id',
             'transferToAccountId' => 'required|exists:cash_accounts,id|different:transferFromAccountId',
-            'transferAmount' => 'required|integer|min:100',
+            'transferAmount' => 'required|integer|min:1',
         ]);
 
         try {
@@ -364,7 +364,7 @@ class CashManager extends Component
     {
         $this->validate([
             'ownerAccountId' => 'required|exists:cash_accounts,id',
-            'ownerAmount' => 'required|integer|min:100',
+            'ownerAmount' => 'required|integer|min:1',
         ]);
 
         try {

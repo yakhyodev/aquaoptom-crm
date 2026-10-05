@@ -626,4 +626,22 @@ class CashSessionAndMovementsTest extends TestCase
             ->assertViewHas('todayCashIn', 1000)
             ->assertViewHas('movements', fn ($rows) => $rows->total() === 1);
     }
+
+    public function test_cash_forms_accept_positive_whole_som_amounts_consistently(): void
+    {
+        $this->actingAs($this->owner);
+        Livewire::test(CashManager::class)
+            ->call('openOwnerFundsModal', 'DEPOSIT')
+            ->set('ownerAccountId', $this->cashAccount->id)->set('ownerAmount', 50)
+            ->call('submitOwnerFunds')->assertHasNoErrors()->assertViewHas('totalBalance', 50)
+            ->call('openTransferModal')
+            ->set('transferFromAccountId', $this->cashAccount->id)
+            ->set('transferToAccountId', $this->bankAccount->id)->set('transferAmount', 50)
+            ->call('submitTransfer')->assertHasNoErrors()->assertViewHas('totalBalance', 50)
+            ->call('openExpenseModal')
+            ->set('expenseAccountId', $this->bankAccount->id)->set('expenseAmount', 50)
+            ->call('submitExpense')->assertHasNoErrors()->assertViewHas('totalBalance', 0);
+        $this->assertSame(0, (int) $this->cashAccount->fresh()->balance);
+        $this->assertSame(0, (int) $this->bankAccount->fresh()->balance);
+    }
 }
