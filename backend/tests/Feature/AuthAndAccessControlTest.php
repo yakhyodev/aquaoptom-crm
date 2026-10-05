@@ -321,11 +321,11 @@ class AuthAndAccessControlTest extends TestCase
         $response->assertSee('id="mobile-overlay"', false);
         $response->assertSee('toggleMobileSidebar', false);
         // 8 Navigation menu links
-        $response->assertSee('Dashboard');
+        $response->assertSee('Bosh sahifa');
         $response->assertSee('Savdo');
         $response->assertSee('Sotuv');
         $response->assertSee('Ombor');
-        $response->assertSee('Qarzdorliklar');
+        $response->assertSee('Qarzlar va to‘lovlar');
         $response->assertSee('Hisobotlar');
         $response->assertSee('Kassa va xarajatlar');
         $response->assertSee('Admin panel');

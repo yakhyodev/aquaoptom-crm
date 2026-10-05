@@ -640,7 +640,7 @@ class CatalogAndPartiesManagementTest extends TestCase
             ->assertSee('Yangi Mahsulot')
             ->assertSee('Kimdan olindi?');
 
-        $this->get('/sotuv')
+        $this->get('/sotuv?mode=customer')
             ->assertOk()
             ->assertSee('Mavjud mijozni qidirish')
             ->assertSee('Yangi Mijoz')

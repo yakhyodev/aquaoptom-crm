@@ -178,7 +178,7 @@ class OfflinePwaAndPosTest extends TestCase
         $response = $this->actingAs($this->cashier)->get('/sotuv');
         $response->assertStatus(200);
         $response->assertSee(route('pos.pwa'), false);
-        $response->assertSee('Offline Kassa (PWA)', false);
+        $response->assertSee('Internetsiz sotuv oynasi', false);
     }
 
     /**

@@ -3,7 +3,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <h1 class="text-xl font-bold text-slate-900 tracking-tight">Boshlang‘ich qoldiqlar (Hisob ochilishi)</h1>
-            <p class="text-xs text-slate-600 mt-1">Ombor tovarlari, kassa pullari hamda taraflar qarz va avanslarini idempotent ochilish hujjati orqali kiritish.</p>
+            <p class="text-xs text-slate-600 mt-1">Do‘konda avvaldan bor mahsulot, pul, mijoz va yetkazuvchi qarzlarini kiriting. Takror bosish hisobni ikki marta yozmaydi.</p>
         </div>
 
         <div class="flex items-center gap-2">

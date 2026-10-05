@@ -513,8 +513,8 @@ class DebtsAndPartyPaymentsTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(DebtsManager::class)
-            ->assertSee('Mijozlar Qarzdorligi')
-            ->assertSee('Majburiyatlari')
+            ->assertSee('Mijozlarning bizga qarzi')
+            ->assertSee('Bizning yetkazuvchilarga qarzimiz')
             ->assertSee('Akmal aka')
             ->set('activeTab', 'suppliers')
             ->assertSee('Navoiy Suvlari MCHJ')

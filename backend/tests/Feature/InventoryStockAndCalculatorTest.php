@@ -656,7 +656,7 @@ class InventoryStockAndCalculatorTest extends TestCase
 
         // Switch to calculator tab
         $test->set('activeTab', 'calculator')
-            ->assertSee('Kutilayotgan Foyda')
+            ->assertSee('Sotilsa tushadigan pul')
             ->assertSee('Narx Simulyatsiyasi');
 
         // Switch to inward tab

@@ -31,7 +31,8 @@
 .app-nav-help { margin-top: 14px; border: 1px solid #334663; background: #17253c; }
 .app-nav-help > span:first-child { border-radius: 9px; background: #263c5b; font-weight: 800; }
 .app-main { --trade-accent: #2456df; --trade-tint: #edf3ff; --trade-ring: #c5d5ff; font-size: 14px; }
-.app-main > :not(.fixed) { animation: trade-arrive .35s ease both; }
+.app-main > :not(.fixed) { animation: workspace-fade .35s ease; }
+@keyframes workspace-fade { from { opacity: 0; } to { opacity: 1; } }
 .app-main :where(.text-xs, .text-\[10px\], .text-\[11px\]) { font-size: 13px; line-height: 1.5; }
 .app-main :where(input, select, textarea), .offline-workspace :where(input, select, textarea) { color: #17243d; background-color: #fff; color-scheme: light; font-size: 15px; border-color: #cbd5e1; accent-color: #2456df; }
 .app-main :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 42px; }

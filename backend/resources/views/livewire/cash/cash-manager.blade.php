@@ -162,11 +162,11 @@
                         <option value="SALE_PAYMENT">Savdo to'lovi</option>
                         <option value="CUSTOMER_PAYMENT">Mijoz qarz to'lovi</option>
                         <option value="SUPPLIER_PAYMENT">Ta'minotchi to'lovi</option>
-                        <option value="EXPENSE">Operatsion xarajat</option>
+                        <option value="EXPENSE">Do‘kon xarajati</option>
                         <option value="TRANSFER_IN">O'tkazma kirimi</option>
                         <option value="TRANSFER_OUT">O'tkazma chiqimi</option>
                         <option value="OWNER_DEPOSIT">Egasi kiritgan pul</option>
-                        <option value="OWNER_DRAW">Egasi olgan pul (Draw)</option>
+                        <option value="OWNER_DRAW">Egaga berilgan pul</option>
                         <option value="DIFFERENCE_SURPLUS">Kassa ortiqchaligi</option>
                         <option value="DIFFERENCE_SHORTAGE">Kassa kamomadi</option>
                     </select>

@@ -577,7 +577,7 @@ class CashSessionAndMovementsTest extends TestCase
             ->set('expenseCategory', 'TRANSPORT')
             ->set('expenseDescription', 'Yoqilg\'i xarajati')
             ->call('submitExpense')
-            ->assertSee('muvaffaqiyatli saqlandi');
+            ->assertSee('Xarajat saqlandi:');
 
         $this->assertEquals(475_000, $this->cashAccount->fresh()->balance);
     }
