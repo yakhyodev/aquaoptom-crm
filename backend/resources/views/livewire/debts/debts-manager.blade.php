@@ -21,8 +21,8 @@ $isCustomer = $activeTab === 'customers';
 @endphp
     <section class="trade-card space-y-5">
         <div><h2 class="text-xl font-bold">{{ $isCustomer ? 'Qaysi mijoz to‘ladi?' : 'Qaysi yetkazuvchiga to‘laymiz?' }}</h2><p class="mt-1 text-slate-600">{{ $isCustomer ? 'To‘lagan pulini shu yerda yozing. Mijozning umumiy qarzi kamayadi.' : 'Berilgan pulni shu yerda yozing. Yetkazuvchiga umumiy qarzimiz kamayadi.' }}</p></div>
-        <div class="flex flex-wrap items-end gap-3">
-            <div class="trade-field flex-1 min-w-0"><label for="debt-search">{{ $isCustomer ? 'Mijozni topish' : 'Yetkazuvchini topish' }}</label><input id="debt-search" wire:model.live.debounce.300ms="search" placeholder="Ism, do‘kon yoki telefon bo‘yicha qidiring"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 items-end gap-3">
+            <div class="trade-field min-w-0"><label for="debt-search">{{ $isCustomer ? 'Mijozni topish' : 'Yetkazuvchini topish' }}</label><input id="debt-search" wire:model.live.debounce.300ms="search" placeholder="Ism, do‘kon yoki telefon bo‘yicha qidiring"></div>
             <div class="trade-field"><label for="debt-filter">Kimlar ko‘rinsin?</label><select id="debt-filter" wire:model.live="statusFilter"><option value="all">Barchasi</option><option value="debtors">Faqat qarzi borlar</option><option value="advance">Oldindan to‘langanlar</option><option value="overdue">To‘lov muddati o‘tganlar</option></select></div>
         </div>
         @if(($isCustomer ? $customerStats['total_advance'] : $supplierStats['total_prepaid']) > 0)

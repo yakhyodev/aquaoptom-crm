@@ -45,6 +45,12 @@ const fs = require('node:fs');
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.screenshot({ path: 'ui-evidence/' + name + '.png', fullPage: true, animations: 'disabled' });
     }
+    async function checkMobileSearch(route) {
+        const selector = { '/kassa': '#cash-search', '/qarzdorliklar': '#debt-search' }[route];
+        if (!selector) return;
+        const width = await page.locator(selector).evaluate(el => el.getBoundingClientRect().width);
+        assert(width >= 240, route + ': search field is too narrow to type a name or phone number (' + width + 'px)');
+    }
     try {
         await page.goto(process.env.PREVIEW_URL + '/login');
         await page.locator('#email').fill('admin');
@@ -60,6 +66,7 @@ const fs = require('node:fs');
                 const response = await page.goto(process.env.PREVIEW_URL + route);
                 assert.equal(response.status(), 200, route + ': clean panel failed to open');
                 assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), route + ': mobile overflow');
+                await checkMobileSearch(route);
                 assert(!/Fanta test|Sinov mijoz|Sinov yetkazuvchisi/.test(await page.locator('main').innerText()), route + ': unwanted fixture');
                 await screenshot('clean-' + route.replaceAll('/', '-') + '-mobile');
             }
@@ -181,6 +188,7 @@ const fs = require('node:fs');
             const response = await page.goto(process.env.PREVIEW_URL + route);
             assert.equal(response.status(), 200, route + ': failed to open');
             assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), route + ': mobile overflow');
+            await checkMobileSearch(route);
             const input = page.locator('main input:visible:not([type=checkbox]):not([type=radio])').first();
             if (await input.count()) await checkContrast(input, route + ' form');
             await screenshot('section-' + route.replaceAll('/', '-') + '-mobile');
