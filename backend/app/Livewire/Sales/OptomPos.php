@@ -159,6 +159,10 @@ class OptomPos extends Component
 
     public function removeItem(int $index): void
     {
+        if (isset($this->items[$index])) {
+            $this->resetErrorBag('quantity-'.$this->items[$index]['variant_id']);
+            $this->resetErrorBag('price-'.$this->items[$index]['variant_id']);
+        }
         $this->reset(['errorMessage', 'posMessage']);
         unset($this->items[$index]);
         $this->items = array_values($this->items);
@@ -170,12 +174,16 @@ class OptomPos extends Component
         if (! isset($this->items[$index])) {
             return;
         }
+        $errorKey = 'quantity-'.$this->items[$index]['variant_id'];
         $value = filter_var($qty, FILTER_VALIDATE_INT);
         if ($value === false || $value < 1) {
             $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
 
+            $this->addError($errorKey, $this->errorMessage);
+
             return;
         }
+        $this->resetErrorBag($errorKey);
         $this->reset(['errorMessage', 'posMessage']);
         $this->items[$index]['quantity'] = $value;
         $this->items[$index]['total'] = $value * $this->items[$index]['price'];
@@ -187,12 +195,16 @@ class OptomPos extends Component
         if (! isset($this->items[$index])) {
             return;
         }
+        $errorKey = 'price-'.$this->items[$index]['variant_id'];
         $value = filter_var($price, FILTER_VALIDATE_INT);
         if ($value === false || $value < 0) {
             $this->errorMessage = 'Narxni 0 yoki undan katta butun raqam bilan yozing.';
 
+            $this->addError($errorKey, $this->errorMessage);
+
             return;
         }
+        $this->resetErrorBag($errorKey);
         $this->reset(['errorMessage', 'posMessage']);
         $this->items[$index]['price'] = $value;
         $this->items[$index]['price_entered'] = true;
@@ -248,6 +260,7 @@ class OptomPos extends Component
 
     public function clearDraft(): void
     {
+        $this->resetErrorBag();
         $this->items = [];
         $this->selectedCustomerId = null;
         $this->selectedCustomerName = null;
@@ -280,6 +293,12 @@ class OptomPos extends Component
      */
     public function checkout(CreateSaleService $saleService): void
     {
+        if ($this->getErrorBag()->any()) {
+            $this->errorMessage = 'Dona va narx maydonlaridagi xatolarni tuzating.';
+
+            return;
+        }
+
         $this->reset(['errorMessage', 'posMessage', 'completedSale']);
 
         if (empty($this->items)) {

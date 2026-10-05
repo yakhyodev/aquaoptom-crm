@@ -139,12 +139,16 @@ class QuickInward extends Component
         if (! isset($this->items[$index])) {
             return;
         }
+        $errorKey = 'quantity-'.$this->items[$index]['variant_id'];
         $value = filter_var($qty, FILTER_VALIDATE_INT);
         if ($value === false || $value < 1) {
             $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
 
+            $this->addError($errorKey, $this->errorMessage);
+
             return;
         }
+        $this->resetErrorBag($errorKey);
         $this->errorMessage = null;
         $this->items[$index]['quantity'] = $value;
         $this->recalculatePayment();
@@ -155,12 +159,16 @@ class QuickInward extends Component
         if (! isset($this->items[$index])) {
             return;
         }
+        $errorKey = 'price-'.$this->items[$index]['variant_id'];
         $value = filter_var($cost, FILTER_VALIDATE_INT);
         if ($value === false || $value < 0) {
             $this->errorMessage = 'Kirim narxini 0 yoki undan katta butun raqam bilan yozing.';
 
+            $this->addError($errorKey, $this->errorMessage);
+
             return;
         }
+        $this->resetErrorBag($errorKey);
         $this->errorMessage = null;
         $this->items[$index]['unit_cost'] = $value;
         $this->items[$index]['cost_entered'] = true;
@@ -169,6 +177,10 @@ class QuickInward extends Component
 
     public function removeItem(int $index): void
     {
+        if (isset($this->items[$index])) {
+            $this->resetErrorBag('quantity-'.$this->items[$index]['variant_id']);
+            $this->resetErrorBag('price-'.$this->items[$index]['variant_id']);
+        }
         unset($this->items[$index]);
         $this->items = array_values($this->items);
         $this->recalculatePayment();
@@ -208,6 +220,7 @@ class QuickInward extends Component
 
     public function clearDraft(): void
     {
+        $this->resetErrorBag();
         $this->reset(['items', 'selectedSupplierId', 'selectedSupplierName', 'supplierInvoiceNumber', 'notes', 'paidAmount', 'successPurchase']);
         $this->paymentType = 'UNPAID';
         $this->operationId = Str::uuid()->toString();
@@ -217,6 +230,12 @@ class QuickInward extends Component
 
     public function postPurchase(ReceivePurchaseService $receiveService): void
     {
+        if ($this->getErrorBag()->any()) {
+            $this->errorMessage = 'Dona va narx maydonlaridagi xatolarni tuzating.';
+
+            return;
+        }
+
         $this->reset(['errorMessage', 'inwardMessage']);
 
         if (! $this->selectedSupplierId) {

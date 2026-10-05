@@ -166,3 +166,5 @@
 .auth-check input { width: 17px; height: 17px; accent-color: #2456df; }
 @media (max-width: 800px) { .auth-shell { grid-template-columns: 1fr; max-width: 420px; gap: 26px; } .auth-intro h1 { font-size: 28px; margin: 20px 0 10px; } .auth-intro > p, .auth-features { display: none; } .auth-card { padding: 26px; } }
 @media (prefers-reduced-motion: reduce) { .trade-workspace *, .trade-dialog, .auth-screen * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.trade-input-error { color: #a32340; font-size: 12px; line-height: 1.5; margin-top: 7px; }

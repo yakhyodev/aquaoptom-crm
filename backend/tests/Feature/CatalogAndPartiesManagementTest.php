@@ -661,7 +661,10 @@ class CatalogAndPartiesManagementTest extends TestCase
             ->call('updateQuantity', 0, 10)->assertSet('paidAmount', 70000)
             ->call('updatePrice', 0, 6500)->assertSet('paidAmount', 65000)->assertSet('items.0.is_system_price', false)
             ->set('paymentType', 'PARTIAL')->assertSet('paidAmount', 0);
-        $pos->call('updateQuantity', 0, '1.5')->assertSet('items.0.quantity', 10);
+        $pos->call('updateQuantity', 0, '1.5')->assertSet('items.0.quantity', 10)
+            ->assertHasErrors('quantity-'.$first->id)
+            ->call('checkout')->assertSet('errorMessage', 'Dona va narx maydonlaridagi xatolarni tuzating.')
+            ->call('updateQuantity', 0, 10)->assertHasNoErrors('quantity-'.$first->id);
         $inward = Livewire::test(QuickInward::class)
             ->set('selectedProductId', $first->product_id)->set('selectedVolumeId', $first->volume_id)
             ->call('addSelectedVariant')->assertSet('items.0.quantity', 1)->assertSet('items.0.unit_cost', 0)

@@ -352,7 +352,9 @@ class AuthAndAccessControlTest extends TestCase
         $originalEnvironment = app()->environment();
         app()->instance('env', 'production');
         try {
-            $this->post('/login', ['email' => 'admin', 'password' => 'admin1'])->assertSessionHasErrors('email');
+            $this->withSession(['_token' => 'preview-production-csrf'])
+                ->post('/login', ['email' => 'admin', 'password' => 'admin1', '_token' => 'preview-production-csrf'])
+                ->assertSessionHasErrors('email');
             $this->assertGuest();
             $this->get('/login')->assertDontSee('Test paneli uchun')->assertDontSee('admin1');
             $this->assertEquals(1, Artisan::call('app:bootstrap-owner', [
