@@ -338,7 +338,7 @@ class PurchaseReceivingTest extends TestCase
                 'default_price' => 7000,
             ])
             ->assertSet('items.0.variant_id', $this->variantFanta05->id)
-            ->assertSet('items.0.quantity', 100);
+            ->assertSet('items.0.quantity', 1);
 
         // Qoralama saqlanadi va 2-marta inline modal hodisasi kelsa mavjud qoralama yo'qolmaydi
         $test->dispatch('product-created', [
@@ -347,14 +347,16 @@ class PurchaseReceivingTest extends TestCase
             'sku' => 'FANTA-500',
             'default_price' => 7000,
         ])
-            ->assertSet('items.0.quantity', 150)
+            ->assertSet('items.0.quantity', 1)
             ->assertSet('selectedSupplierId', $this->supplier->id);
 
         // Kirimni tasdiqlash
-        $test->set('paymentType', 'UNPAID')
+        $test->call('updateQuantity', 0, 150)
+            ->call('updateUnitCost', 0, 5000)
+            ->set('paymentType', 'UNPAID')
             ->call('postPurchase')
             ->assertHasNoErrors()
-            ->assertSee('Kirim muvaffaqiyatli qabul qilindi');
+            ->assertSee('Mahsulotlar omborga qo‘shildi!');
 
         // Bazada tekshirish
         $this->assertEquals(150, InventoryBalance::where('product_variant_id', $this->variantFanta05->id)->value('quantity'));

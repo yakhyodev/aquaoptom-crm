@@ -19,6 +19,7 @@ class BootstrapOwnerCommand extends Command
                             {--email= : Do\'kon egasi emaili}
                             {--phone= : Telefon raqami}
                             {--password= : Xavfsiz parol (agar berilmasa tasodifiy 16 xonali parol generatsiya qilinadi)}
+                            {--preview : Faqat izolyatsiyalangan test paneli uchun qisqa parolga ruxsat}
                             {--force : Mavjud egasini hisobga olmasdan yangi owner qo\'shish}';
 
     /**
@@ -33,6 +34,13 @@ class BootstrapOwnerCommand extends Command
      */
     public function handle(): int
     {
+        $preview = (bool) $this->option('preview');
+        if ($preview && (! config('app.preview_mode') || ! app()->environment(['local', 'staging', 'testing']))) {
+            $this->error('Qisqa parol faqat test panelida ruxsat etiladi.');
+
+            return self::FAILURE;
+        }
+
         $this->info('=== AquaOptom CRM: Birinchi do\'kon egasini (OWNER) ro\'yxatdan o\'tkazish ===');
 
         // Check if an owner already exists
@@ -76,7 +84,7 @@ class BootstrapOwnerCommand extends Command
             }
         }
 
-        if (empty($password) || strlen($password) < 8) {
+        if (empty($password) || strlen($password) < ($preview ? 1 : 8)) {
             $this->error('Xatolik: Parol kamida 8 ta belgidan iborat bo\'lishi shart.');
 
             return self::FAILURE;

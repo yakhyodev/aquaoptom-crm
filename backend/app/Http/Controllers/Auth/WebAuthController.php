@@ -31,9 +31,14 @@ class WebAuthController extends Controller
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
         ], [
-            'email.required' => 'Email yoki telefon raqamini kiritish shart.',
+            'email.required' => 'Loginni kiriting.',
             'password.required' => 'Parolni kiritish shart.',
         ]);
+
+        if (config('app.preview_mode') && app()->environment(['local', 'staging', 'testing'])
+            && $credentials['email'] === 'admin') {
+            $credentials['email'] = 'owner@preview.aquaoptom.test';
+        }
 
         $remember = $request->boolean('remember');
 

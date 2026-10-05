@@ -1,328 +1,70 @@
-<div class="space-y-6">
-    <!-- Inline modallar -->
+<div class="trade-workspace trade-sale">
     <livewire:modals.inline-product-modal />
     <livewire:modals.inline-customer-modal />
-
-    <!-- Xabarnomalar -->
-    @if ($errorMessage)
-        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center space-x-2">
-                <svg class="w-5 h-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="font-medium">{{ $errorMessage }}</span>
-            </div>
-            <button wire:click="$set('errorMessage', null)" class="text-rose-400 hover:text-rose-600 text-lg">&times;</button>
-        </div>
-    @endif
-
-    @if ($posMessage)
-        <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between shadow-sm">
-            <div class="flex items-center space-x-2">
-                <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                <span class="font-medium">{{ $posMessage }}</span>
-            </div>
-            <button wire:click="$set('posMessage', null)" class="text-emerald-400 hover:text-emerald-600 text-lg">&times;</button>
-        </div>
-    @endif
-
-    <!-- Muvaffaqiyatli Chek Kvitansiyasi (Elektron Hujjat) -->
+    <div class="trade-hero"><div><span class="trade-eyebrow">MIJOZGA MAHSULOT SOTISH</span><h1>Sotuvni oson rasmiylashtiring</h1><p>Mahsulotni tanlang, nechta sotilishini yozing va to‘lovni belgilang.</p></div><div class="trade-path" aria-label="Sotuv tartibi"><span><b>1</b> Mahsulot</span><span><b>2</b> Mijoz</span><span><b>3</b> To‘lov</span></div></div>
+    @if ($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
+    @if ($posMessage && ! $completedSale)<div class="trade-alert" role="status">{{ $posMessage }}</div>@endif
     @if ($completedSale)
-        <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 text-white shadow-xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div class="flex items-center gap-2">
-                    <span class="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 font-bold">✓</span>
-                    <div>
-                        <h3 class="text-base font-bold text-white">Savdo Muvaffaqiyatli Yakunlandi!</h3>
-                        <p class="text-xs text-slate-400 font-mono">Elektron Chek: #{{ $completedSale['invoice_number'] ?? '' }}</p>
-                    </div>
-                </div>
-                <button wire:click="$set('completedSale', null)" class="text-slate-400 hover:text-white text-xl">&times;</button>
-            </div>
-
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-                <div>
-                    <span class="text-slate-400 block">Xaridor:</span>
-                    <span class="font-bold text-white text-sm">{{ $completedSale['customer_name'] ?? 'Tezkor xaridor' }}</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 block">Jami Summa:</span>
-                    <span class="font-black text-emerald-400 text-sm">{{ number_format($completedSale['total_amount'] ?? 0, 0, '', ' ') }} so‘m</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 block">To‘landi (Kassa):</span>
-                    <span class="font-semibold text-white text-sm">{{ number_format($completedSale['paid_amount'] ?? 0, 0, '', ' ') }} so‘m</span>
-                </div>
-                <div>
-                    <span class="text-slate-400 block">Nasiya (Qarz):</span>
-                    <span class="font-bold text-rose-400 text-sm">{{ number_format($completedSale['debt_amount'] ?? 0, 0, '', ' ') }} so‘m</span>
-                </div>
-            </div>
-
-            @if (!empty($completedSale['items']))
-                <div class="pt-3 border-t border-slate-800 text-xs text-slate-300">
-                    <div class="font-semibold text-slate-400 mb-1">Xarid tarkibi:</div>
-                    <div class="space-y-1">
-                        @foreach ($completedSale['items'] as $it)
-                            <div class="flex justify-between font-mono text-[11px]">
-                                <span>{{ $it['product_name'] ?? $it['display_name'] ?? 'Tovar' }} ({{ $it['quantity'] }} dona × {{ number_format($it['sale_price'] ?? $it['price'] ?? 0, 0, '', ' ') }})</span>
-                                <span class="font-bold">{{ number_format($it['line_total'] ?? $it['total'] ?? 0, 0, '', ' ') }} so‘m</span>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-        </div>
+        <div class="trade-success" role="status"><span class="trade-success-icon">✓</span><div><h2>Sotuv saqlandi!</h2><p>{{ $completedSale['customer_name'] ?? 'Tezkor xaridor' }} · Chek № {{ $completedSale['invoice_number'] ?? '' }}</p><p>To‘langan: {{ number_format($completedSale['paid_amount'] ?? 0, 0, '', ' ') }} so‘m · Qarz: {{ number_format($completedSale['debt_amount'] ?? 0, 0, '', ' ') }} so‘m</p></div><strong>{{ number_format($completedSale['total_amount'] ?? 0, 0, '', ' ') }} so‘m</strong><button type="button" wire:click="$set('completedSale', null)" class="trade-button trade-button-secondary">Yana sotuv qilish</button></div>
     @endif
-
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Chap: Savat va Chek Qoralamasi (2/3) -->
-        <div class="lg:col-span-2 space-y-4">
-            <!-- Xaridor tanlash paneli -->
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Xaridor:</span>
-                        @if ($selectedCustomerId)
-                            <div class="font-bold text-slate-900 text-base mt-0.5 flex items-center space-x-2">
-                                <span>{{ $selectedCustomerName }}</span>
-                                <span class="text-xs px-2 py-0.5 rounded-full font-semibold {{ $customerCurrentDebt > 0 ? 'bg-rose-100 text-rose-700' : ($customerCurrentDebt < 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600') }}">
-                                    {{ $customerCurrentDebt > 0 ? 'Qarzi: ' . number_format($customerCurrentDebt, 0, '', ' ') . ' so‘m' : ($customerCurrentDebt < 0 ? 'Avansi: ' . number_format(abs($customerCurrentDebt), 0, '', ' ') . ' so‘m' : 'Qarzsiz') }}
-                                </span>
-                                <button wire:click="selectExistingCustomer(null)" class="text-xs text-rose-500 hover:text-rose-700 underline font-normal">(Bekor qilish)</button>
+    <div class="trade-layout">
+        <div class="trade-main">
+            <section class="trade-card">
+                <div class="trade-card-heading"><div class="trade-heading"><span class="trade-step">1</span><div><h2>Nima sotiladi?</h2><p>Mahsulot va hajmni tanlang. Keyin donasini yozing.</p></div></div><button type="button" wire:click="$dispatch('open-inline-product-modal')" class="trade-button trade-button-secondary">+ Yangi Mahsulot / hajm</button></div>
+                <x-trade-product-picker :products="$products" :volumes="$availableVolumes" :selected-product="$selectedProductId" :selected-volume="$selectedVolumeId" />
+                <div class="trade-items">
+                    @forelse ($items as $index => $item)
+                        <article class="trade-item" wire:key="sale-item-{{ $item['variant_id'] }}">
+                            <div class="trade-item-heading"><span class="trade-product-icon">🥤</span><div><h3>{{ $item['display_name'] }}</h3><p>Nechta sotiladi va bir donasi qancha?</p></div><button type="button" wire:click="removeItem({{ $index }})" class="trade-remove" aria-label="{{ $item['display_name'] }} ni olib tashlash">×</button></div>
+                            <div class="trade-item-fields">
+                                <div class="trade-field"><label for="sale-quantity-{{ $index }}">Nechta dona?</label><div class="trade-input-unit"><input id="sale-quantity-{{ $index }}" type="number" min="1" step="1" inputmode="numeric" value="{{ $item['quantity'] }}" wire:input.debounce.300ms="updateQuantity({{ $index }}, $event.target.value)"><span>dona</span></div></div>
+                                <div class="trade-field"><label for="sale-price-{{ $index }}">1 donasining sotuv narxi</label><div class="trade-input-unit"><input id="sale-price-{{ $index }}" type="number" min="0" step="1" inputmode="numeric" placeholder="Narxni yozing" value="{{ ($item['price_entered'] ?? false) ? $item['price'] : '' }}" wire:input.debounce.300ms="updatePrice({{ $index }}, $event.target.value)" @readonly($item['is_system_price'])><span>so‘m</span></div></div>
+                                <div class="trade-line-total"><span>Shu mahsulot uchun</span><strong>{{ number_format($item['total'], 0, '', ' ') }}</strong><small>so‘m</small></div>
                             </div>
-                        @else
-                            <span class="text-sm font-medium text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                <span>Tezkor savdo (Noma'lum xaridor — faqat to‘liq to‘lov)</span>
-                            </span>
-                        @endif
-                    </div>
-
-                    <div class="flex items-center space-x-2">
-                        <button type="button" wire:click="$dispatch('open-inline-customer-modal')" class="inline-flex items-center px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition-colors space-x-1.5">
-                            <svg class="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                            <span>+ Yangi Mijoz</span>
-                        </button>
-                    </div>
+                            @if ($item['default_system_price'] > 0)
+                                <label class="trade-check"><input type="checkbox" wire:click="toggleSystemPrice({{ $index }})" @checked($item['is_system_price'])><span>Belgilangan narxdan foydalanish <strong>{{ number_format($item['default_system_price'], 0, '', ' ') }} so‘m</strong></span></label>
+                                @if ($item['is_system_price'])<p class="trade-help">Boshqa narxda sotish uchun yuqoridagi belgini o‘chiring.</p>@endif
+                            @endif
+                        </article>
+                    @empty
+                        <div class="trade-empty"><span>🛒</span><h3>Savatingiz hozircha bo‘sh</h3><p>Yuqorida mahsulot va hajmni tanlab «Qo‘shish»ni bosing.</p></div>
+                    @endforelse
                 </div>
-
-                <div class="space-y-2">
-                    <label for="pos-customer-search" class="block text-sm font-semibold text-slate-700">Mavjud mijozni qidirish</label>
-                    <input id="pos-customer-search" type="search" wire:model.live.debounce.300ms="customerSearch" placeholder="Ism, telefon, do‘kon nomi yoki manzil" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm text-slate-900 focus:border-blue-500 focus:outline-none">
-                    @if (trim($customerSearch) !== '')
-                        <div class="max-h-48 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
-                            @forelse ($customerResults as $customer)
-                                <button type="button" wire:key="customer-result-{{ $customer->id }}" wire:click="selectExistingCustomer({{ $customer->id }})" class="block w-full px-3 py-2 text-left text-sm text-slate-800 hover:bg-blue-50">
-                                    {{ $customer->display_name }}
-                                </button>
-                            @empty
-                                <p class="px-3 py-2 text-sm text-slate-600">Mijoz topilmadi. «+ Yangi Mijoz» orqali qo‘shing.</p>
-                            @endforelse
-                        </div>
-                    @endif
-                </div>
-
-                <!-- Tezkor mijozlar ro'yxati -->
-                @if (empty($selectedCustomerId) && count($recentCustomers) > 0)
-                    <div class="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
-                        <span class="text-[11px] text-slate-400 font-medium py-1">Tezkor tanlash:</span>
-                        @foreach ($recentCustomers as $rc)
-                            <button type="button" wire:click="selectExistingCustomer({{ $rc->id }})" class="px-2.5 py-1 rounded-lg text-xs bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-700 border border-slate-200 font-medium transition-colors">
-                                {{ $rc->display_name }}
-                            </button>
-                        @endforeach
+            </section>
+            <section class="trade-card">
+                <div class="trade-card-heading"><div class="trade-heading"><span class="trade-step">2</span><div><h2>Kimga sotiladi?</h2><p>Naqd savdoda mijoz tanlash shart emas. Nasiya uchun tanlang.</p></div></div><button type="button" wire:click="$dispatch('open-inline-customer-modal')" class="trade-button trade-button-secondary">+ Yangi Mijoz</button></div>
+                @if ($selectedCustomerId)
+                    <div class="trade-selected-customer"><span class="trade-avatar">✓</span><div><h3>{{ $selectedCustomerName }}</h3><p>{{ $customerCurrentDebt > 0 ? 'Avvalgi qarz: '.number_format($customerCurrentDebt, 0, '', ' ').' so‘m' : ($customerCurrentDebt < 0 ? 'Avvalgi avans: '.number_format(abs($customerCurrentDebt), 0, '', ' ').' so‘m' : 'Bu mijozning qarzi yo‘q') }}</p></div><button type="button" wire:click="selectExistingCustomer(null)" class="trade-clear">Bekor qilish</button></div>
+                @else <p class="trade-guest">⚡ Tezkor savdo — mijozsiz, to‘liq to‘lov bilan</p> @endif
+                <div class="trade-field"><label for="pos-customer-search">Mavjud mijozni qidirish</label><input id="pos-customer-search" type="search" wire:model.live.debounce.300ms="customerSearch" placeholder="Ism, telefon, do‘kon nomi yoki manzil"></div>
+                @if (trim($customerSearch) !== '')
+                    <div class="trade-search-results">
+                        @forelse ($customerResults as $customer)<button type="button" wire:key="customer-result-{{ $customer->id }}" wire:click="selectExistingCustomer({{ $customer->id }})"><span>{{ $customer->display_name }}</span><span>Tanlash →</span></button>@empty<p>Mijoz topilmadi. «+ Yangi Mijoz» orqali qo‘shing.</p>@endforelse
                     </div>
+                @elseif (! $selectedCustomerId && $recentCustomers->isNotEmpty())
+                    <div class="trade-chips">@foreach ($recentCustomers as $customer)<button type="button" wire:click="selectExistingCustomer({{ $customer->id }})">{{ $customer->display_name }}</button>@endforeach</div>
                 @endif
-            </div>
-
-            <!-- Savatdagi qatorlar -->
-            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-                <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                    <h3 class="font-bold text-slate-900 text-sm">Savdo Qoralamasi (Savat)</h3>
-                    <div class="flex items-center space-x-2">
-                        <button type="button" wire:click="$dispatch('open-inline-product-modal')" class="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-semibold rounded-lg transition-colors space-x-1">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                            <span>+ Yangi Tovar</span>
-                        </button>
-                        @if (!empty($items))
-                            <button type="button" wire:click="clearDraft" class="text-xs text-slate-400 hover:text-rose-500 font-medium transition-colors px-2 py-1">
-                                Tozalash
-                            </button>
-                        @endif
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead>
-                            <tr class="bg-slate-50/50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
-                                <th class="px-4 py-3">Mahsulot</th>
-                                <th class="px-3 py-3 text-center">Miqdor (dona)</th>
-                                <th class="px-3 py-3 text-center">Narx turi</th>
-                                <th class="px-3 py-3 text-right">Narx (so'm)</th>
-                                <th class="px-4 py-3 text-right">Jami</th>
-                                <th class="px-3 py-3 text-center">Amal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            @forelse ($items as $index => $item)
-                                <tr class="hover:bg-slate-50/50 transition-colors">
-                                    <td class="px-4 py-3.5">
-                                        <div class="font-bold text-slate-900">{{ $item['display_name'] }}</div>
-                                        <div class="text-[11px] font-mono text-slate-400">{{ $item['sku'] }}</div>
-                                    </td>
-                                    <td class="px-3 py-3.5 text-center">
-                                        <div class="inline-flex items-center space-x-1 bg-slate-100 rounded-lg p-1">
-                                            <button type="button" wire:click="updateQuantity({{ $index }}, {{ $item['quantity'] - 1 }})" class="w-6 h-6 flex items-center justify-center rounded bg-white text-slate-700 hover:bg-slate-200 text-xs font-bold">-</button>
-                                            <span class="w-10 text-center font-bold text-slate-900 text-xs">{{ $item['quantity'] }}</span>
-                                            <button type="button" wire:click="updateQuantity({{ $index }}, {{ $item['quantity'] + 1 }})" class="w-6 h-6 flex items-center justify-center rounded bg-white text-slate-700 hover:bg-slate-200 text-xs font-bold">+</button>
-                                        </div>
-                                    </td>
-                                    <td class="px-3 py-3.5 text-center">
-                                        <label class="inline-flex items-center gap-1 cursor-pointer text-xs">
-                                            <input type="checkbox" wire:click="toggleSystemPrice({{ $index }})" {{ !empty($item['is_system_price']) ? 'checked' : '' }} class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                                            <span class="text-[11px] {{ !empty($item['is_system_price']) ? 'font-semibold text-blue-600' : 'text-slate-500' }}">
-                                                {{ !empty($item['is_system_price']) ? 'Tizim' : 'Erkin' }}
-                                            </span>
-                                        </label>
-                                    </td>
-                                    <td class="px-3 py-3.5 text-right font-medium text-slate-800">
-                                        @if (!empty($item['is_system_price']))
-                                            <span class="font-bold text-slate-900">{{ number_format($item['price'], 0, '.', ' ') }}</span>
-                                        @else
-                                            <input type="number" wire:change="updatePrice({{ $index }}, $event.target.value)" value="{{ $item['price'] }}" class="w-24 px-2 py-1 text-right text-xs rounded border border-slate-300 focus:ring-1 focus:ring-blue-500 font-bold">
-                                        @endif
-                                    </td>
-                                    <td class="px-4 py-3.5 text-right font-bold text-slate-900">
-                                        {{ number_format($item['total'], 0, '.', ' ') }} so'm
-                                    </td>
-                                    <td class="px-3 py-3.5 text-center">
-                                        <button type="button" wire:click="removeItem({{ $index }})" class="text-slate-400 hover:text-rose-500 p-1">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-5 py-12 text-center text-slate-400">
-                                        <div class="flex flex-col items-center justify-center space-y-1">
-                                            <svg class="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                            <p class="font-medium text-slate-500 text-xs">Savat bo'sh</p>
-                                            <p class="text-[11px] text-slate-400">O'ng tarafdagi tezkor tovarlardan tanlang yoki yangi mahsulot qo'shing</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                <details class="trade-details"><summary>Sotuvga izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="sale-notes">Izoh</label><input id="sale-notes" wire:model="notes" placeholder="Qo‘shimcha ma’lumot"></div></details>
+            </section>
         </div>
-
-        <!-- O'ng: To'lov paneli va Tezkor tovarlar (1/3) -->
-        <div class="space-y-4">
-            <!-- Jami summa va Checkout paneli -->
-            <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-xl border border-slate-700 space-y-4">
-                <div>
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-1">Jami Savdo Summasi:</span>
-                    <div class="text-3xl font-black text-emerald-400 tracking-tight">
-                        {{ number_format($totalAmount, 0, '.', ' ') }} <span class="text-sm font-medium text-emerald-200">so‘m</span>
-                    </div>
-                </div>
-
-                <!-- To'lov rejimlari (Tabs) -->
-                <div class="pt-3 border-t border-slate-700/80 space-y-3">
-                    <span class="text-xs font-semibold text-slate-300 block">To‘lov rejimi:</span>
-                    <div class="grid grid-cols-3 gap-1 bg-slate-800 p-1 rounded-xl text-xs font-semibold">
-                        <button type="button" wire:click="setPaymentType('FULL')" class="py-1.5 rounded-lg transition-colors {{ $paymentType === 'FULL' ? 'bg-emerald-500 text-white' : 'text-slate-400 hover:text-white' }}">
-                            To‘liq
-                        </button>
-                        <button type="button" wire:click="setPaymentType('PARTIAL')" @if(!$selectedCustomerId) disabled title="Mijoz tanlanishi shart" @endif class="py-1.5 rounded-lg transition-colors {{ $paymentType === 'PARTIAL' ? 'bg-amber-500 text-white' : 'text-slate-400 hover:text-white disabled:opacity-40' }}">
-                            Qisman
-                        </button>
-                        <button type="button" wire:click="setPaymentType('DEBT')" @if(!$selectedCustomerId) disabled title="Mijoz tanlanishi shart" @endif class="py-1.5 rounded-lg transition-colors {{ $paymentType === 'DEBT' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white disabled:opacity-40' }}">
-                            Nasiya
-                        </button>
-                    </div>
-
-                    <!-- To'lov summasi kiritish (Qisman to'lovda) -->
-                    @if ($paymentType === 'PARTIAL')
-                        <div class="space-y-1">
-                            <label class="text-[11px] text-slate-300">Hozir to‘lanayotgan summa:</label>
-                            <input type="number" wire:model.live="paidAmount" class="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-xl text-emerald-400 font-bold text-sm focus:ring-1 focus:ring-emerald-500">
-                        </div>
-                    @endif
-
-                    <!-- To'lov usuli va Kassa tanlash -->
-                    @if ($paidAmount > 0)
-                        <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
-                            <div>
-                                <label class="text-[11px] text-slate-400 block mb-1">To‘lov usuli:</label>
-                                <select wire:model.live="paymentMethod" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2.5 py-1.5 text-xs text-white">
-                                    <option value="CASH">Naqd pul</option>
-                                    <option value="CARD">Karta / Terminal</option>
-                                    <option value="BANK">Bank o‘tkazmasi</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[11px] text-slate-400 block mb-1">Kassa hisobi:</label>
-                                <select wire:model.live="cashAccountId" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-2.5 py-1.5 text-xs text-white">
-                                    @foreach ($cashAccounts as $ca)
-                                        <option value="{{ $ca->id }}">{{ $ca->name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- Moliyaviy xulosa snapshot -->
-                    <div class="pt-3 border-t border-slate-700/80 space-y-1.5 text-xs text-slate-300 font-mono">
-                        <div class="flex justify-between">
-                            <span class="text-slate-400">Hozir to‘lanadi:</span>
-                            <span class="font-bold text-emerald-400">{{ number_format($paidAmount, 0, '', ' ') }} so‘m</span>
-                        </div>
-                        <div class="flex justify-between">
-                            <span class="text-slate-400">Yangi nasiya:</span>
-                            <span class="font-bold text-rose-400">{{ number_format($debtAmount, 0, '', ' ') }} so‘m</span>
-                        </div>
-                        @if ($selectedCustomerId)
-                            <div class="flex justify-between">
-                                <span class="text-slate-400">Eski hisob:</span>
-                                <span>{{ number_format($customerCurrentDebt, 0, '', ' ') }} so‘m</span>
-                            </div>
-                            <div class="flex justify-between font-bold pt-1 border-t border-slate-700 text-white">
-                                <span>Yakuniy qarz:</span>
-                                <span class="{{ $finalCustomerDebt > 0 ? 'text-rose-400' : 'text-emerald-400' }}">{{ number_format($finalCustomerDebt, 0, '', ' ') }} so‘m</span>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Tasdiqlash tugmasi -->
-                    <button type="button" wire:click="checkout" wire:loading.attr="disabled" class="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-slate-950 font-black text-sm rounded-xl shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50 mt-2">
-                        <span wire:loading.remove wire:target="checkout">✓ Tasdiqlash va Chek Chiqarish</span>
-                        <span wire:loading wire:target="checkout">Bajarilmoqda...</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Tezkor tovarlar katalogi -->
-            <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
-                <h4 class="font-bold text-slate-900 text-xs uppercase tracking-wider">Tezkor Tovarlar</h4>
-                <div class="grid grid-cols-2 gap-2">
-                    @foreach ($recentVariants as $rv)
-                        <button type="button" wire:click="onProductCreated({{ json_encode([
-                            'variant_id' => $rv->id,
-                            'sku' => $rv->sku,
-                            'display_name' => $rv->product->name . ' ' . $rv->volume->name,
-                            'sale_price' => $rv->default_sale_price,
-                        ]) }})" class="p-2.5 rounded-xl border border-slate-200 text-left hover:border-blue-500 hover:bg-blue-50/50 transition-all group">
-                            <div class="font-bold text-slate-800 text-xs group-hover:text-blue-700 truncate">{{ $rv->product->name }}</div>
-                            <div class="text-[11px] text-slate-500 font-medium">{{ $rv->volume->name }}</div>
-                            <div class="text-[11px] font-bold text-slate-900 mt-1">
-                                {{ $rv->default_sale_price ? number_format($rv->default_sale_price, 0, '.', ' ') . " so'm" : "Narxsiz" }}
-                            </div>
-                        </button>
-                    @endforeach
-                </div>
-            </div>
-        </div>
+        <aside class="trade-receipt">
+            <div class="trade-heading"><span class="trade-step">3</span><div><h2>To‘lov va yakunlash</h2><p>Qancha to‘lanishini belgilang.</p></div></div>
+            <div class="trade-total"><span>Jami sotuv summasi</span><strong>{{ number_format($totalAmount, 0, '', ' ') }} <small>so‘m</small></strong><p>{{ count($items) }} xil mahsulot · {{ number_format(array_sum(array_column($items, 'quantity')), 0, '', ' ') }} dona</p></div>
+            <fieldset class="trade-payment"><legend>Mijoz qanday to‘laydi?</legend>
+                @foreach (['FULL' => ['To‘liq to‘lov', 'Barcha summa hozir to‘lanadi'], 'PARTIAL' => ['Qisman to‘lov', 'Bir qismi hozir, qolgani qarz'], 'DEBT' => ['To‘liq nasiya', 'Barcha summa mijoz qarziga yoziladi']] as $value => $option)
+                    <label class="trade-payment-option {{ $paymentType === $value ? 'is-selected' : '' }} {{ $value !== 'FULL' && ! $selectedCustomerId ? 'is-disabled' : '' }}"><input type="radio" name="sale-payment" wire:model.live="paymentType" value="{{ $value }}" @disabled($value !== 'FULL' && ! $selectedCustomerId)><span><strong>{{ $option[0] }}</strong><small>{{ $option[1] }}</small></span><span class="trade-radio-mark"></span></label>
+                @endforeach
+            </fieldset>
+            @if (! $selectedCustomerId)<p class="trade-help">Nasiya yoki qisman to‘lov uchun mijozni tanlang.</p>@endif
+            @if ($paymentType === 'PARTIAL')<div class="trade-field"><label for="sale-paid">Hozir qancha to‘lanadi?</label><div class="trade-input-unit"><input id="sale-paid" type="number" min="0" max="{{ $totalAmount }}" step="1" inputmode="numeric" wire:model.live.debounce.300ms="paidAmount" placeholder="Summani yozing"><span>so‘m</span></div></div>@endif
+            @if ($paymentType !== 'DEBT')
+                <div class="trade-field"><label for="sale-method">To‘lov usuli</label><select id="sale-method" wire:model.live="paymentMethod"><option value="CASH">Naqd pul</option><option value="CARD">Karta</option><option value="BANK">Bank o‘tkazmasi</option></select></div>
+                <details class="trade-details"><summary>Kassa hisobini o‘zgartirish</summary><div class="trade-field"><label for="sale-cash">Kassa</label><select id="sale-cash" wire:model="cashAccountId">@foreach ($cashAccounts as $account)<option value="{{ $account->id }}">{{ $account->name }}</option>@endforeach</select></div></details>
+            @endif
+            <div class="trade-summary"><div><span>Hozir to‘lanadi</span><strong>{{ number_format($paidAmount, 0, '', ' ') }} so‘m</strong></div><div class="trade-debt"><span>Shu sotuvdan qolgan qarz</span><strong>{{ number_format($debtAmount, 0, '', ' ') }} so‘m</strong></div>@if ($selectedCustomerId)<div><span>{{ $finalCustomerDebt < 0 ? 'Mijozda qoladigan avans' : 'Mijozning jami qarzi' }}</span><strong>{{ number_format(abs($finalCustomerDebt), 0, '', ' ') }} so‘m</strong></div>@endif</div>
+            <button type="button" wire:click="checkout" wire:loading.attr="disabled" wire:target="checkout" @disabled(empty($items)) class="trade-button trade-button-primary trade-submit"><span wire:loading.remove wire:target="checkout">✓ Sotuvni yakunlash</span><span wire:loading wire:target="checkout">Saqlanyapti…</span></button>
+            <p class="trade-help trade-center">{{ empty($items) ? 'Avval savatga mahsulot qo‘shing.' : 'Tasdiqlangandan so‘ng sotuv saqlanadi va chek yaratiladi.' }}</p>
+            @if (! empty($items))<button type="button" wire:click="clearDraft" class="trade-clear">Savatni tozalash</button>@endif
+        </aside>
     </div>
 </div>

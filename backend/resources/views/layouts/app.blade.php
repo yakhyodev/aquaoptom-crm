@@ -75,7 +75,7 @@
                 class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors {{ request()->routeIs('sales.history') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}"
             >
                 <span class="text-base">🕒</span>
-                <span>Savdo (Tarix)</span>
+                <span>Savdolar tarixi</span>
             </a>
 
             <!-- 3. Sotuv (Yangi operatsiya) -->
@@ -84,7 +84,7 @@
                 class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors {{ request()->routeIs('sales.pos') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}"
             >
                 <span class="text-base">🛒</span>
-                <span>Sotuv (Yangi chek)</span>
+                <span>Sotuv qilish</span>
             </a>
 
             <!-- 4. Ombor -->
@@ -93,7 +93,11 @@
                 class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors {{ request()->routeIs('inventory.index') ? 'bg-blue-600 text-white font-semibold shadow-sm' : 'text-slate-300 hover:bg-slate-800/80 hover:text-white' }}"
             >
                 <span class="text-base">📦</span>
-                <span>Ombor & Kirim</span>
+                <span>Ombor</span>
+            </a>
+
+            <a href="{{ route('inventory.inward') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors {{ request()->routeIs('inventory.inward') ? 'bg-emerald-600 text-white font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
+                <span class="text-base">📥</span><span>Mahsulot kirimi</span>
             </a>
 
             <!-- 5. Qarzdorliklar -->

@@ -17,6 +17,8 @@ return [
 
     'version' => env('APP_VERSION', '1.0.0'),
 
+    'preview_mode' => env('PREVIEW_MODE', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

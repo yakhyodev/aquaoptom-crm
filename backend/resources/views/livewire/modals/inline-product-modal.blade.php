@@ -1,7 +1,7 @@
 <div>
     @if ($isOpen)
         <div class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
+            <div class="trade-dialog bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden transform transition-all">
                 <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                     <h3 class="font-bold text-slate-900 text-base">Mahsulot yoki yangi hajm qo‘shish</h3>
                     <button wire:click="close" class="text-slate-400 hover:text-slate-600 text-lg font-bold">&times;</button>
@@ -54,7 +54,7 @@
                             Bekor qilish
                         </button>
                         <button type="submit" wire:loading.attr="disabled" wire:target="save" class="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all">
-                            Saqlash va Tanlash
+                            Saqlash va tanlash
                         </button>
                     </div>
                 </form>

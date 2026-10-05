@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Exceptions\CannotDeleteReferencedRecordException;
 use App\Livewire\Catalog\ProductManager;
+use App\Livewire\Inventory\QuickInward;
 use App\Livewire\Modals\InlineCustomerModal;
 use App\Livewire\Modals\InlineProductModal;
 use App\Livewire\Parties\CustomerManager;
@@ -632,16 +633,56 @@ class CatalogAndPartiesManagementTest extends TestCase
 
     public function test_receiving_and_sales_pages_render_the_actual_workflow_forms(): void
     {
-        $this->actingAs($this->owner)->get('/ombor?tab=inward')
+        $this->actingAs($this->owner)->get('/inward')
             ->assertOk()
-            ->assertSee('Kirim qilinadigan mahsulotlar')
+            ->assertSee('Qaysi mahsulot keldi?')
             ->assertSee('Yangi Mahsulot')
-            ->assertSee("Ta'minotchi (Majburiy)", false);
+            ->assertSee('Kimdan olindi?');
 
         $this->get('/sotuv')
             ->assertOk()
             ->assertSee('Mavjud mijozni qidirish')
             ->assertSee('Yangi Mijoz')
-            ->assertSee('Savdo Qoralamasi');
+            ->assertSee('Nima sotiladi?');
+    }
+
+    public function test_simple_product_picker_finds_any_product_and_keeps_receiving_quantity_explicit(): void
+    {
+        $this->actingAs($this->owner);
+        $catalog = new CatalogService;
+        $first = $catalog->createVariant('First Product', '0.5 L', 7000);
+        $second = $catalog->createVariant('First Product', '1 L', 10000);
+        for ($i = 0; $i < 9; $i++) {
+            $catalog->createVariant('Later '.$i, '0.5 L', 8000);
+        }
+        $pos = Livewire::test(OptomPos::class)
+            ->set('selectedProductId', $first->product_id)->set('selectedVolumeId', $first->volume_id)
+            ->call('addSelectedVariant')->assertSet('items.0.variant_id', $first->id)
+            ->call('updateQuantity', 0, 10)->assertSet('paidAmount', 70000)
+            ->call('updatePrice', 0, 6500)->assertSet('paidAmount', 65000)->assertSet('items.0.is_system_price', false)
+            ->set('paymentType', 'PARTIAL')->assertSet('paidAmount', 0);
+        $pos->call('updateQuantity', 0, '1.5')->assertSet('items.0.quantity', 10);
+        $inward = Livewire::test(QuickInward::class)
+            ->set('selectedProductId', $first->product_id)->set('selectedVolumeId', $first->volume_id)
+            ->call('addSelectedVariant')->assertSet('items.0.quantity', 1)->assertSet('items.0.unit_cost', 0)
+            ->call('updateQuantity', 0, 150)->call('updateUnitCost', 0, 5000)
+            ->call('addSelectedVariant')->assertSet('items.0.quantity', 150);
+        $this->assertCount(1, $inward->get('items'));
+        $inward->dispatch('product-created', ['variant_id' => $second->id]);
+        $this->assertCount(2, $inward->get('items'));
+        $this->assertEquals($second->id, $inward->get('items')[1]['variant_id']);
+        $inward->call('updateQuantity', 0, '1.5')->assertSet('items.0.quantity', 150);
+    }
+
+    public function test_receiving_cannot_save_an_untouched_blank_price(): void
+    {
+        $this->actingAs($this->owner);
+        $supplier = (new SupplierService)->createSupplier(['name' => 'Test Supplier']);
+        $variant = (new CatalogService)->createVariant('Test Product', '0.5 L');
+        Livewire::test(QuickInward::class)
+            ->call('selectSupplier', $supplier->id)
+            ->dispatch('product-created', ['variant_id' => $variant->id])
+            ->call('postPurchase')->assertSet('errorMessage', 'Har bir mahsulotning kirim narxini yozing.');
+        $this->assertEquals(0, Purchase::count());
     }
 }

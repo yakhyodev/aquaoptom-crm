@@ -73,7 +73,7 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     // PWA Offline POS — Kassa
     Route::get('/pos', fn () => view('pages.pos-offline'))->name('pos.pwa');
-    Route::get('/inward', fn () => redirect()->route('inventory.index', ['tab' => 'inward']));
+    Route::get('/inward', fn () => view('pages.inward'))->name('inventory.inward');
     Route::get('/calculator', fn () => redirect()->route('inventory.index', ['tab' => 'calculator']));
     Route::get('/returns', fn () => redirect()->route('inventory.index', ['tab' => 'returns']));
     Route::get('/damages', fn () => redirect()->route('inventory.index', ['tab' => 'damages']));

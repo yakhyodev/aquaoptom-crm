@@ -4,7 +4,9 @@ namespace App\Livewire\Sales;
 
 use App\Models\CashAccount;
 use App\Models\Customer;
+use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\Volume;
 use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Parties\CustomerService;
 use App\Services\Sales\CreateSaleService;
@@ -25,6 +27,10 @@ class OptomPos extends Component
 
     public int $customerCurrentDebt = 0;
 
+    public ?int $selectedProductId = null;
+
+    public ?int $selectedVolumeId = null;
+
     public array $items = [];
 
     // To'lov parametrlari
@@ -43,6 +49,11 @@ class OptomPos extends Component
     public ?string $errorMessage = null;
 
     public ?array $completedSale = null;
+
+    public function updatedSelectedProductId(): void
+    {
+        $this->selectedVolumeId = null;
+    }
 
     public function mount(): void
     {
@@ -83,6 +94,7 @@ class OptomPos extends Component
             'sku' => $payload['sku'] ?? ($variant?->sku ?? ''),
             'quantity' => 1,
             'price' => (int) $price,
+            'price_entered' => (int) $price > 0,
             'is_system_price' => (int) $price > 0,
             'default_system_price' => (int) ($variant?->default_sale_price ?? 0),
             'price_version' => $variant?->version ?? 1,
@@ -128,6 +140,23 @@ class OptomPos extends Component
         }
     }
 
+    public function addSelectedVariant(): void
+    {
+        $variant = ProductVariant::with(['product', 'volume'])->where('status', 'active')
+            ->where('product_id', $this->selectedProductId)
+            ->where('volume_id', $this->selectedVolumeId)->first();
+        if (! $variant) {
+            $this->errorMessage = 'Avval mahsulotni, keyin uning hajmini tanlang.';
+
+            return;
+        }
+        $this->onProductCreated([
+            'variant_id' => $variant->id, 'sku' => $variant->sku,
+            'display_name' => $variant->product->name.' — '.$variant->volume->name,
+            'sale_price' => $variant->default_sale_price,
+        ]);
+    }
+
     public function removeItem(int $index): void
     {
         $this->reset(['errorMessage', 'posMessage']);
@@ -136,24 +165,39 @@ class OptomPos extends Component
         $this->syncPaymentAmount();
     }
 
-    public function updateQuantity(int $index, int $qty): void
+    public function updateQuantity(int $index, mixed $qty): void
     {
-        $this->reset(['errorMessage', 'posMessage']);
-        if ($qty <= 0) {
-            $this->removeItem($index);
+        if (! isset($this->items[$index])) {
+            return;
+        }
+        $value = filter_var($qty, FILTER_VALIDATE_INT);
+        if ($value === false || $value < 1) {
+            $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
 
             return;
         }
-        $this->items[$index]['quantity'] = $qty;
-        $this->items[$index]['total'] = $qty * $this->items[$index]['price'];
+        $this->reset(['errorMessage', 'posMessage']);
+        $this->items[$index]['quantity'] = $value;
+        $this->items[$index]['total'] = $value * $this->items[$index]['price'];
         $this->syncPaymentAmount();
     }
 
-    public function updatePrice(int $index, int $price): void
+    public function updatePrice(int $index, mixed $price): void
     {
+        if (! isset($this->items[$index])) {
+            return;
+        }
+        $value = filter_var($price, FILTER_VALIDATE_INT);
+        if ($value === false || $value < 0) {
+            $this->errorMessage = 'Narxni 0 yoki undan katta butun raqam bilan yozing.';
+
+            return;
+        }
         $this->reset(['errorMessage', 'posMessage']);
-        $this->items[$index]['price'] = max(0, $price);
-        $this->items[$index]['total'] = $this->items[$index]['quantity'] * $this->items[$index]['price'];
+        $this->items[$index]['price'] = $value;
+        $this->items[$index]['price_entered'] = true;
+        $this->items[$index]['is_system_price'] = false;
+        $this->items[$index]['total'] = $this->items[$index]['quantity'] * $value;
         $this->syncPaymentAmount();
     }
 
@@ -167,6 +211,7 @@ class OptomPos extends Component
             $sysPrice = (int) ($this->items[$index]['default_system_price'] ?? 0);
             if ($sysPrice > 0) {
                 $this->items[$index]['price'] = $sysPrice;
+                $this->items[$index]['price_entered'] = true;
                 $this->items[$index]['total'] = $this->items[$index]['quantity'] * $sysPrice;
             } else {
                 $this->errorMessage = "'{$this->items[$index]['display_name']}' uchun tizim narxi belgilanmagan!";
@@ -179,11 +224,14 @@ class OptomPos extends Component
     {
         $this->reset(['errorMessage', 'posMessage']);
         $this->paymentType = $type;
-        $this->syncPaymentAmount();
+        $this->updatedPaymentType();
     }
 
     public function updatedPaymentType(): void
     {
+        if ($this->paymentType === 'PARTIAL') {
+            $this->paidAmount = 0;
+        }
         $this->syncPaymentAmount();
     }
 
@@ -238,6 +286,14 @@ class OptomPos extends Component
             $this->errorMessage = "Savdo savati bo'sh! Kamida bitta tovar tanlang.";
 
             return;
+        }
+
+        foreach ($this->items as $item) {
+            if (! ($item['price_entered'] ?? false)) {
+                $this->errorMessage = 'Har bir mahsulotning sotuv narxini yozing.';
+
+                return;
+            }
         }
 
         $totalAmount = $this->getTotalAmount();
@@ -295,22 +351,20 @@ class OptomPos extends Component
 
     public function render()
     {
-        $recentCustomers = Customer::where('status', 'active')->latest()->take(6)->get();
-        $recentVariants = ProductVariant::with(['product', 'volume'])
-            ->where('status', 'active')
-            ->latest()
-            ->take(8)
-            ->get();
-        $customerResults = trim($this->customerSearch) !== ''
-            ? app(CustomerService::class)->search($this->customerSearch)
-            : collect();
-        $cashAccounts = CashAccount::all();
+        $products = Product::where('status', 'active')
+            ->whereHas('variants', fn ($query) => $query->where('status', 'active'))
+            ->orderBy('name')->get();
+        $availableVolumes = Volume::where('status', 'active')
+            ->whereHas('variants', fn ($query) => $query->where('product_id', $this->selectedProductId)
+                ->where('status', 'active'))->orderBy('value_ml')->get();
 
         return view('livewire.sales.optom-pos', [
-            'recentCustomers' => $recentCustomers,
-            'customerResults' => $customerResults,
-            'recentVariants' => $recentVariants,
-            'cashAccounts' => $cashAccounts,
+            'products' => $products,
+            'availableVolumes' => $availableVolumes,
+            'recentCustomers' => Customer::where('status', 'active')->latest()->take(6)->get(),
+            'customerResults' => trim($this->customerSearch) !== ''
+                ? app(CustomerService::class)->search($this->customerSearch) : collect(),
+            'cashAccounts' => CashAccount::all(),
             'totalAmount' => $this->getTotalAmount(),
             'debtAmount' => $this->getDebtAmount(),
             'finalCustomerDebt' => $this->getFinalCustomerDebt(),

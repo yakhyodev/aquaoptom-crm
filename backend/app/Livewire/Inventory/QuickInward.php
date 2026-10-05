@@ -3,8 +3,10 @@
 namespace App\Livewire\Inventory;
 
 use App\Models\CashAccount;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Supplier;
+use App\Models\Volume;
 use App\Services\Purchase\ReceivePurchaseService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Fluent;
@@ -26,6 +28,10 @@ class QuickInward extends Component
     public string $notes = '';
 
     // Tovarlar qatorlari
+    public ?int $selectedProductId = null;
+
+    public ?int $selectedVolumeId = null;
+
     public array $items = [];
 
     public ?int $quickVariantId = null;
@@ -49,6 +55,11 @@ class QuickInward extends Component
 
     public ?array $successPurchase = null;
 
+    public function updatedSelectedProductId(): void
+    {
+        $this->selectedVolumeId = null;
+    }
+
     public function mount(): void
     {
         $this->operationId = Str::uuid()->toString();
@@ -64,27 +75,10 @@ class QuickInward extends Component
     #[On('product-created')]
     public function onProductCreated(array $payload): void
     {
-        $variantId = $payload['variant_id'];
-
-        foreach ($this->items as $index => $item) {
-            if ($item['variant_id'] === $variantId) {
-                $this->items[$index]['quantity'] += 50;
-                $this->inwardMessage = "Kirim qoralamasidagi mahsulot soni oshirildi: {$payload['display_name']}";
-
-                return;
-            }
-        }
-
-        $this->items[] = [
-            'variant_id' => $variantId,
-            'display_name' => $payload['display_name'],
-            'sku' => $payload['sku'] ?? '',
-            'quantity' => 100, // Standard optom receiving batch
-            'unit_cost' => 5000,
-            'new_sale_price' => $payload['default_price'] ?? null,
-        ];
-
-        $this->inwardMessage = "Yangi mahsulot saqlandi va kirim ro'yxatiga qo'shildi: {$payload['display_name']}";
+        $this->selectedProductId = null;
+        $this->selectedVolumeId = null;
+        $this->quickVariantId = (int) $payload['variant_id'];
+        $this->addSelectedVariant();
     }
 
     #[On('supplier-created')]
@@ -106,57 +100,71 @@ class QuickInward extends Component
 
     public function addSelectedVariant(): void
     {
-        if (! $this->quickVariantId) {
-            return;
+        $this->errorMessage = null;
+        if ($this->selectedProductId && $this->selectedVolumeId) {
+            $this->quickVariantId = ProductVariant::where('product_id', $this->selectedProductId)
+                ->where('volume_id', $this->selectedVolumeId)->where('status', 'active')->value('id');
         }
-
-        $variant = ProductVariant::with(['product', 'volume', 'balance'])->find($this->quickVariantId);
+        $variant = ProductVariant::with(['product', 'volume', 'balance'])
+            ->where('status', 'active')->find($this->quickVariantId);
         if (! $variant) {
+            $this->errorMessage = 'Avval mahsulotni, keyin uning hajmini tanlang.';
+
             return;
         }
-
-        $variantId = $variant->id;
-        $displayName = $variant->product->name.' — '.$variant->volume->name;
-
-        foreach ($this->items as $index => $item) {
-            if ($item['variant_id'] === $variantId) {
-                $this->items[$index]['quantity'] += 50;
+        foreach ($this->items as $item) {
+            if ($item['variant_id'] === $variant->id) {
+                $this->inwardMessage = 'Bu mahsulot ro‘yxatda bor. Donasini shu qatorda o‘zgartiring.';
                 $this->quickVariantId = null;
 
                 return;
             }
         }
-
-        $unitCost = ($variant->balance && $variant->balance->average_cost > 0)
-            ? (int) $variant->balance->average_cost
-            : 5000;
-
         $this->items[] = [
-            'variant_id' => $variantId,
-            'display_name' => $displayName,
+            'variant_id' => $variant->id,
+            'display_name' => $variant->product->name.' — '.$variant->volume->name,
             'sku' => $variant->sku,
-            'quantity' => 100,
-            'unit_cost' => $unitCost,
+            'quantity' => 1,
+            'unit_cost' => 0,
+            'cost_entered' => false,
             'new_sale_price' => $variant->default_sale_price,
         ];
-
         $this->quickVariantId = null;
+        $this->inwardMessage = 'Mahsulot qo‘shildi. Endi donasi va kirim narxini yozing.';
+        $this->recalculatePayment();
     }
 
-    public function updateQuantity(int $index, $qty): void
+    public function updateQuantity(int $index, mixed $qty): void
     {
-        if (isset($this->items[$index])) {
-            $this->items[$index]['quantity'] = max(1, (int) $qty);
-            $this->recalculatePayment();
+        if (! isset($this->items[$index])) {
+            return;
         }
+        $value = filter_var($qty, FILTER_VALIDATE_INT);
+        if ($value === false || $value < 1) {
+            $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
+
+            return;
+        }
+        $this->errorMessage = null;
+        $this->items[$index]['quantity'] = $value;
+        $this->recalculatePayment();
     }
 
-    public function updateUnitCost(int $index, $cost): void
+    public function updateUnitCost(int $index, mixed $cost): void
     {
-        if (isset($this->items[$index])) {
-            $this->items[$index]['unit_cost'] = max(0, (int) $cost);
-            $this->recalculatePayment();
+        if (! isset($this->items[$index])) {
+            return;
         }
+        $value = filter_var($cost, FILTER_VALIDATE_INT);
+        if ($value === false || $value < 0) {
+            $this->errorMessage = 'Kirim narxini 0 yoki undan katta butun raqam bilan yozing.';
+
+            return;
+        }
+        $this->errorMessage = null;
+        $this->items[$index]['unit_cost'] = $value;
+        $this->items[$index]['cost_entered'] = true;
+        $this->recalculatePayment();
     }
 
     public function removeItem(int $index): void
@@ -175,7 +183,7 @@ class QuickInward extends Component
         } elseif ($val === 'UNPAID') {
             $this->paidAmount = 0;
         } elseif ($val === 'PARTIAL') {
-            $this->paidAmount = (int) round($total / 2);
+            $this->paidAmount = 0;
         }
     }
 
@@ -223,6 +231,14 @@ class QuickInward extends Component
             return;
         }
 
+        foreach ($this->items as $item) {
+            if (! ($item['cost_entered'] ?? false)) {
+                $this->errorMessage = 'Har bir mahsulotning kirim narxini yozing.';
+
+                return;
+            }
+        }
+
         $totalAmount = $this->calculateTotalAmount();
         $user = Auth::user();
         $canManageCash = $user && ($user->hasRole(['OWNER', 'ADMIN', 'CASHIER']) || $user->hasPermission('manage_cash_outflow') || $user->hasPermission('view_cash'));
@@ -268,18 +284,21 @@ class QuickInward extends Component
 
     public function render()
     {
-        $suppliers = Supplier::where('status', 'active')->orderBy('name')->get();
-        $cashAccounts = CashAccount::orderBy('id')->get();
-        $availableVariants = ProductVariant::with(['product', 'volume'])->where('status', 'active')->orderBy('id')->get();
-
+        $products = Product::where('status', 'active')
+            ->whereHas('variants', fn ($query) => $query->where('status', 'active'))
+            ->orderBy('name')->get();
+        $availableVolumes = Volume::where('status', 'active')
+            ->whereHas('variants', fn ($query) => $query->where('product_id', $this->selectedProductId)
+                ->where('status', 'active'))->orderBy('value_ml')->get();
         $user = Auth::user();
-        $canManageCash = $user && ($user->hasRole(['OWNER', 'ADMIN', 'CASHIER']) || $user->hasPermission('manage_cash_outflow') || $user->hasPermission('view_cash'));
 
         return view('livewire.inventory.quick-inward', [
-            'suppliers' => $suppliers,
-            'cashAccounts' => $cashAccounts,
-            'availableVariants' => $availableVariants,
-            'canManageCash' => $canManageCash,
+            'products' => $products,
+            'availableVolumes' => $availableVolumes,
+            'suppliers' => Supplier::where('status', 'active')->orderBy('name')->get(),
+            'cashAccounts' => CashAccount::orderBy('id')->get(),
+            'canManageCash' => $user && ($user->hasRole(['OWNER', 'ADMIN', 'CASHIER'])
+                || $user->hasPermission('manage_cash_outflow') || $user->hasPermission('view_cash')),
             'totalAmount' => $this->calculateTotalAmount(),
         ]);
     }

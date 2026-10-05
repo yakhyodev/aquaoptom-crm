@@ -1,18 +1,17 @@
 <div class="space-y-6">
     <!-- Header & Tabs -->
-    <div class="sticky top-16 z-20 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+    <div class="md:sticky md:top-16 md:z-20 bg-white rounded-xl shadow-sm border border-slate-200 p-4">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Ombor & Zaxiralar Boshqaruvi</h1>
                 <p class="text-sm text-slate-500 mt-1">Yangi tovar qabul qilish uchun «Kirim qilish» tugmasini bosing. Qoldiqlar va kalkulyator alohida oynalarda.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button
-                    wire:click="$set('activeTab', 'inward')"
+                <a href="{{ route('inventory.inward') }}"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     + Kirim qilish
-                </button>
+                </a>
                 <button
                     wire:click="$set('activeTab', 'balances')"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 {{ $activeTab === 'balances' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' }}">

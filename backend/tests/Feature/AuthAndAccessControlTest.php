@@ -330,4 +330,49 @@ class AuthAndAccessControlTest extends TestCase
         $response->assertSee('Kassa va xarajatlar');
         $response->assertSee('Admin panel');
     }
+
+    public function test_preview_admin_alias_uses_the_actual_user_password(): void
+    {
+        config(['app.preview_mode' => true]);
+        $owner = User::factory()->owner()->create([
+            'email' => 'owner@preview.aquaoptom.test', 'password' => Hash::make('admin1'),
+        ]);
+        $this->post('/login', ['email' => 'admin', 'password' => 'wrong'])->assertSessionHasErrors('email');
+        $this->assertGuest();
+        $this->post('/login', ['email' => 'admin', 'password' => 'admin1'])->assertRedirect('/dashboard');
+        $this->assertAuthenticatedAs($owner);
+    }
+
+    public function test_preview_alias_is_disabled_in_production(): void
+    {
+        config(['app.preview_mode' => true]);
+        User::factory()->owner()->create([
+            'email' => 'owner@preview.aquaoptom.test', 'password' => Hash::make('admin1'),
+        ]);
+        $originalEnvironment = app()->environment();
+        app()->instance('env', 'production');
+        try {
+            $this->post('/login', ['email' => 'admin', 'password' => 'admin1'])->assertSessionHasErrors('email');
+            $this->assertGuest();
+            $this->get('/login')->assertDontSee('Test paneli uchun')->assertDontSee('admin1');
+            $this->assertEquals(1, Artisan::call('app:bootstrap-owner', [
+                '--preview' => true, '--force' => true, '--password' => 'admin1', '--email' => 'new-owner@example.test',
+            ]));
+            $this->assertDatabaseMissing('users', ['email' => 'new-owner@example.test']);
+        } finally {
+            app()->instance('env', $originalEnvironment);
+        }
+    }
+
+    public function test_short_password_requires_explicit_preview_mode(): void
+    {
+        config(['app.preview_mode' => false]);
+        $options = ['--force' => true, '--email' => 'owner@preview.aquaoptom.test', '--password' => 'admin1'];
+        $this->assertEquals(1, Artisan::call('app:bootstrap-owner', $options));
+        $this->assertEquals(1, Artisan::call('app:bootstrap-owner', $options + ['--preview' => true]));
+        config(['app.preview_mode' => true]);
+        $this->assertEquals(0, Artisan::call('app:bootstrap-owner', $options + ['--preview' => true]));
+        $owner = User::where('email', 'owner@preview.aquaoptom.test')->firstOrFail();
+        $this->assertTrue(Hash::check('admin1', $owner->password));
+    }
 }
