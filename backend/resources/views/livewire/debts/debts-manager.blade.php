@@ -35,7 +35,7 @@ $balance = (int) ($isCustomer ? $item->current_debt : $item->balance);
 @endphp
             <article class="rounded-2xl border border-slate-200 bg-white p-5" wire:key="debt-{{ $activeTab }}-{{ $item->id }}">
                 <div class="flex flex-wrap items-center justify-between gap-4">
-                    <div class="min-w-0"><h3 class="text-lg font-bold break-words">{{ $item->display_name }}</h3><p class="mt-1 text-sm text-slate-600">{{ $item->phone ?: 'Telefon kiritilmagan' }} @if($item->address) · {{ $item->address }} @endif</p></div>
+                    <div class="min-w-0"><h3 class="text-lg font-bold break-words">{{ $item->name }}</h3>@if($isCustomer && $item->store_name)<p class="text-sm font-semibold text-blue-700">{{ $item->store_name }}</p>@elseif(! $isCustomer && $item->company_name)<p class="text-sm text-slate-600">{{ $item->company_name }}</p>@endif<p class="mt-1 text-sm text-slate-600">{{ $item->phone ?: 'Telefon kiritilmagan' }} @if($item->address) · {{ $item->address }} @endif</p></div>
                     <div class="text-left sm:text-right">
                         <p class="text-sm text-slate-600">{{ $balance > 0 ? ($isCustomer ? 'Bizga to‘lashi kerak' : 'Biz to‘lashimiz kerak') : ($balance < 0 ? 'Oldindan to‘langan' : 'Qarz yo‘q') }}</p>
                         <strong class="text-xl {{ $balance > 0 ? 'text-rose-700' : 'text-emerald-700' }}">{{ number_format(abs($balance), 0, '.', ' ') }} so‘m</strong>

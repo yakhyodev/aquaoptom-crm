@@ -82,7 +82,7 @@
 
     <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
     <div class="money-flow-cards"><div><span>Tanlangan davrda pul kirdi</span><strong>{{ number_format($dashboard['flow']['cash_in'], 0, '.', ' ') }} so‘m</strong></div><div><span>Tanlangan davrda pul chiqdi</span><strong>{{ number_format($dashboard['flow']['cash_out'], 0, '.', ' ') }} so‘m</strong></div><div><span>Shundan do‘kon xarajatlari</span><strong data-testid="dashboard-expenses">{{ number_format($dashboard['flow']['operating_expenses'], 0, '.', ' ') }} so‘m</strong></div></div>
-    <p class="workspace-caption">Hisoblararo o‘tkazmalar va boshlang‘ich qoldiq davriy pul kirimi/chiqimiga qo‘shilmaydi. Mijozdan tushgan to‘lovlar quyida alohida.</p>
+    <p class="workspace-caption">Boshlang‘ich qoldiq tanlangan davrdagi pul kirimiga qo‘shilmaydi. Mijozdan tushgan to‘lovlar quyida alohida.</p>
     <!-- 3. DAVRIY OQIM (Flow Metrics) -->
     <div>
         <div class="flex items-center justify-between mb-3">
@@ -206,7 +206,7 @@
                         <div class="text-lg font-bold text-emerald-700">
                             {{ number_format($dashboard['balances']['customer_advances'], 0, '.', ' ') }} <span class="text-xs font-normal">so'm</span>
                         </div>
-                        <div class="text-xs text-slate-600 mt-0.5">Qarz bilan net qilinmaydi</div>
+                        <div class="text-xs text-slate-600 mt-0.5">Oldindan to‘langan pul alohida ko‘rsatiladi.</div>
                     </div>
                 </div>
             </div>
@@ -219,7 +219,7 @@
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <div class="text-xs text-rose-700 font-semibold">Bizning Qarzimiz (Payables):</div>
+                        <div class="text-xs text-rose-700 font-semibold">Yetkazuvchilarga qarzimiz:</div>
                         <div class="text-xl font-black text-rose-700">
                             {{ number_format($dashboard['balances']['supplier_payables'], 0, '.', ' ') }} <span class="text-xs font-normal">so'm</span>
                         </div>

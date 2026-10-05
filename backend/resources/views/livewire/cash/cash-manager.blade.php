@@ -12,7 +12,7 @@
     <div class="workspace-hint flex flex-wrap items-center justify-between gap-3"><p>Mijoz qarzini to‘lasa yoki yetkazuvchiga qarz to‘lasangiz, uni <strong>«Qarzlar va to‘lovlar»</strong> orqali yozing. Sotuv puli kassaga avtomatik tushadi.</p><a class="trade-button trade-button-secondary" href="{{ url('/qarzdorliklar') }}">Qarz to‘lovlariga o‘tish →</a>@can('manage_cash')<button type="button" wire:click="openOwnerFundsModal('DRAW')" class="trade-button trade-button-secondary">Egaga pul berish</button>@endcan</div>
     <section class="trade-card space-y-4">
         <h2 class="text-xl font-bold">Pul qayerdan kirdi va qayerga ketdi?</h2>
-        <div class="flex flex-wrap gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div class="trade-field"><label for="cash-direction">Qaysi amallar?</label><select id="cash-direction" wire:model.live="filterDirection"><option value="ALL">Barchasi</option><option value="IN">Pul kirimi</option><option value="OUT">Pul chiqimi</option></select></div>
             <div class="trade-field"><label for="cash-period">Qachon?</label><select id="cash-period" wire:model.live="filterDateRange"><option value="today">Bugun</option><option value="7days">So‘nggi 7 kun</option><option value="month">Shu oy</option><option value="all">Barcha vaqt</option></select></div>
             <div class="trade-field flex-1 min-w-0"><label for="cash-search">Qidirish</label><input id="cash-search" wire:model.live.debounce.300ms="search" placeholder="Izoh yoki amalni qidiring"></div>

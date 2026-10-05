@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   late final ApiService _api;
-  final _emailController = TextEditingController(text: 'owner@aquaoptom.uz');
+  final _emailController = TextEditingController(text: 'admin');
   final _passwordController = TextEditingController(text: 'password');
   bool _isLoading = false;
   String? _errorMessage;
@@ -41,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final user = await _api.login(
-        email: _emailController.text,
+        email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
@@ -219,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
-                          labelText: 'Elektron pochta (Email)',
+                          labelText: 'Login yoki email',
                           labelStyle: const TextStyle(color: Colors.blueGrey),
                           prefixIcon: const Icon(Icons.email_outlined,
                               color: Colors.blueAccent),

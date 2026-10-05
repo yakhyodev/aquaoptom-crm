@@ -22,6 +22,10 @@ class AuthApiController extends Controller
         ]);
 
         $loginInput = $validated['email'];
+        if (config('app.preview_mode') && app()->environment(['local', 'staging', 'testing'])
+            && $loginInput === 'admin') {
+            $loginInput = 'owner@preview.aquaoptom.test';
+        }
         $user = filter_var($loginInput, FILTER_VALIDATE_EMAIL)
             ? User::where('email', $loginInput)->first()
             : User::where('phone', $loginInput)->first();

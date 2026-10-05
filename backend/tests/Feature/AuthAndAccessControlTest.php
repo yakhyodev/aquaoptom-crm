@@ -388,4 +388,28 @@ class AuthAndAccessControlTest extends TestCase
         }
         $this->actingAs($owner)->get('/catalog')->assertOk()->assertSee('Mahsulotlar va narxlar');
     }
+
+    public function test_mobile_preview_admin_login_checks_password_and_is_disabled_in_production(): void
+    {
+        config(['app.preview_mode' => true]);
+        User::factory()->owner()->create([
+            'email' => 'owner@preview.aquaoptom.test', 'password' => Hash::make('admin1'),
+        ]);
+        $this->postJson('/api/auth/login', ['email' => 'admin', 'password' => 'admin1'])
+            ->assertOk()->assertJsonPath('user.email', 'owner@preview.aquaoptom.test')
+            ->assertJsonStructure(['token']);
+        $this->postJson('/api/auth/login', ['email' => 'admin', 'password' => 'wrong'])
+            ->assertUnauthorized();
+        $originalEnv = app()->environment();
+        app()->instance('env', 'production');
+        try {
+            $this->postJson('/api/auth/login', ['email' => 'admin', 'password' => 'admin1'])
+                ->assertUnauthorized();
+        } finally {
+            app()->instance('env', $originalEnv);
+        }
+        config(['app.preview_mode' => false]);
+        $this->postJson('/api/auth/login', ['email' => 'admin', 'password' => 'admin1'])
+            ->assertUnauthorized();
+    }
 }
