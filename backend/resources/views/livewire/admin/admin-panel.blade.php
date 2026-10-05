@@ -136,7 +136,7 @@
                             required
                             class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono focus:outline-none focus:border-blue-500"
                         />
-                        <span class="text-slate-600 text-xs mt-1">Do'kon kuni hisobotlari va smenalar ushbu mintaqa bo'yicha hisoblanadi.</span>
+                        <span class="text-slate-600 text-xs mt-1">Hisobotlardagi sana va vaqt ushbu mintaqa bo‘yicha ko‘rsatiladi.</span>
                     </div>
 
                     <div>
@@ -327,7 +327,7 @@
                     <div>
                         <h3 class="text-base font-bold text-slate-900">Tekshirish kerak bo‘lgan yozuvlar</h3>
                         <p class="text-xs text-slate-600 mt-0.5">
-                            Offline qurilmalardan kechikib kelgan, yopiq smena yoki limit buzilishi sababli server qabul qilmagan operatsiyalar.
+                            Internet qaytgach yuborilgan, ammo tekshirish yoki limit sababli tasdiq talab qilgan savdolar.
                         </p>
                     </div>
                 </div>

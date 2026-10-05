@@ -298,6 +298,10 @@ class CashManager extends Component
             'expenseAccountId' => 'required|exists:cash_accounts,id',
             'expenseAmount' => 'required|integer|min:1',
             'expenseCategory' => 'required|string',
+        ], [
+            'expenseAmount.required' => 'Summani yozing.',
+            'expenseAmount.integer' => 'Summani faqat butun so‘mda yozing.',
+            'expenseAmount.min' => 'Summa 0 dan katta bo‘lishi kerak.',
         ]);
 
         try {
@@ -379,6 +383,10 @@ class CashManager extends Component
         $this->validate([
             'ownerAccountId' => 'required|exists:cash_accounts,id',
             'ownerAmount' => 'required|integer|min:1',
+        ], [
+            'ownerAmount.required' => 'Summani yozing.',
+            'ownerAmount.integer' => 'Summani faqat butun so‘mda yozing.',
+            'ownerAmount.min' => 'Summa 0 dan katta bo‘lishi kerak.',
         ]);
 
         try {
