@@ -12,6 +12,7 @@ use App\Services\Payments\SupplierPaymentService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -41,6 +42,7 @@ class DebtsManager extends Component
 
     public bool $confirmExcessAsAdvance = false;
 
+    #[Locked]
     public ?string $paymentOperationId = null;
 
     // Ta'minotchi to'lov modali
@@ -58,6 +60,7 @@ class DebtsManager extends Component
 
     public bool $supplierConfirmExcessAsAdvance = false;
 
+    #[Locked]
     public ?string $supplierPaymentOperationId = null;
 
     // Hisob ko'chirmasi (Statement) modali
@@ -173,6 +176,7 @@ class DebtsManager extends Component
     public function openCustomerPaymentModal(int $customerId): void
     {
         $this->clearMessages();
+        $this->resetValidation();
         $customer = Customer::findOrFail($customerId);
 
         $this->selectedCustomerId = $customerId;
@@ -207,7 +211,20 @@ class DebtsManager extends Component
 
     public function submitCustomerPayment(CustomerPaymentService $service): void
     {
+        if (! $this->showCustomerPaymentModal || ! $this->selectedCustomerId || ! $this->paymentOperationId) {
+            return;
+        }
+
         $this->clearMessages();
+        $this->paymentAmount = str_replace([' ', ','], '', $this->paymentAmount ?? '');
+        $this->validate([
+            'paymentAmount' => 'required|integer|min:1',
+            'selectedCustomerId' => 'required|exists:customers,id',
+        ], [
+            'paymentAmount.required' => 'To‘lov summasini yozing.',
+            'paymentAmount.integer' => 'Summani faqat butun so‘mda yozing.',
+            'paymentAmount.min' => 'Summa 0 dan katta bo‘lishi kerak.',
+        ]);
 
         $amount = (int) str_replace([' ', ','], '', $this->paymentAmount);
         if ($amount <= 0) {
@@ -236,6 +253,7 @@ class DebtsManager extends Component
 
             $this->showCustomerPaymentModal = false;
             $this->dispatch('refresh-dashboard');
+            $cashRemaining = number_format((int) CashAccount::find($this->paymentCashAccountId)?->balance, 0, '.', ' ');
             $paidFormatted = number_format($amount, 0, '.', ' ');
             $newDebtFormatted = number_format(abs($result['new_debt']), 0, '.', ' ');
 
@@ -244,6 +262,7 @@ class DebtsManager extends Component
             } else {
                 $this->successMessage = "To'lov qabul qilindi: {$paidFormatted} so'm. Hujjat #{$result['payment_number']}. Qolgan qarz: {$newDebtFormatted} so'm.";
             }
+            $this->successMessage .= " Kassada qolgan pul: {$cashRemaining} so‘m.";
         } catch (OperationValidationException $e) {
             if ($e->getErrorCode() === 'EXCESS_PAYMENT_REQUIRES_ADVANCE_CONFIRMATION') {
                 $this->errorMessage = $e->getMessage();
@@ -262,6 +281,7 @@ class DebtsManager extends Component
     public function openSupplierPaymentModal(int $supplierId): void
     {
         $this->clearMessages();
+        $this->resetValidation();
         $supplier = Supplier::findOrFail($supplierId);
 
         $this->selectedSupplierId = $supplierId;
@@ -296,7 +316,20 @@ class DebtsManager extends Component
 
     public function submitSupplierPayment(SupplierPaymentService $service): void
     {
+        if (! $this->showSupplierPaymentModal || ! $this->selectedSupplierId || ! $this->supplierPaymentOperationId) {
+            return;
+        }
+
         $this->clearMessages();
+        $this->supplierPaymentAmount = str_replace([' ', ','], '', $this->supplierPaymentAmount ?? '');
+        $this->validate([
+            'supplierPaymentAmount' => 'required|integer|min:1',
+            'selectedSupplierId' => 'required|exists:suppliers,id',
+        ], [
+            'supplierPaymentAmount.required' => 'To‘lov summasini yozing.',
+            'supplierPaymentAmount.integer' => 'Summani faqat butun so‘mda yozing.',
+            'supplierPaymentAmount.min' => 'Summa 0 dan katta bo‘lishi kerak.',
+        ]);
 
         $amount = (int) str_replace([' ', ','], '', $this->supplierPaymentAmount);
         if ($amount <= 0) {
@@ -325,6 +358,7 @@ class DebtsManager extends Component
 
             $this->showSupplierPaymentModal = false;
             $this->dispatch('refresh-dashboard');
+            $cashRemaining = number_format((int) CashAccount::find($this->supplierPaymentCashAccountId)?->balance, 0, '.', ' ');
             $paidFormatted = number_format($amount, 0, '.', ' ');
             $newPayableFormatted = number_format(abs($result['new_payable']), 0, '.', ' ');
 
@@ -333,6 +367,7 @@ class DebtsManager extends Component
             } else {
                 $this->successMessage = "Ta'minotchiga to'lov amalga oshirildi: {$paidFormatted} so'm. Hujjat #{$result['payment_number']}. Qolgan qarzimiz: {$newPayableFormatted} so'm.";
             }
+            $this->successMessage .= " Kassada qolgan pul: {$cashRemaining} so‘m.";
         } catch (OperationValidationException $e) {
             $this->errorMessage = $e->getMessage();
         } catch (\Exception $e) {
@@ -545,6 +580,8 @@ class DebtsManager extends Component
             'customerStats' => $customerStats,
             'supplierStats' => $supplierStats,
             'cashAccounts' => $cashAccounts,
+            'paymentCashBalance' => (int) $cashAccounts->firstWhere('id', $this->paymentCashAccountId)?->balance,
+            'supplierCashBalance' => (int) $cashAccounts->firstWhere('id', $this->supplierPaymentCashAccountId)?->balance,
             'selectedCustomer' => $selectedCustomer,
             'selectedSupplier' => $selectedSupplier,
         ]);

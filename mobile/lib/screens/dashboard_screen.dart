@@ -277,7 +277,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           value: Formatters.formatMoney(_dashboardData!.balances.cashTotal),
                           icon: Icons.account_balance,
                           iconColor: Colors.greenAccent,
-                          subtitle: 'Naqd: ${Formatters.formatMoney(_dashboardData!.balances.cashInHand)}',
+                          subtitle: 'Barcha pul bitta kassada',
                         ),
                         _buildMetricCard(
                           title: 'Mijozlar Qarzi',

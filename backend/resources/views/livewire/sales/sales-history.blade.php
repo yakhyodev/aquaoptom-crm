@@ -90,19 +90,11 @@
         </div>
 
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span class="text-xs font-semibold text-emerald-600  block">Dastlabki Naqd</span>
+            <span class="text-xs font-semibold text-emerald-600  block">Sotuvda to‘langan pul</span>
             <span class="text-lg font-bold text-emerald-700 font-mono mt-1 block">
-                {{ number_format($summary['kpi']['cash_at_pos']) }}
+                {{ number_format($summary['kpi']['cash_at_pos'] + $summary['kpi']['card_at_pos'] + $summary['kpi']['bank_at_pos']) }}
             </span>
-            <span class="text-xs text-slate-600">POS naqd tushum</span>
-        </div>
-
-        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-            <span class="text-xs font-semibold text-blue-600  block">Dastlabki Karta/Bank</span>
-            <span class="text-lg font-bold text-blue-700 font-mono mt-1 block">
-                {{ number_format($summary['kpi']['card_at_pos'] + $summary['kpi']['bank_at_pos']) }}
-            </span>
-            <span class="text-xs text-slate-600">karta + bank</span>
+            <span class="text-xs text-slate-600">Kassaga tushgan summa</span>
         </div>
 
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -150,18 +142,6 @@
                     @foreach($staffUsers as $u)
                         <option value="{{ $u->id }}">{{ $u->name }} (<x-enum-label :value="$u->role" />)</option>
                     @endforeach
-                </select>
-            </div>
-
-            <div>
-                <label class="text-xs font-semibold text-slate-600 block mb-1">To'lov turi</label>
-                <select wire:model.live="paymentMethod" class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg">
-                    <option value="">Barcha turlar</option>
-                    <option value="CASH">Naqd pul</option>
-                    <option value="CARD">Karta / Terminal</option>
-                    <option value="BANK">Bank hisobi</option>
-                    <option value="DEBT">To'liq Nasiya</option>
-                    <option value="MIXED">Aralash</option>
                 </select>
             </div>
 
@@ -234,7 +214,7 @@
                                     {{ $sale->payment_method === 'BANK' ? 'bg-purple-100 text-purple-800' : '' }}
                                     {{ $sale->payment_method === 'DEBT' ? 'bg-amber-100 text-amber-800' : '' }}
                                     {{ !in_array($sale->payment_method, ['CASH','CARD','BANK','DEBT']) ? 'bg-slate-100 text-slate-700' : '' }}">
-                                    <x-enum-label :value="$sale->payment_method ?: $sale->payment_type ?: 'CASH'" />
+                                    <x-enum-label :value="$sale->payment_type" />
                                 </span>
                             </td>
                             <td class="p-3 text-right font-mono font-bold text-slate-900">
@@ -378,7 +358,7 @@
                         @foreach($selectedSale->returns as $ret)
                             <div class="text-xs text-rose-800 flex justify-between font-mono">
                                 <span>#{{ $ret->return_number }} ({{ $ret->posted_at?->format('Y-m-d H:i') }})</span>
-                                <span>-{{ number_format($ret->total_amount) }} so'm (Naqd refund: {{ number_format($ret->refund_amount) }}, Qarz kamayishi: {{ number_format($ret->debt_reduction_amount) }})</span>
+                                <span>-{{ number_format($ret->total_amount) }} so'm (Qaytarilgan pul: {{ number_format($ret->refund_amount) }}, Qarz kamayishi: {{ number_format($ret->debt_reduction_amount) }})</span>
                             </div>
                         @endforeach
                     </div>

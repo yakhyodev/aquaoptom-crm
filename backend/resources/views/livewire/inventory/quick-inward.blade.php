@@ -59,7 +59,7 @@
                 <section class="trade-card">
                     <div class="trade-card-heading"><div class="trade-heading"><span class="trade-step">2</span><div><h2>Kimdan olindi?</h2><p>Mahsulotni olib kelgan yetkazuvchini tanlang.</p></div></div><button type="button" wire:click="$dispatch('open-inline-supplier-modal')" class="trade-button trade-button-secondary">+ Yangi yetkazuvchi</button></div>
                     <div class="trade-field"><label for="inward-supplier">Ta’minotchi / yetkazuvchi</label><select id="inward-supplier" wire:model.live="selectedSupplierId"><option value="">Yetkazuvchini tanlang</option>@foreach ($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->display_name }}</option>@endforeach</select></div>
-                    <details class="trade-details"><summary>Hujjat raqami va izoh <span>ixtiyoriy</span></summary><div class="trade-two-fields"><div class="trade-field"><label for="inward-invoice">Hujjat raqami</label><input id="inward-invoice" type="text" wire:model="supplierInvoiceNumber" placeholder="Masalan: N-1052"></div><div class="trade-field"><label for="inward-notes">Izoh</label><input id="inward-notes" type="text" wire:model="notes" placeholder="Qo‘shimcha ma’lumot"></div></div></details>
+                    <details class="trade-details"><summary>Izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="inward-notes">Izoh</label><input id="inward-notes" type="text" wire:model="notes" placeholder="Qo‘shimcha ma’lumot"></div></details>
                 </section>
             </div>
 
@@ -73,7 +73,6 @@
                         @endforeach
                     </fieldset>
                     @if ($paymentType === 'PARTIAL')<div class="trade-field"><label for="inward-paid">Hozir qancha to‘landi?</label><div class="trade-input-unit"><input id="inward-paid" type="number" min="0" max="{{ $totalAmount }}" step="1" wire:model.live.debounce.300ms="paidAmount" inputmode="numeric" placeholder="Summani yozing"><span>so‘m</span></div></div>@endif
-                    @if ($paymentType !== 'UNPAID')<details class="trade-details"><summary>Qaysi kassadan to‘landi?</summary><div class="trade-field"><label for="inward-cash">Kassa</label><select id="inward-cash" wire:model.live="cashAccountId">@foreach ($cashAccounts as $account)<option value="{{ $account->id }}">{{ $account->name }}</option>@endforeach</select></div></details>@endif
                 @else <p class="trade-help">Bu kirim to‘lovsiz qabul qilinadi. To‘lovni kassa xodimi kiritadi.</p> @endif
                 <div class="trade-summary"><div><span>Hozir to‘langan</span><strong>{{ number_format($paidAmount, 0, '', ' ') }} so‘m</strong></div><div class="trade-debt"><span>Yetkazuvchiga qolgan qarz</span><strong>{{ number_format(max(0, $totalAmount - $paidAmount), 0, '', ' ') }} so‘m</strong></div></div>
                 <button type="button" wire:click="postPurchase" wire:loading.attr="disabled" wire:target="postPurchase" @disabled(empty($items) || ! $selectedSupplierId) class="trade-button trade-button-primary trade-submit"><span wire:loading.remove wire:target="postPurchase">✓ Omborga kirim qilish</span><span wire:loading wire:target="postPurchase">Saqlanyapti…</span></button>

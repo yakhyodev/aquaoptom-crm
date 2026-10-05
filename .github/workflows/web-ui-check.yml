@@ -6,6 +6,12 @@ on:
         description: Run ID of the active Temporary Web Preview
         required: true
         type: string
+      scenario:
+        description: Full tests write fixtures only to the disposable review preview
+        type: choice
+        options: ['read_only', 'full']
+        default: 'read_only'
+        required: true
 permissions:
   contents: read
   actions: read
@@ -17,6 +23,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       PREVIEW_OWNER_PASSWORD: ${{ secrets.AQUAOPTOM_PREVIEW_OWNER_PASSWORD }}
       PREVIEW_RUN_ID: ${{ inputs.preview_run_id }}
+      BROWSER_SCENARIO: ${{ inputs.scenario }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -37,6 +44,8 @@ jobs:
           info = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'preview-info/connection.json').read_text())
           assert info['temporary'] and not info['data_persistent']
           assert info['login'] == 'admin'
+          if os.environ['BROWSER_SCENARIO'] == 'full':
+              assert info.get('preview_slot') == 'review', 'Mutating browser tests must use the review slot, never the clean user panel.'
           assert re.fullmatch(r'https://[a-z0-9-]+\.trycloudflare\.com', info['url'])
           with open(os.environ['GITHUB_ENV'], 'a') as output:
               output.write('PREVIEW_URL=' + info['url'] + '\n')

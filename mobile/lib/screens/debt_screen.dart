@@ -81,10 +81,12 @@ class _DebtScreenState extends State<DebtScreen>
       text: currentBalance > 0 ? currentBalance.toString() : '',
     );
     final notesCtrl = TextEditingController();
-    int? selectedAccountId = _cashAccounts.isNotEmpty
-        ? _cashAccounts.first.id
-        : null;
-    String selectedMethod = 'CASH';
+    final cashAccount = _cashAccounts.isEmpty ? null : _cashAccounts.firstWhere(
+      (account) => account.isDefault,
+      orElse: () => _cashAccounts.first,
+    );
+    final selectedAccountId = cashAccount?.id;
+    String? paymentError;
     final opId = OperationId.generate();
     bool submitting = false;
     bool confirmAdvance = false;
@@ -141,62 +143,12 @@ class _DebtScreenState extends State<DebtScreen>
                   ),
                   const SizedBox(height: 12),
 
-                  // Cash Account
-                  DropdownButtonFormField<int>(
-                    initialValue: selectedAccountId,
-                    dropdownColor: const Color(0xFF1E293B),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: 'Kassa hisobi',
-                      labelStyle: TextStyle(color: Colors.blueGrey),
-                      filled: true,
-                      fillColor: Color(0xFF0F172A),
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _cashAccounts.map((a) {
-                      return DropdownMenuItem(
-                        value: a.id,
-                        child: Text(
-                          '${a.name} (${Formatters.formatMoney(a.balance)})',
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setDlgState(() => selectedAccountId = val);
-                    },
-                  ),
+                  Text('Kassada hozir: ${Formatters.formatMoney(cashAccount?.balance ?? 0)}', style: const TextStyle(color: Colors.white)),
                   const SizedBox(height: 12),
-
-                  // Method
-                  Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Naqd'),
-                        selected: selectedMethod == 'CASH',
-                        onSelected: (_) =>
-                            setDlgState(() => selectedMethod = 'CASH'),
-                        selectedColor: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Karta'),
-                        selected: selectedMethod == 'CARD',
-                        onSelected: (_) =>
-                            setDlgState(() => selectedMethod = 'CARD'),
-                        selectedColor: Colors.blueAccent,
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Bank'),
-                        selected: selectedMethod == 'BANK',
-                        onSelected: (_) =>
-                            setDlgState(() => selectedMethod = 'BANK'),
-                        selectedColor: Colors.blueAccent,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
+                  if (paymentError != null) ...[
+                    Text(paymentError!, style: const TextStyle(color: Colors.redAccent)),
+                    const SizedBox(height: 12),
+                  ],
                   if ((int.tryParse(amountCtrl.text) ?? 0) >
                       (currentBalance > 0 ? currentBalance : 0))
                     CheckboxListTile(
@@ -240,17 +192,14 @@ class _DebtScreenState extends State<DebtScreen>
                         final amount =
                             int.tryParse(amountCtrl.text.trim()) ?? 0;
                         if (amount <= 0) {
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'To\'lov summasi 0 dan katta bo\'lishi shart!',
-                                ),
-                              ),
-                            );
-                          }
+                          setDlgState(() => paymentError = 'Summani butun so‘mda, 0 dan katta qilib yozing.');
                           return;
                         }
+                        if (!isCustomer && amount > (cashAccount?.balance ?? 0)) {
+                          setDlgState(() => paymentError = 'Kassada pul yetmaydi. Summani kamaytiring yoki kassaga pul qo‘shing.');
+                          return;
+                        }
+                        setDlgState(() => paymentError = null);
 
                         setDlgState(() => submitting = true);
 
@@ -260,7 +209,7 @@ class _DebtScreenState extends State<DebtScreen>
                             partyId: partyId,
                             amount: amount,
                             cashAccountId: selectedAccountId,
-                            paymentMethod: selectedMethod,
+                            paymentMethod: 'CASH',
                             operationId: opId,
                             confirmExcessAsAdvance: confirmAdvance,
                             notes: notesCtrl.text.trim().isEmpty
@@ -284,15 +233,7 @@ class _DebtScreenState extends State<DebtScreen>
                           }
                         } catch (e) {
                           if (ctx.mounted) {
-                            setDlgState(() => submitting = false);
-                          }
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('To\'lov xatosi: $e'),
-                                backgroundColor: Colors.redAccent,
-                              ),
-                            );
+                            setDlgState(() { submitting = false; paymentError = 'To‘lov saqlanmadi: $e'; });
                           }
                         }
                       },

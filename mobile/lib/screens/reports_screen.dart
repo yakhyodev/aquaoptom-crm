@@ -186,16 +186,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         valueColor: Colors.amberAccent,
                       ),
                       _buildReportRow(
-                        'Naqd:',
-                        Formatters.formatMoney(_reportsData!.sales.cashAtPos),
-                      ),
-                      _buildReportRow(
-                        'Karta:',
-                        Formatters.formatMoney(_reportsData!.sales.cardAtPos),
-                      ),
-                      _buildReportRow(
-                        'Bank:',
-                        Formatters.formatMoney(_reportsData!.sales.bankAtPos),
+                        'Sotuvda to‘langan pul:',
+                        Formatters.formatMoney(_reportsData!.sales.cashAtPos + _reportsData!.sales.cardAtPos + _reportsData!.sales.bankAtPos),
                       ),
                       if (_reportsData!.sales.totalReturnsAmount > 0)
                         _buildReportRow(

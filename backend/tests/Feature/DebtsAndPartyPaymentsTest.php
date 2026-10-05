@@ -527,4 +527,53 @@ class DebtsAndPartyPaymentsTest extends TestCase
         $this->assertEquals(10000000, $this->customerAkmal->fresh()->debt_limit);
         $this->assertEquals('2026-11-01', $this->customerAkmal->fresh()->payment_due_date->format('Y-m-d'));
     }
+
+    public function test_customer_payment_closes_dialog_and_repeated_confirmation_records_once(): void
+    {
+        $this->customerAkmal->update(['current_debt' => 200000]);
+        $component = Livewire::actingAs($this->owner)->test(DebtsManager::class)
+            ->call('openCustomerPaymentModal', $this->customerAkmal->id)
+            ->set('paymentAmount', '50000')
+            ->call('submitCustomerPayment')
+            ->assertHasNoErrors()
+            ->assertSet('showCustomerPaymentModal', false)
+            ->assertSee('Kassada qolgan pul:');
+        $component->call('submitCustomerPayment');
+        $this->assertSame(150000, (int) $this->customerAkmal->fresh()->current_debt);
+        $this->assertSame(1050000, (int) $this->cashAccount->fresh()->balance);
+        $this->assertSame(1, Payment::where('party_type', 'CUSTOMER')->where('party_id', $this->customerAkmal->id)->count());
+    }
+
+    public function test_supplier_shortage_stays_in_dialog_and_successful_retry_closes_once(): void
+    {
+        $this->supplierNavoiy->update(['balance' => 2000000]);
+        $component = Livewire::actingAs($this->owner)->test(DebtsManager::class)
+            ->call('openSupplierPaymentModal', $this->supplierNavoiy->id)
+            ->set('supplierPaymentAmount', '1100000')
+            ->call('submitSupplierPayment')
+            ->assertSet('showSupplierPaymentModal', true)
+            ->assertSee('Kassada pul yetmaydi.')
+            ->assertViewHas('supplierCashBalance', 1000000);
+        $this->assertSame(0, Payment::count());
+        $component->set('supplierPaymentAmount', '100000')
+            ->call('submitSupplierPayment')->assertHasNoErrors()
+            ->assertSet('showSupplierPaymentModal', false)
+            ->assertViewHas('supplierCashBalance', 900000)
+            ->call('submitSupplierPayment');
+        $this->assertSame(1900000, (int) $this->supplierNavoiy->fresh()->balance);
+        $this->assertSame(900000, (int) $this->cashAccount->fresh()->balance);
+        $this->assertSame(1, Payment::where('party_type', 'SUPPLIER')->where('party_id', $this->supplierNavoiy->id)->count());
+    }
+
+    public function test_payment_amount_does_not_silently_truncate_fractions(): void
+    {
+        $this->customerAkmal->update(['current_debt' => 10000]);
+        Livewire::actingAs($this->owner)->test(DebtsManager::class)
+            ->call('openCustomerPaymentModal', $this->customerAkmal->id)
+            ->set('paymentAmount', '100.5')->call('submitCustomerPayment')
+            ->assertHasErrors(['paymentAmount' => 'integer'])
+            ->assertSet('showCustomerPaymentModal', true);
+        $this->assertSame(10000, (int) $this->customerAkmal->fresh()->current_debt);
+        $this->assertSame(0, Payment::count());
+    }
 }

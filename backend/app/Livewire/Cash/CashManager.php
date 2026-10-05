@@ -82,7 +82,7 @@ class CashManager extends Component
     // Expense Form
     public ?int $expenseAccountId = null;
 
-    public int $expenseAmount = 0;
+    public mixed $expenseAmount = 0;
 
     public string $expenseCategory = 'TRANSPORT';
 
@@ -102,7 +102,7 @@ class CashManager extends Component
 
     public string $ownerFundType = 'DEPOSIT'; // DEPOSIT, DRAW
 
-    public int $ownerAmount = 0;
+    public mixed $ownerAmount = 0;
 
     public string $ownerDescription = '';
 
@@ -278,6 +278,8 @@ class CashManager extends Component
     // --- Xarajat ---
     public function openExpenseModal(): void
     {
+        $this->resetValidation();
+        $this->feedbackMessage = null;
         $this->expenseOperationId = (string) Str::uuid();
         $this->expenseAmount = 0;
         $this->expenseCategory = 'TRANSPORT';
@@ -287,6 +289,11 @@ class CashManager extends Component
 
     public function submitExpense(ExpenseService $expenseService): void
     {
+        if (! $this->showExpenseModal) {
+            return;
+        }
+        $this->feedbackMessage = null;
+
         $this->validate([
             'expenseAccountId' => 'required|exists:cash_accounts,id',
             'expenseAmount' => 'required|integer|min:1',
@@ -296,7 +303,7 @@ class CashManager extends Component
         try {
             $result = $expenseService->createExpense(
                 cashAccountId: $this->expenseAccountId,
-                amount: $this->expenseAmount,
+                amount: (int) $this->expenseAmount,
                 category: $this->expenseCategory,
                 description: $this->expenseDescription ?: null,
                 userId: Auth::id(),
@@ -353,6 +360,8 @@ class CashManager extends Component
     // --- Egasi mablag'i ---
     public function openOwnerFundsModal(string $type = 'DEPOSIT'): void
     {
+        $this->resetValidation();
+        $this->feedbackMessage = null;
         $this->ownerFundsOperationId = (string) Str::uuid();
         $this->ownerFundType = $type;
         $this->ownerAmount = 0;
@@ -362,6 +371,11 @@ class CashManager extends Component
 
     public function submitOwnerFunds(OwnerFundsService $ownerFundsService): void
     {
+        if (! $this->showOwnerFundsModal) {
+            return;
+        }
+        $this->feedbackMessage = null;
+
         $this->validate([
             'ownerAccountId' => 'required|exists:cash_accounts,id',
             'ownerAmount' => 'required|integer|min:1',
@@ -371,7 +385,7 @@ class CashManager extends Component
             if ($this->ownerFundType === 'DEPOSIT') {
                 $ownerFundsService->deposit(
                     cashAccountId: $this->ownerAccountId,
-                    amount: $this->ownerAmount,
+                    amount: (int) $this->ownerAmount,
                     description: $this->ownerDescription ?: null,
                     userId: Auth::id(),
                     operationId: $this->ownerFundsOperationId
@@ -380,7 +394,7 @@ class CashManager extends Component
             } else {
                 $ownerFundsService->withdraw(
                     cashAccountId: $this->ownerAccountId,
-                    amount: $this->ownerAmount,
+                    amount: (int) $this->ownerAmount,
                     description: $this->ownerDescription ?: null,
                     userId: Auth::id(),
                     operationId: $this->ownerFundsOperationId
@@ -388,6 +402,7 @@ class CashManager extends Component
                 $this->feedbackMessage = 'Egaga pul berildi. Bu do‘kon xarajati emas; foyda hisobotiga qo‘shilmaydi.';
             }
 
+            $this->feedbackMessage .= ' Kassada qolgan pul: '.number_format((int) CashAccount::find($this->ownerAccountId)?->balance, 0, '.', ' ').' so‘m.';
             $this->showOwnerFundsModal = false;
             $this->dispatch('refresh-dashboard');
             $this->feedbackType = 'success';

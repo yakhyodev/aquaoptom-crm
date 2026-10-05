@@ -1,596 +1,99 @@
 <div class="space-y-6" wire:poll.30s>
-    <!-- Bildirishnomalar -->
-    @if ($successMessage)
-        <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <span class="text-xl">✓</span>
-                <span class="font-medium text-sm">{{ $successMessage }}</span>
-            </div>
-            <button wire:click="clearMessages" class="text-emerald-700/60 hover:text-emerald-700 text-sm">✕</button>
-        </div>
-    @endif
+    @if($successMessage)<div class="trade-alert" role="status">✓ {{ $successMessage }}</div>@endif
+    @if($errorMessage && ! $showCustomerPaymentModal && ! $showSupplierPaymentModal)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
 
-    @if ($errorMessage)
-        <div class="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <span class="text-xl">⚠️</span>
-                <span class="font-medium text-sm">{{ $errorMessage }}</span>
-            </div>
-            <button wire:click="clearMessages" class="text-rose-700/60 hover:text-rose-700 text-sm">✕</button>
-        </div>
-    @endif
-
-    <!-- Asosiy Tablar -->
-    <div class="flex flex-wrap border-b border-slate-200">
-        <button
-            wire:click="switchTab('customers')"
-            class="px-6 py-3 font-semibold text-sm transition-all border-b-2 flex items-center space-x-2 {{ $activeTab === 'customers' ? 'border-blue-500 text-blue-700 bg-blue-500/5' : 'border-transparent text-slate-600 hover:text-slate-800' }}"
-        >
-            <span>👥</span>
-            <span>Mijozlarning bizga qarzi</span>
-            <span class="text-xs px-2 py-0.5 rounded-full {{ $customerStats['debtors_count'] > 0 ? 'bg-rose-500/20 text-rose-700' : 'bg-slate-100 text-slate-600' }}">
-                {{ $customerStats['debtors_count'] }}
-            </span>
+    <div class="grid gap-4 sm:grid-cols-2" aria-label="Qarz bilan nima qilmoqchisiz?">
+        <button type="button" wire:click="switchTab('customers')" class="trade-card text-left {{ $activeTab === 'customers' ? 'ring-2 ring-blue-500' : '' }}" aria-pressed="{{ $activeTab === 'customers' ? 'true' : 'false' }}">
+            <span class="text-3xl">📥</span><h2 class="mt-3 text-xl font-bold text-slate-900">Mijoz qarzini to‘ladi</h2>
+            <p class="mt-2 text-slate-600">Mijozni toping → «Qarz to‘lovini olish» → summani yozing.</p>
+            <p class="mt-4 font-semibold text-blue-700">Mijozlarning bizga qarzi: {{ number_format($customerStats['total_debt'], 0, '.', ' ') }} so‘m</p>
+            <p class="mt-1 text-sm text-slate-600">{{ $customerStats['debtors_count'] }} ta qarzdor mijoz · Pul kassaga qo‘shiladi.</p>
         </button>
-
-        <button
-            wire:click="switchTab('suppliers')"
-            class="px-6 py-3 font-semibold text-sm transition-all border-b-2 flex items-center space-x-2 {{ $activeTab === 'suppliers' ? 'border-amber-500 text-amber-700 bg-amber-500/5' : 'border-transparent text-slate-600 hover:text-slate-800' }}"
-        >
-            <span>🏭</span>
-            <span>Bizning yetkazuvchilarga qarzimiz</span>
-            <span class="text-xs px-2 py-0.5 rounded-full {{ $supplierStats['payables_count'] > 0 ? 'bg-amber-500/20 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
-                {{ $supplierStats['payables_count'] }}
-            </span>
+        <button type="button" wire:click="switchTab('suppliers')" class="trade-card text-left {{ $activeTab === 'suppliers' ? 'ring-2 ring-amber-500' : '' }}" aria-pressed="{{ $activeTab === 'suppliers' ? 'true' : 'false' }}">
+            <span class="text-3xl">📤</span><h2 class="mt-3 text-xl font-bold text-slate-900">Yetkazuvchiga pul bermoqchiman</h2>
+            <p class="mt-2 text-slate-600">Yetkazuvchini toping → «Qarzni to‘lash» → summani yozing.</p>
+            <p class="mt-4 font-semibold text-amber-700">Bizning yetkazuvchilarga qarzimiz: {{ number_format($supplierStats['total_payable'], 0, '.', ' ') }} so‘m</p>
+            <p class="mt-1 text-sm text-slate-600">{{ $supplierStats['payables_count'] }} ta yetkazuvchiga qarzmiz · Pul kassadan ayriladi.</p>
         </button>
     </div>
-
-    <!-- STATISTIKA KARTALARI -->
-    @if ($activeTab === 'customers')
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Jami Olinadigan Qarz</div>
-                <div class="mt-2 text-2xl font-black font-mono text-rose-700">
-                    {{ number_format($customerStats['total_debt'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-rose-700/80">
-                    {{ $customerStats['debtors_count'] }} ta mijoz qarzdor
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Mijozlar oldindan to‘lagan pul</div>
-                <div class="mt-2 text-2xl font-black font-mono text-emerald-700">
-                    {{ number_format($customerStats['total_advance'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-emerald-700/80">
-                    {{ $customerStats['advance_count'] }} ta mijoz avansda
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Mijozlar bilan umumiy hisob</div>
-                <div class="mt-2 text-2xl font-black font-mono {{ $customerStats['net_balance'] >= 0 ? 'text-blue-700' : 'text-emerald-700' }}">
-                    {{ number_format($customerStats['net_balance'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-slate-600">
-                    Qarzlar yig‘indisi − oldindan to‘lovlar
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Muddati O'tgan Qarzdorlar</div>
-                <div class="mt-2 text-2xl font-black font-mono {{ $customerStats['overdue_count'] > 0 ? 'text-rose-700' : 'text-slate-600' }}">
-                    {{ $customerStats['overdue_count'] }} <span class="text-xs font-normal text-slate-600">ta mijoz</span>
-                </div>
-                <div class="mt-1 text-xs text-slate-600">
-                    Kelishilgan sana bo'yicha
-                </div>
-            </div>
+    @php($isCustomer = $activeTab === 'customers')
+    <section class="trade-card space-y-5">
+        <div><h2 class="text-xl font-bold">{{ $isCustomer ? 'Qaysi mijoz to‘ladi?' : 'Qaysi yetkazuvchiga to‘laymiz?' }}</h2><p class="mt-1 text-slate-600">{{ $isCustomer ? 'To‘lagan pulini shu yerda yozing. Mijozning umumiy qarzi kamayadi.' : 'Berilgan pulni shu yerda yozing. Yetkazuvchiga umumiy qarzimiz kamayadi.' }}</p></div>
+        <div class="flex flex-wrap items-end gap-3">
+            <div class="trade-field flex-1 min-w-0"><label for="debt-search">{{ $isCustomer ? 'Mijozni topish' : 'Yetkazuvchini topish' }}</label><input id="debt-search" wire:model.live.debounce.300ms="search" placeholder="Ism, do‘kon yoki telefon bo‘yicha qidiring"></div>
+            <div class="trade-field"><label for="debt-filter">Kimlar ko‘rinsin?</label><select id="debt-filter" wire:model.live="statusFilter"><option value="all">Barchasi</option><option value="debtors">Faqat qarzi borlar</option><option value="advance">Oldindan to‘langanlar</option><option value="overdue">To‘lov muddati o‘tganlar</option></select></div>
         </div>
-    @else
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Jami To'lanishi Kerak Qarz</div>
-                <div class="mt-2 text-2xl font-black font-mono text-amber-700">
-                    {{ number_format($supplierStats['total_payable'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-amber-700/80">
-                    {{ $supplierStats['payables_count'] }} ta ta'minotchi oldida
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Bizning Avansimiz (Haqdorligimiz)</div>
-                <div class="mt-2 text-2xl font-black font-mono text-emerald-700">
-                    {{ number_format($supplierStats['total_prepaid'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-emerald-700/80">
-                    {{ $supplierStats['prepaid_count'] }} ta ta'minotchi avansda
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Sof Ta'minotchi Majburiyati</div>
-                <div class="mt-2 text-2xl font-black font-mono {{ $supplierStats['net_balance'] >= 0 ? 'text-amber-700' : 'text-emerald-700' }}">
-                    {{ number_format($supplierStats['net_balance'], 0, '.', ' ') }} <span class="text-xs font-normal text-slate-600">so'm</span>
-                </div>
-                <div class="mt-1 text-xs text-slate-600">
-                    Qarzlar yig‘indisi − oldindan to‘lovlar
-                </div>
-            </div>
-
-            <div class="p-4 rounded-2xl bg-slate-50/60 border border-slate-200">
-                <div class="text-xs font-medium text-slate-600">Muddati O'tgan Majburiyatlar</div>
-                <div class="mt-2 text-2xl font-black font-mono {{ $supplierStats['overdue_count'] > 0 ? 'text-rose-700' : 'text-slate-600' }}">
-                    {{ $supplierStats['overdue_count'] }} <span class="text-xs font-normal text-slate-600">ta ta'minotchi</span>
-                </div>
-                <div class="mt-1 text-xs text-slate-600">
-                    Kelishilgan sana bo'yicha
-                </div>
-            </div>
-        </div>
-    @endif
-
-    <!-- FILTR VA QIDIRUV -->
-    <div class="p-4 rounded-2xl bg-slate-50/40 border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="w-full md:w-96 relative">
-            <span class="absolute inset-y-0 left-3 flex items-center text-slate-600 text-sm">🔍</span>
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="search"
-                placeholder="{{ $activeTab === 'customers' ? 'Mijoz, do\'kon nomi, telefon...' : 'Ta\'minotchi, kompaniya, telefon...' }}"
-                class="w-full bg-slate-50/80 border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-900 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
-        </div>
-
-        <div class="flex items-center space-x-2 w-full md:w-auto overflow-x-auto">
-            <button
-                wire:click="$set('statusFilter', 'all')"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {{ $statusFilter === 'all' ? 'bg-slate-200 text-slate-900' : 'bg-slate-100/40 text-slate-600 hover:text-slate-900' }}"
-            >
-                Barchasi
-            </button>
-            <button
-                wire:click="$set('statusFilter', 'debtors')"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {{ $statusFilter === 'debtors' ? 'bg-rose-500/20 text-rose-700 border border-rose-500/30' : 'bg-slate-100/40 text-slate-600 hover:text-slate-900' }}"
-            >
-                {{ $activeTab === 'customers' ? 'Faqat Qarzdorlar' : 'Faqat Qarzimiz borlar' }}
-            </button>
-            <button
-                wire:click="$set('statusFilter', 'advance')"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {{ $statusFilter === 'advance' ? 'bg-emerald-500/20 text-emerald-700 border border-emerald-500/30' : 'bg-slate-100/40 text-slate-600 hover:text-slate-900' }}"
-            >
-                Faqat Avansdagilar
-            </button>
-            <button
-                wire:click="$set('statusFilter', 'overdue')"
-                class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors {{ $statusFilter === 'overdue' ? 'bg-amber-500/20 text-amber-700 border border-amber-500/30' : 'bg-slate-100/40 text-slate-600 hover:text-slate-900' }}"
-            >
-                Muddati O'tganlar
-            </button>
-        </div>
-    </div>
-
-    <!-- JADVAL -->
-    <div class="rounded-2xl bg-slate-50/60 border border-slate-200 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-700">
-                <thead class="bg-slate-50/80 text-xs font-semibold text-slate-600  border-b border-slate-200">
-                    <tr>
-                        <th class="px-6 py-4">Taraf / Nomi</th>
-                        <th class="px-6 py-4">Telefon va Manzil</th>
-                        <th class="px-6 py-4">Qarz yoki oldindan to‘lov</th>
-                        <th class="px-6 py-4">Limit / Muddat</th>
-                        <th class="px-6 py-4 text-right">Amallar</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200/60">
-                    @forelse ($items as $item)
-                        @php
-                            $isCustomer = ($activeTab === 'customers');
-                            $balance = $isCustomer ? (int) $item->current_debt : (int) $item->balance;
-                            $limit = $isCustomer ? (int) $item->debt_limit : (int) $item->credit_limit;
-                            $dueDate = $item->payment_due_date ? Carbon::parse($item->payment_due_date) : null;
-                            $isOverdue = $balance > 0 && $dueDate && $dueDate->isPast();
-                        @endphp
-                        <tr class="hover:bg-slate-100/30 transition-colors">
-                            <td class="px-6 py-4">
-                                <div class="font-bold text-slate-900 text-base">
-                                    {{ $item->name }}
-                                </div>
-                                <div class="text-xs text-slate-600">
-                                    {{ $isCustomer ? ($item->store_name ? 'Do\'kon: '.$item->store_name : 'Jismoniy shaxs') : ($item->company_name ? 'Kompaniya: '.$item->company_name : 'Ta\'minotchi') }}
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-4 text-xs">
-                                <div class="text-slate-700 font-mono">
-                                    {{ $item->phone ?: 'Telefon yo\'q' }}
-                                </div>
-                                <div class="text-slate-600 mt-0.5">
-                                    {{ $item->address ?: '-' }}
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-4">
-                                @if ($balance > 0)
-                                    <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold font-mono bg-rose-500/10 text-rose-700 border border-rose-500/20">
-                                        Qarz: {{ number_format($balance, 0, '.', ' ') }} so'm
-                                    </div>
-                                @elseif ($balance < 0)
-                                    <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold font-mono bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                                        Avans: {{ number_format(abs($balance), 0, '.', ' ') }} so'm
-                                    </div>
-                                @else
-                                    <div class="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono text-slate-600 bg-slate-100">
-                                        0 so'm (Hisob teng)
-                                    </div>
-                                @endif
-                            </td>
-
-                            <td class="px-6 py-4 text-xs">
-                                <div>
-                                    <span class="text-slate-600">Limit:</span>
-                                    <span class="font-mono {{ $limit > 0 && $balance > $limit ? 'text-rose-700 font-bold' : 'text-slate-700' }}">
-                                        {{ $limit > 0 ? number_format($limit, 0, '.', ' ').' so\'m' : 'Cheksiz' }}
-                                    </span>
-                                </div>
-                                <div class="mt-0.5">
-                                    <span class="text-slate-600">To'lov sanasi:</span>
-                                    @if ($dueDate)
-                                        <span class="font-mono {{ $isOverdue ? 'text-rose-700 font-bold' : 'text-slate-700' }}">
-                                            {{ $dueDate->format('d.m.Y') }}
-                                            @if ($isOverdue)
-                                                <span class="text-xs bg-rose-500/20 text-rose-700 px-1 py-0.2 rounded">Kechikkan</span>
-                                            @endif
-                                        </span>
-                                    @else
-                                        <span class="text-slate-600">Belgilanmagan</span>
-                                    @endif
-                                </div>
-                            </td>
-
-                            <td class="px-6 py-4 text-right space-x-2">
-                                @if ($isCustomer)
-                                    <button
-                                        type="button"
-                                        wire:click="openCustomerPaymentModal({{ $item->id }})"
-                                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                                    >
-                                        To'lov qabul qilish
-                                    </button>
-                                @else
-                                    <button
-                                        type="button"
-                                        wire:click="openSupplierPaymentModal({{ $item->id }})"
-                                        class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded-lg text-xs font-medium transition-colors shadow-sm"
-                                    >
-                                        To'lov qilish
-                                    </button>
-                                @endif
-
-                                <button
-                                    type="button"
-                                    wire:click="openStatementModal('{{ $isCustomer ? 'CUSTOMER' : 'SUPPLIER' }}', {{ $item->id }})"
-                                    class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-medium transition-colors border border-slate-300"
-                                >
-                                    Ko'chirma
-                                </button>
-
-                                <button
-                                    type="button"
-                                    wire:click="openSettingsModal('{{ $isCustomer ? 'CUSTOMER' : 'SUPPLIER' }}', {{ $item->id }})"
-                                    class="px-2 py-1.5 text-slate-600 hover:text-slate-900 rounded-lg text-xs transition-colors"
-                                    title="Kredit limiti va to'lov sanasini sozlash"
-                                >
-                                    ⚙️
-                                </button>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-slate-600">
-                                Hech qanday ma'lumot topilmadi.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-
-        @if ($items && $items->hasPages())
-            <div class="px-6 py-4 border-t border-slate-200 bg-slate-50/40">
-                {{ $items->links() }}
-            </div>
+        @if(($isCustomer ? $customerStats['total_advance'] : $supplierStats['total_prepaid']) > 0)
+            <p class="workspace-hint">Oldindan to‘langan pul: <strong>{{ number_format($isCustomer ? $customerStats['total_advance'] : $supplierStats['total_prepaid'], 0, '.', ' ') }} so‘m</strong>. Bu boshqa odamning qarzini kamaytirmaydi.</p>
         @endif
-    </div>
-
-    <!-- ======================================================== -->
-    <!-- MODAL 1: MIJOZ TO'LOVINI QABUL QILISH -->
-    <!-- ======================================================== -->
-    @if ($showCustomerPaymentModal && $selectedCustomer)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div class="bg-slate-50 border border-slate-200 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-                <div class="flex items-center justify-between border-b border-slate-200 pb-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">Mijozdan To'lov Qabul Qilish</h3>
-                        <p class="text-xs text-slate-600 mt-0.5">
-                            {{ $selectedCustomer->display_name }}
-                        </p>
+        <div class="space-y-3">
+        @forelse($items as $item)
+            @php($balance = (int) ($isCustomer ? $item->current_debt : $item->balance))
+            <article class="rounded-2xl border border-slate-200 bg-white p-5" wire:key="debt-{{ $activeTab }}-{{ $item->id }}">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <div class="min-w-0"><h3 class="text-lg font-bold break-words">{{ $item->display_name }}</h3><p class="mt-1 text-sm text-slate-600">{{ $item->phone ?: 'Telefon kiritilmagan' }} @if($item->address) · {{ $item->address }} @endif</p></div>
+                    <div class="text-left sm:text-right">
+                        <p class="text-sm text-slate-600">{{ $balance > 0 ? ($isCustomer ? 'Bizga to‘lashi kerak' : 'Biz to‘lashimiz kerak') : ($balance < 0 ? 'Oldindan to‘langan' : 'Qarz yo‘q') }}</p>
+                        <strong class="text-xl {{ $balance > 0 ? 'text-rose-700' : 'text-emerald-700' }}">{{ number_format(abs($balance), 0, '.', ' ') }} so‘m</strong>
                     </div>
-                    <button wire:click="$set('showCustomerPaymentModal', false)" class="text-slate-600 hover:text-slate-900">✕</button>
                 </div>
-
-                <div class="p-3 rounded-xl bg-slate-50/60 border border-slate-200/80 flex items-center justify-between">
-                    <span class="text-xs text-slate-600">Joriy qarz / avans:</span>
-                    <span class="text-sm font-mono font-bold {{ $selectedCustomer->current_debt > 0 ? 'text-rose-700' : ($selectedCustomer->current_debt < 0 ? 'text-emerald-700' : 'text-slate-600') }}">
-                        @if ($selectedCustomer->current_debt > 0)
-                            Qarz: {{ number_format($selectedCustomer->current_debt, 0, '.', ' ') }} so'm
-                        @elseif ($selectedCustomer->current_debt < 0)
-                            Avans: {{ number_format(abs($selectedCustomer->current_debt), 0, '.', ' ') }} so'm
-                        @else
-                            0 so'm
-                        @endif
-                    </span>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button type="button" wire:click="{{ $isCustomer ? 'openCustomerPaymentModal' : 'openSupplierPaymentModal' }}({{ $item->id }})" class="trade-button trade-button-primary">{{ $isCustomer ? 'Qarz to‘lovini olish' : 'Qarzni to‘lash' }}</button>
+                    <button type="button" wire:click="openStatementModal('{{ $isCustomer ? 'CUSTOMER' : 'SUPPLIER' }}', {{ $item->id }})" class="trade-button trade-button-secondary">Olingan mahsulotlar va to‘lovlar</button>
+                    <button type="button" wire:click="openSettingsModal('{{ $isCustomer ? 'CUSTOMER' : 'SUPPLIER' }}', {{ $item->id }})" class="trade-button trade-button-secondary">Qarz muddati</button>
                 </div>
+            </article>
+        @empty
+            <div class="trade-empty"><span>🤝</span><h3>{{ $search || $statusFilter !== 'all' ? 'Bu qidiruv bo‘yicha hech kim topilmadi' : ($isCustomer ? 'Hali mijozlar yo‘q' : 'Hali yetkazuvchilar yo‘q') }}</h3><p>{{ $isCustomer ? 'Mijozga nasiya sotuv qilsangiz, qarzi shu yerda ko‘rinadi.' : 'Mahsulot kirimida yetkazuvchini tanlang. To‘lanmagan summa shu yerda ko‘rinadi.' }}</p><a href="{{ url($isCustomer ? '/sotuv?mode=customer' : '/inward') }}" class="trade-button trade-button-secondary mt-3">{{ $isCustomer ? 'Sotuvga o‘tish' : 'Mahsulot kirimiga o‘tish' }}</a></div>
+        @endforelse
+        </div>
+        {{ $items->links() }}
+    </section>
 
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">To‘lov summasi (so‘m)</label>
-                        <input
-                            type="number"
-                            wire:model.live="paymentAmount"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            placeholder="Masalan: 100000"
-                        />
-                        <div class="flex flex-wrap gap-2 mt-2">
-                            @if ($selectedCustomer->current_debt > 0)
-                                <button
-                                    type="button"
-                                    wire:click="setFullCustomerDebt"
-                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-blue-700 rounded-lg"
-                                >
-                                    To'liq qarz ({{ number_format($selectedCustomer->current_debt, 0, '.', ' ') }})
-                                </button>
-                            @endif
-                            <button type="button" wire:click="setQuickCustomerAmount(100000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">100 000</button>
-                            <button type="button" wire:click="setQuickCustomerAmount(500000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">500 000</button>
-                            <button type="button" wire:click="setQuickCustomerAmount(1000000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">1 000 000</button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Kassa hisobi</label>
-                            <select
-                                wire:model.live="paymentCashAccountId"
-                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
-                                @foreach ($cashAccounts as $acc)
-                                    <option value="{{ $acc->id }}">
-                                        {{ $acc->name }} ({{ number_format($acc->balance, 0, '.', ' ') }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">To'lov usuli</label>
-                            <select
-                                wire:model.live="paymentMethod"
-                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
-                                <option value="CASH">Naqd pul</option>
-                                <option value="CARD">Plastik karta</option>
-                                <option value="BANK">Bank o'tkazmasi</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Izoh (ixtiyoriy)</label>
-                        <input
-                            type="text"
-                            wire:model="paymentNotes"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            placeholder="Qarz to'lovi haqida izoh..."
-                        />
-                    </div>
-
-                    @php
-                        $inputAmount = (int) str_replace([' ', ','], '', $this->paymentAmount ?? '0');
-                        $currentDebt = (int) $selectedCustomer->current_debt;
-                        $isExcess = ($currentDebt > 0 && $inputAmount > $currentDebt);
-                        $excessDiff = $inputAmount - $currentDebt;
-                    @endphp
-
-                    @if ($isExcess)
-                        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs space-y-2">
-                            <div class="flex items-center space-x-2">
-                                <span>⚠️</span>
-                                <span class="font-bold">Qarzdan ortiq summa: {{ number_format($excessDiff, 0, '.', ' ') }} so'm</span>
-                            </div>
-                            <p class="text-xs text-amber-700/80">
-                                Ushbu summa mijozning avansi (haqdorligi) sifatida signed balansda saqlanadi.
-                            </p>
-                            <label class="flex items-center space-x-2 cursor-pointer pt-1">
-                                <input
-                                    type="checkbox"
-                                    wire:model="confirmExcessAsAdvance"
-                                    class="rounded bg-slate-50 border-slate-300 text-blue-600 focus:ring-0"
-                                />
-                                <span class="font-semibold text-slate-900">Ortiqcha pulni avans sifatida tasdiqlayman</span>
-                            </label>
-                        </div>
-                    @endif
-                </div>
-
-                <div class="flex items-center justify-end space-x-3 border-t border-slate-200 pt-4">
-                    <button
-                        type="button"
-                        wire:click="$set('showCustomerPaymentModal', false)"
-                        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium"
-                    >
-                        Bekor qilish
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="submitCustomerPayment" wire:loading.attr="disabled" wire:target="submitCustomerPayment"
-                        wire:loading.attr="disabled"
-                        class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-slate-900 rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 disabled:opacity-50"
-                    >
-                        <span wire:loading.remove>Tasdiqlash va Kirim qilish</span>
-                        <span wire:loading>Jarayonda...</span>
-                    </button>
-                </div>
-            </div>
+    @if($showCustomerPaymentModal && $selectedCustomer)
+        @php
+            $inputAmount = (int) str_replace([' ', ','], '', $paymentAmount ?? '0');
+            $partyBalance = (int) $selectedCustomer->current_debt;
+        @endphp
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" x-on:keydown.escape.window="$wire.set('showCustomerPaymentModal', false)">
+            <form wire:submit="submitCustomerPayment" role="dialog" aria-modal="true" aria-labelledby="paymentAmount-title" class="trade-card w-full max-w-lg max-h-[90dvh] overflow-y-auto space-y-5 shadow-2xl">
+                <div class="flex justify-between items-start gap-3"><div><h2 id="paymentAmount-title" class="text-xl font-bold">Mijoz qarz to‘lovini qabul qilish</h2><p class="mt-1 text-slate-600">{{ $selectedCustomer->display_name }}</p></div><button type="button" wire:click="$set('showCustomerPaymentModal', false)" aria-label="To‘lov oynasini yopish" class="trade-remove">×</button></div>
+                @if($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
+                <x-validation-errors />
+                <div class="workspace-hint"><p>{{ $partyBalance >= 0 ? 'Hozirgi qarz' : 'Oldindan to‘langan pul' }}: <strong>{{ number_format(abs($partyBalance), 0, '.', ' ') }} so‘m</strong></p><p>Kassada hozir: <strong>{{ number_format($paymentCashBalance, 0, '.', ' ') }} so‘m</strong></p></div>
+                <div class="trade-field"><label for="paymentAmount-input">Mijoz qancha pul berdi?</label><div class="trade-input-unit"><input id="paymentAmount-input" type="number" min="1" step="1" inputmode="numeric" wire:model.live.debounce.300ms="paymentAmount" placeholder="Summani yozing"><span>so‘m</span></div></div>
+                @if($partyBalance > 0)<button type="button" wire:click="setFullCustomerDebt" class="trade-button trade-button-secondary">Qarzni to‘liq to‘lash: {{ number_format($partyBalance, 0, '.', ' ') }} so‘m</button>@endif
+                <div class="trade-summary"><div><span>To‘lovdan keyingi qarz</span><strong>{{ number_format(max(0, $partyBalance - $inputAmount), 0, '.', ' ') }} so‘m</strong></div><div><span>To‘lovdan keyin kassada</span><strong>{{ number_format($paymentCashBalance + $inputAmount, 0, '.', ' ') }} so‘m</strong></div></div>
+                @if($inputAmount > max(0, $partyBalance))<label class="workspace-hint flex items-start gap-3"><input type="checkbox" wire:model="confirmExcessAsAdvance"><span>Qarzdan ortiq {{ number_format($inputAmount - max(0, $partyBalance), 0, '.', ' ') }} so‘mni keyingi xaridlar uchun oldindan to‘lov sifatida saqlashga roziman.</span></label>@endif
+                <details class="trade-details"><summary>Izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="paymentNotes-input">Izoh</label><input id="paymentNotes-input" wire:model="paymentNotes" placeholder="To‘lov haqida izoh"></div></details>
+                <p class="text-sm text-slate-600">Pul kassaga qo‘shiladi va mijozning qarzi kamayadi. Saqlangach, oyna yopiladi.</p>
+                <div class="flex flex-wrap justify-end gap-3"><button type="button" wire:click="$set('showCustomerPaymentModal', false)" class="trade-button trade-button-secondary">Bekor qilish</button><button type="submit" wire:loading.attr="disabled" wire:target="submitCustomerPayment" class="trade-button trade-button-primary"><span wire:loading.remove wire:target="submitCustomerPayment">To‘lovni qabul qilish</span><span wire:loading wire:target="submitCustomerPayment">Saqlanyapti…</span></button></div>
+            </form>
         </div>
     @endif
 
-    <!-- ======================================================== -->
-    <!-- MODAL 2: TA'MINOTCHIGA TO'LOV QILISH -->
-    <!-- ======================================================== -->
-    @if ($showSupplierPaymentModal && $selectedSupplier)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <div class="bg-slate-50 border border-slate-200 rounded-2xl w-full max-w-lg p-6 space-y-5 shadow-2xl">
-                <div class="flex items-center justify-between border-b border-slate-200 pb-4">
-                    <div>
-                        <h3 class="text-lg font-bold text-slate-900">Ta'minotchiga To'lov Qilish</h3>
-                        <p class="text-xs text-slate-600 mt-0.5">
-                            {{ $selectedSupplier->display_name }}
-                        </p>
-                    </div>
-                    <button wire:click="$set('showSupplierPaymentModal', false)" class="text-slate-600 hover:text-slate-900">✕</button>
-                </div>
-
-                <div class="p-3 rounded-xl bg-slate-50/60 border border-slate-200/80 flex items-center justify-between">
-                    <span class="text-xs text-slate-600">Bizning qarzimiz / avansimiz:</span>
-                    <span class="text-sm font-mono font-bold {{ $selectedSupplier->balance > 0 ? 'text-amber-700' : ($selectedSupplier->balance < 0 ? 'text-emerald-700' : 'text-slate-600') }}">
-                        @if ($selectedSupplier->balance > 0)
-                            Qarzimiz: {{ number_format($selectedSupplier->balance, 0, '.', ' ') }} so'm
-                        @elseif ($selectedSupplier->balance < 0)
-                            Avansimiz: {{ number_format(abs($selectedSupplier->balance), 0, '.', ' ') }} so'm
-                        @else
-                            0 so'm
-                        @endif
-                    </span>
-                </div>
-
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">To‘lov summasi (so‘m)</label>
-                        <input
-                            type="number"
-                            wire:model.live="supplierPaymentAmount"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-lg font-mono font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            placeholder="Masalan: 500000"
-                        />
-                        <div class="flex flex-wrap gap-2 mt-2">
-                            @if ($selectedSupplier->balance > 0)
-                                <button
-                                    type="button"
-                                    wire:click="setFullSupplierPayable"
-                                    class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-amber-700 rounded-lg"
-                                >
-                                    To'liq qarz ({{ number_format($selectedSupplier->balance, 0, '.', ' ') }})
-                                </button>
-                            @endif
-                            <button type="button" wire:click="setQuickSupplierAmount(100000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">100 000</button>
-                            <button type="button" wire:click="setQuickSupplierAmount(500000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">500 000</button>
-                            <button type="button" wire:click="setQuickSupplierAmount(1000000)" class="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-xs text-slate-700 rounded-lg">1 000 000</button>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">Kassa hisobi (Chiqim)</label>
-                            <select
-                                wire:model.live="supplierPaymentCashAccountId"
-                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            >
-                                @foreach ($cashAccounts as $acc)
-                                    <option value="{{ $acc->id }}">
-                                        {{ $acc->name }} ({{ number_format($acc->balance, 0, '.', ' ') }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 mb-1">To'lov usuli</label>
-                            <select
-                                wire:model.live="supplierPaymentMethod"
-                                class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            >
-                                <option value="CASH">Naqd pul</option>
-                                <option value="CARD">Plastik karta</option>
-                                <option value="BANK">Bank o'tkazmasi</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-700 mb-1">Izoh (ixtiyoriy)</label>
-                        <input
-                            type="text"
-                            wire:model="supplierPaymentNotes"
-                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            placeholder="Ta'minotchiga to'lov izohi..."
-                        />
-                    </div>
-
-                    @php
-                        $inputSupAmount = (int) str_replace([' ', ','], '', $this->supplierPaymentAmount ?? '0');
-                        $currentPayable = (int) $selectedSupplier->balance;
-                        $isSupExcess = ($currentPayable > 0 && $inputSupAmount > $currentPayable);
-                        $excessSupDiff = $inputSupAmount - $currentPayable;
-                    @endphp
-
-                    @if ($isSupExcess)
-                        <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 text-xs space-y-2">
-                            <div class="flex items-center space-x-2">
-                                <span>⚠️</span>
-                                <span class="font-bold">Qarzdan ortiq to'lov: {{ number_format($excessSupDiff, 0, '.', ' ') }} so'm</span>
-                            </div>
-                            <p class="text-xs text-amber-700/80">
-                                Ushbu summa ta'minotchiga berilgan avans sifatida signed daftarda saqlanadi.
-                            </p>
-                            <label class="flex items-center space-x-2 cursor-pointer pt-1">
-                                <input
-                                    type="checkbox"
-                                    wire:model="supplierConfirmExcessAsAdvance"
-                                    class="rounded bg-slate-50 border-slate-300 text-amber-600 focus:ring-0"
-                                />
-                                <span class="font-semibold text-slate-900">Ortiqcha to'lovni avans sifatida tasdiqlayman</span>
-                            </label>
-                        </div>
-                    @endif
-                </div>
-
-                <div class="flex items-center justify-end space-x-3 border-t border-slate-200 pt-4">
-                    <button
-                        type="button"
-                        wire:click="$set('showSupplierPaymentModal', false)"
-                        class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-medium"
-                    >
-                        Bekor qilish
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="submitSupplierPayment" wire:loading.attr="disabled" wire:target="submitSupplierPayment"
-                        wire:loading.attr="disabled"
-                        class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-slate-900 rounded-xl text-xs font-bold shadow-lg shadow-amber-500/20 disabled:opacity-50"
-                    >
-                        <span wire:loading.remove>Tasdiqlash va Chiqim qilish</span>
-                        <span wire:loading>Jarayonda...</span>
-                    </button>
-                </div>
-            </div>
+    @if($showSupplierPaymentModal && $selectedSupplier)
+        @php
+            $inputAmount = (int) str_replace([' ', ','], '', $supplierPaymentAmount ?? '0');
+            $partyBalance = (int) $selectedSupplier->balance;
+        @endphp
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" x-on:keydown.escape.window="$wire.set('showSupplierPaymentModal', false)">
+            <form wire:submit="submitSupplierPayment" role="dialog" aria-modal="true" aria-labelledby="supplierPaymentAmount-title" class="trade-card w-full max-w-lg max-h-[90dvh] overflow-y-auto space-y-5 shadow-2xl">
+                <div class="flex justify-between items-start gap-3"><div><h2 id="supplierPaymentAmount-title" class="text-xl font-bold">Yetkazuvchining qarzini to‘lash</h2><p class="mt-1 text-slate-600">{{ $selectedSupplier->display_name }}</p></div><button type="button" wire:click="$set('showSupplierPaymentModal', false)" aria-label="To‘lov oynasini yopish" class="trade-remove">×</button></div>
+                @if($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
+                <x-validation-errors />
+                <div class="workspace-hint"><p>{{ $partyBalance >= 0 ? 'Hozirgi qarz' : 'Oldindan to‘langan pul' }}: <strong>{{ number_format(abs($partyBalance), 0, '.', ' ') }} so‘m</strong></p><p>Kassada hozir: <strong>{{ number_format($supplierCashBalance, 0, '.', ' ') }} so‘m</strong></p></div>
+                <div class="trade-field"><label for="supplierPaymentAmount-input">Yetkazuvchiga qancha pul berildi?</label><div class="trade-input-unit"><input id="supplierPaymentAmount-input" type="number" min="1" step="1" inputmode="numeric" wire:model.live.debounce.300ms="supplierPaymentAmount" placeholder="Summani yozing"><span>so‘m</span></div></div>
+                @if($partyBalance > 0)<button type="button" wire:click="setFullSupplierPayable" class="trade-button trade-button-secondary">Qarzni to‘liq to‘lash: {{ number_format($partyBalance, 0, '.', ' ') }} so‘m</button>@endif
+                <div class="trade-summary"><div><span>To‘lovdan keyingi qarz</span><strong>{{ number_format(max(0, $partyBalance - $inputAmount), 0, '.', ' ') }} so‘m</strong></div><div><span>To‘lovdan keyin kassada</span><strong>{{ number_format($supplierCashBalance - $inputAmount, 0, '.', ' ') }} so‘m</strong></div></div>
+                @if($inputAmount > $supplierCashBalance)<div class="trade-alert trade-alert-error" role="alert">Kassada pul yetmaydi. {{ number_format($inputAmount - $supplierCashBalance, 0, '.', ' ') }} so‘m yetishmayapti. Summani kamaytiring yoki <a href="{{ route('cash.index') }}" class="underline font-bold">kassaga pul qo‘shing</a>.</div>@endif
+                @if($inputAmount > max(0, $partyBalance))<label class="workspace-hint flex items-start gap-3"><input type="checkbox" wire:model="supplierConfirmExcessAsAdvance"><span>Qarzdan ortiq {{ number_format($inputAmount - max(0, $partyBalance), 0, '.', ' ') }} so‘mni keyingi xaridlar uchun oldindan to‘lov sifatida saqlashga roziman.</span></label>@endif
+                <details class="trade-details"><summary>Izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="supplierPaymentNotes-input">Izoh</label><input id="supplierPaymentNotes-input" wire:model="supplierPaymentNotes" placeholder="To‘lov haqida izoh"></div></details>
+                <p class="text-sm text-slate-600">Pul kassadan ayriladi va yetkazuvchiga qarzimiz kamayadi. Saqlangach, oyna yopiladi.</p>
+                <div class="flex flex-wrap justify-end gap-3"><button type="button" wire:click="$set('showSupplierPaymentModal', false)" class="trade-button trade-button-secondary">Bekor qilish</button><button type="submit" wire:loading.attr="disabled" wire:target="submitSupplierPayment" class="trade-button trade-button-primary"><span wire:loading.remove wire:target="submitSupplierPayment">Tasdiqlash va chiqim qilish</span><span wire:loading wire:target="submitSupplierPayment">Saqlanyapti…</span></button></div>
+            </form>
         </div>
     @endif
-
-    <!-- ======================================================== -->
     <!-- MODAL 3: HISOB KO'CHIRMASI (STATEMENT) -->
     <!-- ======================================================== -->
     @if ($showStatementModal && $statementData)

@@ -25,18 +25,10 @@ class ProductionReferenceSeeder extends Seeder
             ['is_default' => true]
         );
 
-        // 3. Official Cash Accounts (Opening balance strictly 0)
+        // The shop records all money in one account, starting at zero.
         CashAccount::firstOrCreate(
             ['type' => 'CASH'],
-            ['name' => 'Asosiy Naqd Kassa', 'balance' => 0, 'is_default' => true]
-        );
-        CashAccount::firstOrCreate(
-            ['type' => 'CARD'],
-            ['name' => 'Humo / Uzcard Terminal', 'balance' => 0]
-        );
-        CashAccount::firstOrCreate(
-            ['type' => 'BANK'],
-            ['name' => 'Bank Hisob-Raqami', 'balance' => 0]
+            ['name' => 'Do‘kon kassasi', 'balance' => 0, 'is_default' => true]
         );
 
         // 4. Standard Beverage Volumes (Hajmlar)

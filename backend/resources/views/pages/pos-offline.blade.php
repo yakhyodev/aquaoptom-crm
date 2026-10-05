@@ -372,27 +372,13 @@
                 <!-- Payment Method Buttons -->
                 <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">To'lov usuli:</label>
-                    <div class="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                    <div class="grid grid-cols-2 gap-1.5 text-xs font-bold">
                         <button type="button"
                                 @click="onPaymentMethodChange('CASH')"
                                 class="py-2 rounded-lg border transition-colors flex flex-col items-center gap-0.5"
                                 :class="paymentMethod === 'CASH' ? 'bg-emerald-600 text-slate-900 border-emerald-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
                             <span>💵</span>
-                            <span class="text-xs">Naqd</span>
-                        </button>
-                        <button type="button"
-                                @click="onPaymentMethodChange('CARD')"
-                                class="py-2 rounded-lg border transition-colors flex flex-col items-center gap-0.5"
-                                :class="paymentMethod === 'CARD' ? 'bg-blue-600 text-slate-900 border-blue-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
-                            <span>💳</span>
-                            <span class="text-xs">Karta</span>
-                        </button>
-                        <button type="button"
-                                @click="onPaymentMethodChange('BANK')"
-                                class="py-2 rounded-lg border transition-colors flex flex-col items-center gap-0.5"
-                                :class="paymentMethod === 'BANK' ? 'bg-indigo-600 text-slate-900 border-indigo-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
-                            <span>🏦</span>
-                            <span class="text-xs">Bank</span>
+                            <span class="text-xs">To‘liq to‘lov</span>
                         </button>
                         <button type="button"
                                 @click="onPaymentMethodChange('DEBT')"
@@ -486,7 +472,7 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-slate-600">To'lov:</span>
-                    <span x-text="completedSale ? completedSale.payment_method : ''"></span>
+                    <span x-text="completedSale ? (completedSale.payment_method === 'DEBT' ? 'Nasiya' : 'To‘langan') : ''"></span>
                 </div>
             </div>
 
@@ -670,7 +656,7 @@
                                 <template x-if="item.type === 'CREATE_SALE'">
                                     <span>
                                         Savdo: <span class="font-semibold text-slate-900" x-text="`${(item.payload.items || []).reduce((acc, i) => acc + (i.quantity || 0), 0)} dona`"></span> •
-                                        To'lov: <span class="font-semibold text-slate-900" x-text="item.payload.payment_method"></span>
+                                        To'lov: <span class="font-semibold text-slate-900" x-text="item.payload.payment_method === 'DEBT' ? 'Nasiya' : 'To‘langan'"></span>
                                         <template x-if="item.payload.paid_amount">
                                             <span x-text="`(${parseInt(item.payload.paid_amount).toLocaleString('uz-UZ')} so'm)`"></span>
                                         </template>
@@ -694,7 +680,7 @@
                                     <div class="font-bold flex items-center gap-1">
                                         <span>⚠️</span> Admin tekshiruvi kutilmoqda: <span x-text="item.error_code || 'NEEDS_REVIEW'"></span>
                                     </div>
-                                    <div x-text="item.error_message || 'Kech yopilgan smena yoki ajratma chegarasi sababli admin tasdig\'iga o\'tkazildi.'"></div>
+                                    <div x-text="item.error_message || 'Saqlangan savdoni mas’ul xodim tekshirishi kerak.'"></div>
                                 </div>
                             </template>
                             <template x-if="item.status === 'FAILED'">

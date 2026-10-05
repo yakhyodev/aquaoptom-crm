@@ -102,7 +102,11 @@ jobs:
           docker compose -f docker/preview-compose.yml up -d postgres redis app reverb nginx
           docker compose -f docker/preview-compose.yml exec -T app php artisan migrate --force
           docker compose -f docker/preview-compose.yml exec -T app php artisan db:seed --class=ProductionReferenceSeeder --force
-          docker compose -f docker/preview-compose.yml exec -T app php artisan app:bootstrap-owner --preview --name='Preview Owner' --email=owner@preview.aquaoptom.test --password="$PREVIEW_OWNER_PASSWORD" --no-interaction
+          docker compose -f docker/preview-compose.yml exec -T app php artisan app:bootstrap-owner --preview --name='Do‘kon egasi' --email=owner@preview.aquaoptom.test --password="$PREVIEW_OWNER_PASSWORD" --no-interaction
+          count=$(docker compose -f docker/preview-compose.yml exec -T postgres psql -U postgres -d aquaoptom_preview -tAc 'SELECT (SELECT COUNT(*) FROM products) + (SELECT COUNT(*) FROM customers) + (SELECT COUNT(*) FROM suppliers) + (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM purchases) + (SELECT COUNT(*) FROM payments) + (SELECT COUNT(*) FROM cash_movements)')
+          test "$count" = 0 || { echo 'Preview must start without business/test records.'; exit 1; }
+          accounts=$(docker compose -f docker/preview-compose.yml exec -T postgres psql -U postgres -d aquaoptom_preview -tAc 'SELECT COUNT(*) FROM cash_accounts')
+          test "$accounts" = 1 || { echo 'The shop must have one cash account.'; exit 1; }
           docker compose -f docker/preview-compose.yml up -d worker outbox
           for attempt in $(seq 1 60); do
             if curl --fail --silent "$PREVIEW_URL/login" > "$RUNNER_TEMP/login.html"; then break; fi
@@ -115,7 +119,7 @@ jobs:
           python3 - <<'PY'
           import datetime, json, os, pathlib
           expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=int(os.environ['PREVIEW_MINUTES']))
-          info = {'url': os.environ['PREVIEW_URL'], 'login': 'admin', 'expires_at_utc': expiry.isoformat(), 'source': os.environ['GITHUB_SHA'], 'temporary': True, 'data_persistent': False}
+          info = {'url': os.environ['PREVIEW_URL'], 'login': 'admin', 'expires_at_utc': expiry.isoformat(), 'source': os.environ['GITHUB_SHA'], 'temporary': True, 'data_persistent': False, 'preview_slot': '${{ inputs.preview_slot }}'}
           pathlib.Path('preview-info/connection.json').write_text(json.dumps(info, indent=2))
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
               output.write(f"### Temporary AquaOptom web preview\n\nWeb: {info['url']}\n\nLogin: {info['login']}\n\nExpiry UTC: {info['expires_at_utc']}\n\nTemporary isolated data, not production. Password is a repository secret.\n")

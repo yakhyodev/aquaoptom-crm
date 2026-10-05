@@ -136,19 +136,11 @@
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <span class="text-xs font-semibold text-emerald-600  block">Naqd Tushum</span>
+                    <span class="text-xs font-semibold text-emerald-600  block">Sotuvda to‘langan pul</span>
                     <span class="text-lg font-bold text-emerald-700 font-mono mt-1 block">
-                        {{ number_format($salesReport['kpi']['cash_at_pos']) }}
+                        {{ number_format($salesReport['kpi']['cash_at_pos'] + $salesReport['kpi']['card_at_pos'] + $salesReport['kpi']['bank_at_pos']) }}
                     </span>
-                    <span class="text-xs text-slate-600">POS naqd</span>
-                </div>
-
-                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <span class="text-xs font-semibold text-purple-600  block">Karta + Bank</span>
-                    <span class="text-lg font-bold text-purple-700 font-mono mt-1 block">
-                        {{ number_format($salesReport['kpi']['card_at_pos'] + $salesReport['kpi']['bank_at_pos']) }}
-                    </span>
-                    <span class="text-xs text-slate-600">karta / o'tkazma</span>
+                    <span class="text-xs text-slate-600">Kassaga tushgan summa</span>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -604,8 +596,7 @@
                                 <th class="p-3">Roli</th>
                                 <th class="p-3 text-right">Cheklar Soni</th>
                                 <th class="p-3 text-right">Jami Savdo</th>
-                                <th class="p-3 text-right">Naqd Qabul Qilingan</th>
-                                <th class="p-3 text-right">Karta/Bank</th>
+                                <th class="p-3 text-right">Qabul qilingan pul</th>
                                 <th class="p-3 text-right">Nasiya Chiqarilgan</th>
                             </tr>
                         </thead>
@@ -616,8 +607,7 @@
                                     <td class="p-3 font-sans text-slate-600">{{ $st['role'] }}</td>
                                     <td class="p-3 text-right text-slate-700 font-bold">{{ number_format($st['orders_count']) }}</td>
                                     <td class="p-3 text-right font-bold text-blue-700">{{ number_format($st['total_amount']) }}</td>
-                                    <td class="p-3 text-right text-emerald-600">{{ number_format($st['paid_cash']) }}</td>
-                                    <td class="p-3 text-right text-purple-600">{{ number_format($st['paid_card'] + $st['paid_bank']) }}</td>
+                                    <td class="p-3 text-right text-emerald-600">{{ number_format($st['paid_cash'] + $st['paid_card'] + $st['paid_bank']) }}</td>
                                     <td class="p-3 text-right text-amber-600">{{ number_format($st['debt_amount']) }}</td>
                                 </tr>
                             @empty

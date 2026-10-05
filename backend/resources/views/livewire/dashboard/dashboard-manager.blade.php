@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Naqd + karta + bank. Sana filtri bu qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts">@foreach($dashboard['balances']['cash_accounts'] as $account)<div><span>{{ $account['name'] }}</span><strong>{{ number_format($account['balance'], 0, '.', ' ') }} so‘m</strong></div>@endforeach<div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
+    <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
     <div class="money-flow-cards"><div><span>Tanlangan davrda pul kirdi</span><strong>{{ number_format($dashboard['flow']['cash_in'], 0, '.', ' ') }} so‘m</strong></div><div><span>Tanlangan davrda pul chiqdi</span><strong>{{ number_format($dashboard['flow']['cash_out'], 0, '.', ' ') }} so‘m</strong></div><div><span>Shundan do‘kon xarajatlari</span><strong data-testid="dashboard-expenses">{{ number_format($dashboard['flow']['operating_expenses'], 0, '.', ' ') }} so‘m</strong></div></div>
     <p class="workspace-caption">Hisoblararo o‘tkazmalar va boshlang‘ich qoldiq davriy pul kirimi/chiqimiga qo‘shilmaydi. Mijozdan tushgan to‘lovlar quyida alohida.</p>
     <!-- 3. DAVRIY OQIM (Flow Metrics) -->
@@ -113,9 +113,6 @@
                     {{ number_format($dashboard['flow']['cash_collected'], 0, '.', ' ') }} <span class="text-xs font-normal text-emerald-600">so'm</span>
                 </div>
                 <div class="text-xs text-slate-600 mt-1.5 flex flex-wrap gap-2 font-mono">
-                    <span>Naqd: {{ number_format($dashboard['flow']['payments_by_method']['cash'], 0, '.', ' ') }}</span>
-                    <span>Karta: {{ number_format($dashboard['flow']['payments_by_method']['card'], 0, '.', ' ') }}</span>
-                    <span>Bank: {{ number_format($dashboard['flow']['payments_by_method']['bank'], 0, '.', ' ') }}</span>
                 </div>
                 <div class="absolute -right-2 -bottom-2 text-slate-800/40 text-5xl font-black select-none pointer-events-none">💵</div>
             </div>
@@ -177,22 +174,16 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <!-- 4.1. Kassalardagi Jami Pul -->
+            <!-- 4.1. Kassadagi jami pul -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold text-slate-600">Kassalardagi Jami Pul</span>
+                    <span class="text-xs font-semibold text-slate-600">Kassadagi jami pul</span>
                     <span class="text-xs text-emerald-700 font-bold">Faol</span>
                 </div>
                 <div class="text-2xl font-black text-slate-900">
                     {{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <span class="text-xs text-slate-600 font-normal">so'm</span>
                 </div>
-                <div class="mt-3 pt-3 border-t border-slate-200 space-y-1.5 text-xs">
-                    @foreach ($dashboard['balances']['cash_accounts'] as $acc)
-                        <div class="flex items-center justify-between text-slate-700">
-                            <span class="text-slate-600">{{ $acc['name'] }} (<x-enum-label :value="$acc['type']" />):</span>
-                            <span class="font-mono font-semibold">{{ number_format($acc['balance'], 0, '.', ' ') }} so'm</span>
-                        </div>
-                    @endforeach
+                <div class="mt-3 pt-3 border-t border-slate-200 space-y-1.5 text-xs"><p>Do‘kon kassasi</p>
                 </div>
             </div>
 

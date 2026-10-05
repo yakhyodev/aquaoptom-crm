@@ -562,8 +562,8 @@ class CashSessionAndMovementsTest extends TestCase
 
         Livewire::actingAs($this->owner)
             ->test(CashManager::class)
-            ->assertSee('Asosiy Naqd Kassa')
-            ->assertSee('Bank Hisob-Raqami')
+            ->assertSee('Kassada hozir bor pul')
+            ->assertDontSee('OCHIQ SMENA')
             ->assertSee('500 000')
             // Smena ochish
             ->call('openNewSessionModal', $this->cashAccount->id)
@@ -643,5 +643,17 @@ class CashSessionAndMovementsTest extends TestCase
             ->call('submitExpense')->assertHasNoErrors()->assertViewHas('totalBalance', 0);
         $this->assertSame(0, (int) $this->cashAccount->fresh()->balance);
         $this->assertSame(0, (int) $this->bankAccount->fresh()->balance);
+    }
+
+    public function test_cash_forms_reject_fractional_amounts_without_truncation(): void
+    {
+        Livewire::actingAs($this->owner)->test(CashManager::class)
+            ->call('openOwnerFundsModal', 'DEPOSIT')->set('ownerAmount', '100.5')
+            ->call('submitOwnerFunds')->assertHasErrors(['ownerAmount' => 'integer'])
+            ->assertSet('showOwnerFundsModal', true)
+            ->call('openExpenseModal')->set('expenseAmount', '50.5')
+            ->call('submitExpense')->assertHasErrors(['expenseAmount' => 'integer'])
+            ->assertSet('showExpenseModal', true);
+        $this->assertSame(0, (int) $this->cashAccount->fresh()->balance);
     }
 }

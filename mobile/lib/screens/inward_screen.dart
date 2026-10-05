@@ -28,7 +28,6 @@ class _InwardScreenState extends State<InwardScreen> {
   final _newLitresController = TextEditingController(text: '0.5');
   final _quantityController = TextEditingController(text: '100');
   final _costPriceController = TextEditingController();
-  final _invoiceNumberController = TextEditingController();
   String _selectedPackage = 'dona';
   final String _operationId = OperationId.generate();
 
@@ -45,7 +44,6 @@ class _InwardScreenState extends State<InwardScreen> {
     _newLitresController.dispose();
     _quantityController.dispose();
     _costPriceController.dispose();
-    _invoiceNumberController.dispose();
     super.dispose();
   }
 
@@ -180,9 +178,6 @@ class _InwardScreenState extends State<InwardScreen> {
           packageName: _selectedPackage,
           costPrice: costPrice > 0 ? costPrice : null,
           supplierName: _selectedSupplier?.name,
-          invoiceNumber: _invoiceNumberController.text.trim().isEmpty
-              ? null
-              : _invoiceNumberController.text.trim(),
         );
       } else {
         if (_selectedVariant == null) {
@@ -196,9 +191,6 @@ class _InwardScreenState extends State<InwardScreen> {
           packageName: _selectedPackage,
           costPrice: costPrice > 0 ? costPrice : null,
           supplierName: _selectedSupplier?.name,
-          invoiceNumber: _invoiceNumberController.text.trim().isEmpty
-              ? null
-              : _invoiceNumberController.text.trim(),
         );
       }
 
@@ -410,16 +402,6 @@ class _InwardScreenState extends State<InwardScreen> {
                                 setState(() => _selectedSupplier = val),
                           ),
                           const SizedBox(height: 12),
-                          TextField(
-                            controller: _invoiceNumberController,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Hisob-faktura / Nakladnoy raqami',
-                              filled: true,
-                              fillColor: Color(0xFF0F172A),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
                         ],
                       ),
                     ),
