@@ -16,7 +16,9 @@
             <p class="mt-1 text-sm text-slate-600">{{ $supplierStats['payables_count'] }} ta yetkazuvchiga qarzmiz · Pul kassadan ayriladi.</p>
         </button>
     </div>
-    @php($isCustomer = $activeTab === 'customers')
+    @php
+$isCustomer = $activeTab === 'customers';
+@endphp
     <section class="trade-card space-y-5">
         <div><h2 class="text-xl font-bold">{{ $isCustomer ? 'Qaysi mijoz to‘ladi?' : 'Qaysi yetkazuvchiga to‘laymiz?' }}</h2><p class="mt-1 text-slate-600">{{ $isCustomer ? 'To‘lagan pulini shu yerda yozing. Mijozning umumiy qarzi kamayadi.' : 'Berilgan pulni shu yerda yozing. Yetkazuvchiga umumiy qarzimiz kamayadi.' }}</p></div>
         <div class="flex flex-wrap items-end gap-3">
@@ -28,7 +30,9 @@
         @endif
         <div class="space-y-3">
         @forelse($items as $item)
-            @php($balance = (int) ($isCustomer ? $item->current_debt : $item->balance))
+            @php
+$balance = (int) ($isCustomer ? $item->current_debt : $item->balance);
+@endphp
             <article class="rounded-2xl border border-slate-200 bg-white p-5" wire:key="debt-{{ $activeTab }}-{{ $item->id }}">
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div class="min-w-0"><h3 class="text-lg font-bold break-words">{{ $item->display_name }}</h3><p class="mt-1 text-sm text-slate-600">{{ $item->phone ?: 'Telefon kiritilmagan' }} @if($item->address) · {{ $item->address }} @endif</p></div>
