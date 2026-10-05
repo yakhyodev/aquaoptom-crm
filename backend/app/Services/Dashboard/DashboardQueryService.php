@@ -144,7 +144,7 @@ class DashboardQueryService
         $totalCashCollected = (int) DB::table('cash_movements')
             ->whereBetween('created_at', [$startUtc, $endUtc])
             ->where('direction', 'IN')
-            ->whereIn('type', ['SALE_PAYMENT', 'CUSTOMER_PAYMENT', 'OPENING_BALANCE'])
+            ->whereIn('type', ['SALE_PAYMENT', 'CUSTOMER_PAYMENT'])
             ->sum('amount');
 
         // c) To'lov usullari bo'yicha bo'linish (cash_movements direction=IN or payments)
@@ -153,18 +153,21 @@ class DashboardQueryService
                 ->join('cash_accounts', 'cash_accounts.id', '=', 'cash_movements.cash_account_id')
                 ->whereBetween('cash_movements.created_at', [$startUtc, $endUtc])
                 ->where('cash_movements.direction', 'IN')
+                ->whereIn('cash_movements.type', ['SALE_PAYMENT', 'CUSTOMER_PAYMENT'])
                 ->where('cash_accounts.type', 'CASH')
                 ->sum('cash_movements.amount'),
             'card' => (int) DB::table('cash_movements')
                 ->join('cash_accounts', 'cash_accounts.id', '=', 'cash_movements.cash_account_id')
                 ->whereBetween('cash_movements.created_at', [$startUtc, $endUtc])
                 ->where('cash_movements.direction', 'IN')
+                ->whereIn('cash_movements.type', ['SALE_PAYMENT', 'CUSTOMER_PAYMENT'])
                 ->where('cash_accounts.type', 'CARD')
                 ->sum('cash_movements.amount'),
             'bank' => (int) DB::table('cash_movements')
                 ->join('cash_accounts', 'cash_accounts.id', '=', 'cash_movements.cash_account_id')
                 ->whereBetween('cash_movements.created_at', [$startUtc, $endUtc])
                 ->where('cash_movements.direction', 'IN')
+                ->whereIn('cash_movements.type', ['SALE_PAYMENT', 'CUSTOMER_PAYMENT'])
                 ->where('cash_accounts.type', 'BANK')
                 ->sum('cash_movements.amount'),
         ];
@@ -181,7 +184,13 @@ class DashboardQueryService
             ->where('type', 'SUPPLIER_PAYMENT')
             ->sum('amount');
 
+        $externalCash = DB::table('cash_movements')
+            ->whereBetween('created_at', [$startUtc, $endUtc])
+            ->whereNotIn('type', ['TRANSFER_IN', 'TRANSFER_OUT', 'OPENING_BALANCE']);
+
         return [
+            'cash_in' => (int) (clone $externalCash)->where('direction', 'IN')->sum('amount'),
+            'cash_out' => (int) (clone $externalCash)->where('direction', 'OUT')->sum('amount'),
             'total_sales' => $totalSales,
             'sales_count' => $salesCount,
             'cash_collected' => $totalCashCollected,

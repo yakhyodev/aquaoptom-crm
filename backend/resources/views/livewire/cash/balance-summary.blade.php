@@ -1,0 +1,1 @@
+<a href="{{ route('cash.index') }}" class="app-cash-pill" wire:poll.15s aria-label="Kassadagi jami pulni ko‘rish"><span>Jami pul</span><strong>{{ number_format($balance, 0, '.', ' ') }} so‘m</strong></a>

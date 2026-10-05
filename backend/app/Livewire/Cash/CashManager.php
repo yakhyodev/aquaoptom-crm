@@ -5,18 +5,30 @@ namespace App\Livewire\Cash;
 use App\Models\CashAccount;
 use App\Models\CashMovement;
 use App\Models\CashSession;
+use App\Models\SystemSetting;
 use App\Services\Ledger\CashSessionService;
 use App\Services\Ledger\CashTransferService;
 use App\Services\Ledger\ExpenseService;
 use App\Services\Ledger\OwnerFundsService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class CashManager extends Component
 {
     use WithPagination;
+
+    #[Locked]
+    public string $expenseOperationId = '';
+
+    #[Locked]
+    public string $transferOperationId = '';
+
+    #[Locked]
+    public string $ownerFundsOperationId = '';
 
     // Active View Tab: 'movements' | 'sessions'
     public string $activeTab = 'movements';
@@ -114,6 +126,9 @@ class CashManager extends Component
 
     public function mount(): void
     {
+        $this->expenseOperationId = (string) Str::uuid();
+        $this->transferOperationId = (string) Str::uuid();
+        $this->ownerFundsOperationId = (string) Str::uuid();
         $defaultAccount = CashAccount::where('is_default', true)->first() ?: CashAccount::first();
         if ($defaultAccount) {
             $this->openAccountId = $defaultAccount->id;
@@ -263,6 +278,7 @@ class CashManager extends Component
     // --- Xarajat ---
     public function openExpenseModal(): void
     {
+        $this->expenseOperationId = (string) Str::uuid();
         $this->expenseAmount = 0;
         $this->expenseCategory = 'TRANSPORT';
         $this->expenseDescription = '';
@@ -273,7 +289,7 @@ class CashManager extends Component
     {
         $this->validate([
             'expenseAccountId' => 'required|exists:cash_accounts,id',
-            'expenseAmount' => 'required|integer|min:100',
+            'expenseAmount' => 'required|integer|min:1',
             'expenseCategory' => 'required|string',
         ]);
 
@@ -283,12 +299,14 @@ class CashManager extends Component
                 amount: $this->expenseAmount,
                 category: $this->expenseCategory,
                 description: $this->expenseDescription ?: null,
-                userId: Auth::id()
+                userId: Auth::id(),
+                operationId: $this->expenseOperationId
             );
 
             $this->showExpenseModal = false;
             $this->feedbackType = 'success';
-            $this->feedbackMessage = "Operatsion xarajat (#{$result['expense_number']}) muvaffaqiyatli saqlandi!";
+            $this->feedbackMessage = 'Xarajat saqlandi: '.number_format($this->expenseAmount, 0, '.', ' ')." so'm. Kassada qolgan pul: ".number_format($result['balance_after'], 0, '.', ' ')." so'm.";
+            $this->dispatch('refresh-dashboard');
         } catch (\Exception $e) {
             $this->feedbackType = 'error';
             $this->feedbackMessage = $e->getMessage();
@@ -298,6 +316,7 @@ class CashManager extends Component
     // --- O'tkazma ---
     public function openTransferModal(): void
     {
+        $this->transferOperationId = (string) Str::uuid();
         $this->transferAmount = 0;
         $this->transferDescription = '';
         $this->showTransferModal = true;
@@ -317,12 +336,14 @@ class CashManager extends Component
                 toAccountId: $this->transferToAccountId,
                 amount: $this->transferAmount,
                 description: $this->transferDescription ?: null,
-                userId: Auth::id()
+                userId: Auth::id(),
+                operationId: $this->transferOperationId
             );
 
             $this->showTransferModal = false;
             $this->feedbackType = 'success';
-            $this->feedbackMessage = 'Hisoblararo pul o\'tkazmasi muvaffaqiyatli bajarildi!';
+            $this->feedbackMessage = 'Pul o‘tkazildi. Do‘kondagi jami pul o‘zgarmadi. Hisoblarning yangi qoldig‘i yuqorida ko‘rsatilgan.';
+            $this->dispatch('refresh-dashboard');
         } catch (\Exception $e) {
             $this->feedbackType = 'error';
             $this->feedbackMessage = $e->getMessage();
@@ -332,6 +353,7 @@ class CashManager extends Component
     // --- Egasi mablag'i ---
     public function openOwnerFundsModal(string $type = 'DEPOSIT'): void
     {
+        $this->ownerFundsOperationId = (string) Str::uuid();
         $this->ownerFundType = $type;
         $this->ownerAmount = 0;
         $this->ownerDescription = '';
@@ -351,7 +373,8 @@ class CashManager extends Component
                     cashAccountId: $this->ownerAccountId,
                     amount: $this->ownerAmount,
                     description: $this->ownerDescription ?: null,
-                    userId: Auth::id()
+                    userId: Auth::id(),
+                    operationId: $this->ownerFundsOperationId
                 );
                 $this->feedbackMessage = "Do'kon egasi mablag'i kassaga muvaffaqiyatli kiritildi!";
             } else {
@@ -359,12 +382,14 @@ class CashManager extends Component
                     cashAccountId: $this->ownerAccountId,
                     amount: $this->ownerAmount,
                     description: $this->ownerDescription ?: null,
-                    userId: Auth::id()
+                    userId: Auth::id(),
+                    operationId: $this->ownerFundsOperationId
                 );
-                $this->feedbackMessage = "Do'kon egasi mablag'i (Owner Draw) chiqarildi! (Operatsion foydaga ta'sir qilmaydi)";
+                $this->feedbackMessage = 'Egaga pul berildi. Bu do‘kon xarajati emas; foyda hisobotiga qo‘shilmaydi.';
             }
 
             $this->showOwnerFundsModal = false;
+            $this->dispatch('refresh-dashboard');
             $this->feedbackType = 'success';
         } catch (\Exception $e) {
             $this->feedbackType = 'error';
@@ -376,6 +401,13 @@ class CashManager extends Component
     {
         $accounts = CashAccount::orderBy('id')->get();
         $totalBalance = (int) $accounts->sum('balance');
+
+        $today = Carbon::now(SystemSetting::get('timezone', 'Asia/Tashkent'));
+        $todayMovements = CashMovement::whereBetween('created_at', [$today->copy()->startOfDay()->utc(), $today->copy()->endOfDay()->utc()])
+            ->whereNotIn('type', ['TRANSFER_IN', 'TRANSFER_OUT', 'OPENING_BALANCE']);
+        $todayCashIn = (int) (clone $todayMovements)->where('direction', 'IN')->sum('amount');
+        $todayCashOut = (int) (clone $todayMovements)->where('direction', 'OUT')->sum('amount');
+        $todayExpenses = (int) (clone $todayMovements)->where('type', 'EXPENSE')->sum('amount');
 
         // Ochiq smena
         $activeSession = CashSession::with(['account', 'opener'])
@@ -413,13 +445,13 @@ class CashManager extends Component
         }
 
         // Date range filter
-        $now = Carbon::now();
+        $now = Carbon::now(SystemSetting::get('timezone', 'Asia/Tashkent'));
         if ($this->filterDateRange === 'today') {
-            $movementsQuery->whereDate('created_at', $now->toDateString());
+            $movementsQuery->whereBetween('created_at', [$now->copy()->startOfDay()->utc(), $now->copy()->endOfDay()->utc()]);
         } elseif ($this->filterDateRange === '7days') {
-            $movementsQuery->where('created_at', '>=', $now->copy()->subDays(7)->startOfDay());
+            $movementsQuery->where('created_at', '>=', $now->copy()->subDays(7)->startOfDay()->utc());
         } elseif ($this->filterDateRange === 'month') {
-            $movementsQuery->where('created_at', '>=', $now->copy()->startOfMonth());
+            $movementsQuery->where('created_at', '>=', $now->copy()->startOfMonth()->utc());
         }
 
         $movements = $movementsQuery->paginate(20);
@@ -432,6 +464,9 @@ class CashManager extends Component
         return view('livewire.cash.cash-manager', [
             'accounts' => $accounts,
             'totalBalance' => $totalBalance,
+            'todayCashIn' => $todayCashIn,
+            'todayCashOut' => $todayCashOut,
+            'todayExpenses' => $todayExpenses,
             'activeSession' => $activeSession,
             'activeSessionExpected' => $activeSessionExpected,
             'movements' => $movements,

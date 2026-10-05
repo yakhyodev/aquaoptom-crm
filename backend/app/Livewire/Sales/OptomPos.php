@@ -4,6 +4,7 @@ namespace App\Livewire\Sales;
 
 use App\Models\CashAccount;
 use App\Models\Customer;
+use App\Models\InventoryBalance;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Volume;
@@ -12,12 +13,15 @@ use App\Services\Parties\CustomerService;
 use App\Services\Sales\CreateSaleService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class OptomPos extends Component
 {
     public string $operationId = '';
+
+    public string $salesMode = 'quick';
 
     public string $customerSearch = '';
 
@@ -32,6 +36,9 @@ class OptomPos extends Component
     public ?int $selectedVolumeId = null;
 
     public array $items = [];
+
+    #[Locked]
+    public array $invalidFields = [];
 
     // To'lov parametrlari
     public string $paymentType = 'FULL'; // FULL, PARTIAL, DEBT
@@ -50,14 +57,48 @@ class OptomPos extends Component
 
     public ?array $completedSale = null;
 
+    public function updatedPaymentMethod(): void
+    {
+        if (in_array($this->paymentMethod, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->cashAccountId = CashAccount::where('type', $this->paymentMethod)
+                ->orderByDesc('is_default')->orderBy('id')->value('id');
+        }
+    }
+
+    public function updatedCashAccountId(): void
+    {
+        $account = CashAccount::find($this->cashAccountId);
+        if ($account && in_array($account->type, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->paymentMethod = $account->type;
+        }
+    }
+
     public function updatedSelectedProductId(): void
     {
         $this->selectedVolumeId = null;
     }
 
+    public function setSalesMode(string $mode): void
+    {
+        if (! in_array($mode, ['quick', 'customer'], true)) {
+            return;
+        }
+
+        $this->salesMode = $mode;
+        if ($mode === 'quick') {
+            $this->selectedCustomerId = null;
+            $this->selectedCustomerName = null;
+            $this->customerCurrentDebt = 0;
+            $this->customerSearch = '';
+            $this->paymentType = 'FULL';
+            $this->syncPaymentAmount();
+        }
+    }
+
     public function mount(): void
     {
         $this->operationId = Str::uuid()->toString();
+        $this->salesMode = request()->query('mode') === 'customer' ? 'customer' : $this->salesMode;
 
         // Standart kassa hisobini olish
         $defaultCash = CashAccount::where('is_default', true)->first();
@@ -160,6 +201,7 @@ class OptomPos extends Component
     public function removeItem(int $index): void
     {
         if (isset($this->items[$index])) {
+            unset($this->invalidFields['quantity-'.$this->items[$index]['variant_id']], $this->invalidFields['price-'.$this->items[$index]['variant_id']]);
             $this->resetErrorBag('quantity-'.$this->items[$index]['variant_id']);
             $this->resetErrorBag('price-'.$this->items[$index]['variant_id']);
         }
@@ -179,10 +221,12 @@ class OptomPos extends Component
         if ($value === false || $value < 1) {
             $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
 
+            $this->invalidFields[$errorKey] = $this->errorMessage;
             $this->addError($errorKey, $this->errorMessage);
 
             return;
         }
+        unset($this->invalidFields[$errorKey]);
         $this->resetErrorBag($errorKey);
         $this->reset(['errorMessage', 'posMessage']);
         $this->items[$index]['quantity'] = $value;
@@ -200,10 +244,12 @@ class OptomPos extends Component
         if ($value === false || $value < 0) {
             $this->errorMessage = 'Narxni 0 yoki undan katta butun raqam bilan yozing.';
 
+            $this->invalidFields[$errorKey] = $this->errorMessage;
             $this->addError($errorKey, $this->errorMessage);
 
             return;
         }
+        unset($this->invalidFields[$errorKey]);
         $this->resetErrorBag($errorKey);
         $this->reset(['errorMessage', 'posMessage']);
         $this->items[$index]['price'] = $value;
@@ -260,6 +306,7 @@ class OptomPos extends Component
 
     public function clearDraft(): void
     {
+        $this->invalidFields = [];
         $this->resetErrorBag();
         $this->items = [];
         $this->selectedCustomerId = null;
@@ -293,7 +340,10 @@ class OptomPos extends Component
      */
     public function checkout(CreateSaleService $saleService): void
     {
-        if ($this->getErrorBag()->any()) {
+        if ($this->invalidFields !== []) {
+            foreach ($this->invalidFields as $key => $message) {
+                $this->addError($key, $message);
+            }
             $this->errorMessage = 'Dona va narx maydonlaridagi xatolarni tuzating.';
 
             return;
@@ -347,6 +397,16 @@ class OptomPos extends Component
                 'customer_name' => $sale->customer_name,
                 'items' => $this->items,
             ];
+
+            $this->completedSale['remaining_party_balance'] = (int) Customer::find($this->selectedCustomerId)?->current_debt;
+            $this->completedSale['remaining_stock'] = array_map(fn ($item) => [
+                'name' => $item['display_name'],
+                'quantity' => (int) InventoryBalance::where('product_variant_id', $item['variant_id'])->sum('quantity'),
+            ], $this->items);
+            if (Auth::user()?->hasPermission('view_cash') || Auth::user()?->isOwner()) {
+                $this->completedSale['remaining_cash'] = (int) CashAccount::find($this->cashAccountId)?->balance;
+            }
+            $this->dispatch('refresh-dashboard');
 
             $this->posMessage = "Savdo muvaffaqiyatli yakunlandi! Chek: #{$sale->invoice_number}";
 

@@ -14,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Volume;
 use App\Models\Warehouse;
+use App\Services\Dashboard\DashboardQueryService;
 use App\Services\Ledger\CashAccountService;
 use App\Services\Ledger\CashSessionService;
 use App\Services\Ledger\CashTransferService;
@@ -27,7 +28,9 @@ use App\Services\Operations\Exceptions\OperationPermissionException;
 use App\Services\Operations\Exceptions\OperationValidationException;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Payments\SupplierPaymentService;
+use App\Services\Reports\ReportQueryService;
 use App\Services\Sales\CreateSaleService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -577,5 +580,50 @@ class CashSessionAndMovementsTest extends TestCase
             ->assertSee('muvaffaqiyatli saqlandi');
 
         $this->assertEquals(475_000, $this->cashAccount->fresh()->balance);
+    }
+
+    public function test_expense_changes_all_cash_summaries_and_retry_does_not_duplicate_it(): void
+    {
+        $this->actingAs($this->owner);
+        app(OwnerFundsService::class)->deposit($this->cashAccount->id, 100000, userId: $this->owner->id);
+        $cash = Livewire::test(CashManager::class)
+            ->call('openExpenseModal')
+            ->set('expenseAccountId', $this->cashAccount->id)
+            ->set('expenseAmount', 10000)
+            ->set('expenseCategory', 'TRANSPORT')
+            ->call('submitExpense')
+            ->assertHasNoErrors()
+            ->assertViewHas('totalBalance', 90000)
+            ->assertViewHas('todayExpenses', 10000)
+            ->assertDispatched('refresh-dashboard');
+        $cash->call('submitExpense')->assertViewHas('totalBalance', 90000);
+        $this->assertSame(1, Expense::count());
+        $this->assertSame(1, CashMovement::where('type', 'EXPENSE')->count());
+        $dashboard = app(DashboardQueryService::class)->getDashboardData($this->owner);
+        $this->assertSame(90000, $dashboard['balances']['total_cash']);
+        $this->assertSame(10000, $dashboard['flow']['operating_expenses']);
+        $this->assertSame(10000, $dashboard['flow']['cash_out']);
+        $this->assertSame(100000, $dashboard['flow']['cash_in']);
+        $this->assertSame(0, $dashboard['flow']['cash_collected']);
+        $this->assertSame(0, $dashboard['flow']['payments_by_method']['cash']);
+        $reports = app(ReportQueryService::class);
+        $this->assertSame(10000, $reports->getProfitAndLoss(['period' => 'today'])['operating_expenses']);
+        $this->assertSame(90000, $reports->getCashSummary(['period' => 'today'])['summary']['total_closing_cash']);
+        app(CashTransferService::class)->transfer($this->cashAccount->id, $this->bankAccount->id, 20000, userId: $this->owner->id);
+        $after = app(DashboardQueryService::class)->getDashboardData($this->owner);
+        $this->assertSame(90000, $after['balances']['total_cash']);
+        $this->assertSame(10000, $after['flow']['cash_out']);
+        $this->assertSame(100000, $after['flow']['cash_in']);
+        $this->get('/dashboard')->assertOk()->assertSee('90 000')->assertSee('10 000');
+    }
+
+    public function test_cash_today_uses_shop_timezone_across_utc_midnight(): void
+    {
+        $this->actingAs($this->owner);
+        $this->travelTo(Carbon::parse('2026-10-05 01:00:00', 'Asia/Tashkent')->utc());
+        app(OwnerFundsService::class)->deposit($this->cashAccount->id, 1000, userId: $this->owner->id);
+        Livewire::test(CashManager::class)
+            ->assertViewHas('todayCashIn', 1000)
+            ->assertViewHas('movements', fn ($rows) => $rows->total() === 1);
     }
 }

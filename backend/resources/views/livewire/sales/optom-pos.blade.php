@@ -1,11 +1,15 @@
 <div class="trade-workspace trade-sale">
     <livewire:modals.inline-product-modal />
     <livewire:modals.inline-customer-modal />
-    <div class="trade-hero"><div><span class="trade-eyebrow">MIJOZGA MAHSULOT SOTISH</span><h1>Sotuvni oson rasmiylashtiring</h1><p>Mahsulotni tanlang, nechta sotilishini yozing va to‘lovni belgilang.</p></div><div class="trade-path" aria-label="Sotuv tartibi"><span><b>1</b> Mahsulot</span><span><b>2</b> Mijoz</span><span><b>3</b> To‘lov</span></div></div>
+    <div class="sale-modes" aria-label="Sotuv turini tanlang"><button type="button" wire:click="setSalesMode('quick')" aria-pressed="{{ $salesMode === 'quick' ? 'true' : 'false' }}" class="{{ $salesMode === 'quick' ? 'is-active' : '' }}"><span>⚡</span><strong>Tezkor sotuv</strong><small>Mijozsiz, to‘liq to‘lov</small></button><button type="button" wire:click="setSalesMode('customer')" aria-pressed="{{ $salesMode === 'customer' ? 'true' : 'false' }}" class="{{ $salesMode === 'customer' ? 'is-active' : '' }}"><span>👤</span><strong>Mijozga sotuv</strong><small>Mijoz, to‘lov yoki nasiya</small></button></div>
+    <div class="trade-hero"><div><span class="trade-eyebrow">{{ $salesMode === 'quick' ? 'TEZKOR SOTUV' : 'MIJOZGA MAHSULOT SOTISH' }}</span><h1>Sotuvni oson rasmiylashtiring</h1><p>Mahsulotni tanlang, nechta sotilishini yozing va to‘lovni belgilang.</p></div><div class="trade-path" aria-label="Sotuv tartibi"><span><b>1</b> Mahsulot</span>@if ($salesMode === 'customer')<span><b>2</b> Mijoz</span>@endif<span><b>3</b> To‘lov</span></div></div>
     @if ($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
     @if ($posMessage && ! $completedSale)<div class="trade-alert" role="status">{{ $posMessage }}</div>@endif
     @if ($completedSale)
         <div class="trade-success" role="status"><span class="trade-success-icon">✓</span><div><h2>Sotuv saqlandi!</h2><p>{{ $completedSale['customer_name'] ?? 'Tezkor xaridor' }} · Chek № {{ $completedSale['invoice_number'] ?? '' }}</p><p>To‘langan: {{ number_format($completedSale['paid_amount'] ?? 0, 0, '', ' ') }} so‘m · Qarz: {{ number_format($completedSale['debt_amount'] ?? 0, 0, '', ' ') }} so‘m</p></div><strong>{{ number_format($completedSale['total_amount'] ?? 0, 0, '', ' ') }} so‘m</strong><button type="button" wire:click="$set('completedSale', null)" class="trade-button trade-button-secondary">Yana sotuv qilish</button></div>
+        <div class="operation-outcome" role="status"><h3>Amaldan keyingi holat</h3><div>@foreach($completedSale['remaining_stock'] ?? [] as $stock)<p><span>{{ $stock['name'] }} — omborda</span><strong>{{ number_format($stock['quantity'], 0, '', ' ') }} dona</strong></p>@endforeach
+        @if(isset($completedSale['remaining_cash']))<p><span>Tanlangan kassada qolgan pul</span><strong>{{ number_format($completedSale['remaining_cash'], 0, '', ' ') }} so‘m</strong></p>@endif
+        @if(($completedSale['remaining_party_balance'] ?? 0) !== 0)<p><span>{{ $completedSale['remaining_party_balance'] < 0 ? 'Oldindan to‘langan pul' : 'Mijozning jami qarzi' }}</span><strong>{{ number_format(abs($completedSale['remaining_party_balance']), 0, '', ' ') }} so‘m</strong></p>@endif</div><a href="{{ route('inventory.index') }}">Omborda ko‘rish →</a><a href="{{ route('debts.index') }}">Qarzlar va to‘lovlar →</a></div>
     @endif
     <div class="trade-layout">
         <div class="trade-main">
@@ -17,8 +21,8 @@
                         <article class="trade-item" wire:key="sale-item-{{ $item['variant_id'] }}">
                             <div class="trade-item-heading"><span class="trade-product-icon">🥤</span><div><h3>{{ $item['display_name'] }}</h3><p>Nechta sotiladi va bir donasi qancha?</p></div><button type="button" wire:click="removeItem({{ $index }})" class="trade-remove" aria-label="{{ $item['display_name'] }} ni olib tashlash">×</button></div>
                             <div class="trade-item-fields">
-                                <div class="trade-field"><label for="sale-quantity-{{ $index }}">Nechta dona?</label><div class="trade-input-unit"><input id="sale-quantity-{{ $index }}" type="number" min="1" step="1" inputmode="numeric" value="{{ $item['quantity'] }}" wire:input.debounce.300ms="updateQuantity({{ $index }}, $event.target.value)"><span>dona</span></div>@error('quantity-'.$item['variant_id'])<p class="trade-input-error">{{ $message }}</p>@enderror</div>
-                                <div class="trade-field"><label for="sale-price-{{ $index }}">1 donasining sotuv narxi</label><div class="trade-input-unit"><input id="sale-price-{{ $index }}" type="number" min="0" step="1" inputmode="numeric" placeholder="Narxni yozing" value="{{ ($item['price_entered'] ?? false) ? $item['price'] : '' }}" wire:input.debounce.300ms="updatePrice({{ $index }}, $event.target.value)" @readonly($item['is_system_price'])><span>so‘m</span></div>@error('price-'.$item['variant_id'])<p class="trade-input-error">{{ $message }}</p>@enderror</div>
+                                <div class="trade-field"><label for="sale-quantity-{{ $index }}">Nechta dona?</label><div class="trade-input-unit"><input id="sale-quantity-{{ $index }}" type="number" min="1" step="1" inputmode="numeric" value="{{ $item['quantity'] }}" wire:input.debounce.300ms="updateQuantity({{ $index }}, $event.target.value)"><span>dona</span></div>@if(isset($invalidFields['quantity-'.$item['variant_id']]))<p class="trade-input-error">{{ $invalidFields['quantity-'.$item['variant_id']] }}</p>@endif</div>
+                                <div class="trade-field"><label for="sale-price-{{ $index }}">1 donasining sotuv narxi</label><div class="trade-input-unit"><input id="sale-price-{{ $index }}" type="number" min="0" step="1" inputmode="numeric" placeholder="Narxni yozing" value="{{ ($item['price_entered'] ?? false) ? $item['price'] : '' }}" wire:input.debounce.300ms="updatePrice({{ $index }}, $event.target.value)" @readonly($item['is_system_price'])><span>so‘m</span></div>@if(isset($invalidFields['price-'.$item['variant_id']]))<p class="trade-input-error">{{ $invalidFields['price-'.$item['variant_id']] }}</p>@endif</div>
                                 <div class="trade-line-total"><span>Shu mahsulot uchun</span><strong>{{ number_format($item['total'], 0, '', ' ') }}</strong><small>so‘m</small></div>
                             </div>
                             @if ($item['default_system_price'] > 0)
@@ -31,6 +35,7 @@
                     @endforelse
                 </div>
             </section>
+            @if ($salesMode === 'customer')
             <section class="trade-card">
                 <div class="trade-card-heading"><div class="trade-heading"><span class="trade-step">2</span><div><h2>Kimga sotiladi?</h2><p>Naqd savdoda mijoz tanlash shart emas. Nasiya uchun tanlang.</p></div></div><button type="button" wire:click="$dispatch('open-inline-customer-modal')" class="trade-button trade-button-secondary">+ Yangi Mijoz</button></div>
                 @if ($selectedCustomerId)
@@ -46,6 +51,9 @@
                 @endif
                 <details class="trade-details"><summary>Sotuvga izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="sale-notes">Izoh</label><input id="sale-notes" wire:model="notes" placeholder="Qo‘shimcha ma’lumot"></div></details>
             </section>
+            @else
+                <div class="workspace-hint">⚡ Tezkor sotuv: donani klaviaturada yozing (masalan, 200). Mijoz tanlash shart emas. Nasiya uchun yuqoridagi «Mijozga sotuv»ni tanlang.</div>
+            @endif
         </div>
         <aside class="trade-receipt">
             <div class="trade-heading"><span class="trade-step">3</span><div><h2>To‘lov va yakunlash</h2><p>Qancha to‘lanishini belgilang.</p></div></div>
@@ -59,7 +67,7 @@
             @if ($paymentType === 'PARTIAL')<div class="trade-field"><label for="sale-paid">Hozir qancha to‘lanadi?</label><div class="trade-input-unit"><input id="sale-paid" type="number" min="0" max="{{ $totalAmount }}" step="1" inputmode="numeric" wire:model.live.debounce.300ms="paidAmount" placeholder="Summani yozing"><span>so‘m</span></div></div>@endif
             @if ($paymentType !== 'DEBT')
                 <div class="trade-field"><label for="sale-method">To‘lov usuli</label><select id="sale-method" wire:model.live="paymentMethod"><option value="CASH">Naqd pul</option><option value="CARD">Karta</option><option value="BANK">Bank o‘tkazmasi</option></select></div>
-                <details class="trade-details"><summary>Kassa hisobini o‘zgartirish</summary><div class="trade-field"><label for="sale-cash">Kassa</label><select id="sale-cash" wire:model="cashAccountId">@foreach ($cashAccounts as $account)<option value="{{ $account->id }}">{{ $account->name }}</option>@endforeach</select></div></details>
+                <details class="trade-details"><summary>Kassa hisobini o‘zgartirish</summary><div class="trade-field"><label for="sale-cash">Kassa</label><select id="sale-cash" wire:model.live="cashAccountId">@foreach ($cashAccounts as $account)<option value="{{ $account->id }}">{{ $account->name }}</option>@endforeach</select></div></details>
             @endif
             <div class="trade-summary"><div><span>Hozir to‘lanadi</span><strong>{{ number_format($paidAmount, 0, '', ' ') }} so‘m</strong></div><div class="trade-debt"><span>Shu sotuvdan qolgan qarz</span><strong>{{ number_format($debtAmount, 0, '', ' ') }} so‘m</strong></div>@if ($selectedCustomerId)<div><span>{{ $finalCustomerDebt < 0 ? 'Mijozda qoladigan avans' : 'Mijozning jami qarzi' }}</span><strong>{{ number_format(abs($finalCustomerDebt), 0, '', ' ') }} so‘m</strong></div>@endif</div>
             <button type="button" wire:click="checkout" wire:loading.attr="disabled" wire:target="checkout" @disabled(empty($items)) class="trade-button trade-button-primary trade-submit"><span wire:loading.remove wire:target="checkout">✓ Sotuvni yakunlash</span><span wire:loading wire:target="checkout">Saqlanyapti…</span></button>

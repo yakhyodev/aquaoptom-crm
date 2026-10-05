@@ -9,6 +9,7 @@ use App\Livewire\Modals\InlineCustomerModal;
 use App\Livewire\Modals\InlineProductModal;
 use App\Livewire\Parties\CustomerManager;
 use App\Livewire\Sales\OptomPos;
+use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\InventoryMovement;
@@ -687,5 +688,18 @@ class CatalogAndPartiesManagementTest extends TestCase
             ->dispatch('product-created', ['variant_id' => $variant->id])
             ->call('postPurchase')->assertSet('errorMessage', 'Har bir mahsulotning kirim narxini yozing.');
         $this->assertEquals(0, Purchase::count());
+    }
+
+    public function test_payment_method_selects_matching_cash_account_and_quick_mode_clears_customer(): void
+    {
+        $this->actingAs($this->owner);
+        $card = CashAccount::create(['name' => 'Card', 'type' => 'CARD', 'balance' => 0]);
+        $bank = CashAccount::create(['name' => 'Bank', 'type' => 'BANK', 'balance' => 0]);
+        Livewire::test(OptomPos::class)->set('paymentMethod', 'CARD')
+            ->assertSet('cashAccountId', $card->id)
+            ->set('cashAccountId', $bank->id)->assertSet('paymentMethod', 'BANK')
+            ->call('setSalesMode', 'customer')->set('selectedCustomerId', 123)->set('paymentType', 'DEBT')
+            ->call('setSalesMode', 'quick')->assertSet('selectedCustomerId', null)->assertSet('paymentType', 'FULL');
+        Livewire::test(QuickInward::class)->set('paymentMethod', 'CARD')->assertSet('cashAccountId', $card->id);
     }
 }

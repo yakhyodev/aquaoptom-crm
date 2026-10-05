@@ -97,6 +97,38 @@ class DebtsManager extends Component
         'statusFilter' => ['except' => 'all'],
     ];
 
+    public function updatedPaymentMethod(): void
+    {
+        if (in_array($this->paymentMethod, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->paymentCashAccountId = CashAccount::where('type', $this->paymentMethod)
+                ->orderByDesc('is_default')->orderBy('id')->value('id');
+        }
+    }
+
+    public function updatedPaymentCashAccountId(): void
+    {
+        $account = CashAccount::find($this->paymentCashAccountId);
+        if ($account && in_array($account->type, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->paymentMethod = $account->type;
+        }
+    }
+
+    public function updatedSupplierPaymentMethod(): void
+    {
+        if (in_array($this->supplierPaymentMethod, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->supplierPaymentCashAccountId = CashAccount::where('type', $this->supplierPaymentMethod)
+                ->orderByDesc('is_default')->orderBy('id')->value('id');
+        }
+    }
+
+    public function updatedSupplierPaymentCashAccountId(): void
+    {
+        $account = CashAccount::find($this->supplierPaymentCashAccountId);
+        if ($account && in_array($account->type, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->supplierPaymentMethod = $account->type;
+        }
+    }
+
     public function mount(): void
     {
         $defaultAccount = CashAccount::where('is_default', true)->first() ?: CashAccount::first();
@@ -203,6 +235,7 @@ class DebtsManager extends Component
             );
 
             $this->showCustomerPaymentModal = false;
+            $this->dispatch('refresh-dashboard');
             $paidFormatted = number_format($amount, 0, '.', ' ');
             $newDebtFormatted = number_format(abs($result['new_debt']), 0, '.', ' ');
 
@@ -291,6 +324,7 @@ class DebtsManager extends Component
             );
 
             $this->showSupplierPaymentModal = false;
+            $this->dispatch('refresh-dashboard');
             $paidFormatted = number_format($amount, 0, '.', ' ');
             $newPayableFormatted = number_format(abs($result['new_payable']), 0, '.', ' ');
 

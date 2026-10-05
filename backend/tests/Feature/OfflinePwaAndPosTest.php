@@ -249,4 +249,13 @@ class OfflinePwaAndPosTest extends TestCase
         $this->assertEquals(0, $exitCode, "IndexedDB testlari muvaffaqiyatsiz bo'ldi:\n{$outputText}");
         $this->assertStringContainsString('ALL AQUADB TESTS PASSED', $outputText);
     }
+
+    public function test_keyboard_quantity_input_keeps_draft_and_accepts_wholesale_quantities(): void
+    {
+        $output = [];
+        $exitCode = 0;
+        exec('node '.escapeshellarg(base_path('tests/pwa-quantity-input-test.cjs')), $output, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $output));
+        $this->assertStringContainsString('PWA KEYBOARD QUANTITY TESTS PASSED', implode("\n", $output));
+    }
 }

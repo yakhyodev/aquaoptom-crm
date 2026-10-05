@@ -3,6 +3,7 @@
 namespace App\Livewire\Inventory;
 
 use App\Models\CashAccount;
+use App\Models\InventoryBalance;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Supplier;
@@ -11,6 +12,7 @@ use App\Services\Purchase\ReceivePurchaseService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Fluent;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -34,6 +36,9 @@ class QuickInward extends Component
 
     public array $items = [];
 
+    #[Locked]
+    public array $invalidFields = [];
+
     public ?int $quickVariantId = null;
 
     // To'lov parametrlari
@@ -54,6 +59,22 @@ class QuickInward extends Component
     public ?string $errorMessage = null;
 
     public ?array $successPurchase = null;
+
+    public function updatedPaymentMethod(): void
+    {
+        if (in_array($this->paymentMethod, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->cashAccountId = CashAccount::where('type', $this->paymentMethod)
+                ->orderByDesc('is_default')->orderBy('id')->value('id');
+        }
+    }
+
+    public function updatedCashAccountId(): void
+    {
+        $account = CashAccount::find($this->cashAccountId);
+        if ($account && in_array($account->type, ['CASH', 'CARD', 'BANK'], true)) {
+            $this->paymentMethod = $account->type;
+        }
+    }
 
     public function updatedSelectedProductId(): void
     {
@@ -144,10 +165,12 @@ class QuickInward extends Component
         if ($value === false || $value < 1) {
             $this->errorMessage = 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.';
 
+            $this->invalidFields[$errorKey] = $this->errorMessage;
             $this->addError($errorKey, $this->errorMessage);
 
             return;
         }
+        unset($this->invalidFields[$errorKey]);
         $this->resetErrorBag($errorKey);
         $this->errorMessage = null;
         $this->items[$index]['quantity'] = $value;
@@ -164,10 +187,12 @@ class QuickInward extends Component
         if ($value === false || $value < 0) {
             $this->errorMessage = 'Kirim narxini 0 yoki undan katta butun raqam bilan yozing.';
 
+            $this->invalidFields[$errorKey] = $this->errorMessage;
             $this->addError($errorKey, $this->errorMessage);
 
             return;
         }
+        unset($this->invalidFields[$errorKey]);
         $this->resetErrorBag($errorKey);
         $this->errorMessage = null;
         $this->items[$index]['unit_cost'] = $value;
@@ -178,6 +203,7 @@ class QuickInward extends Component
     public function removeItem(int $index): void
     {
         if (isset($this->items[$index])) {
+            unset($this->invalidFields['quantity-'.$this->items[$index]['variant_id']], $this->invalidFields['price-'.$this->items[$index]['variant_id']]);
             $this->resetErrorBag('quantity-'.$this->items[$index]['variant_id']);
             $this->resetErrorBag('price-'.$this->items[$index]['variant_id']);
         }
@@ -220,6 +246,7 @@ class QuickInward extends Component
 
     public function clearDraft(): void
     {
+        $this->invalidFields = [];
         $this->resetErrorBag();
         $this->reset(['items', 'selectedSupplierId', 'selectedSupplierName', 'supplierInvoiceNumber', 'notes', 'paidAmount', 'successPurchase']);
         $this->paymentType = 'UNPAID';
@@ -230,7 +257,10 @@ class QuickInward extends Component
 
     public function postPurchase(ReceivePurchaseService $receiveService): void
     {
-        if ($this->getErrorBag()->any()) {
+        if ($this->invalidFields !== []) {
+            foreach ($this->invalidFields as $key => $message) {
+                $this->addError($key, $message);
+            }
             $this->errorMessage = 'Dona va narx maydonlaridagi xatolarni tuzating.';
 
             return;
@@ -283,6 +313,16 @@ class QuickInward extends Component
             );
 
             $this->successPurchase = $res instanceof Fluent ? $res->toArray() : (array) $res;
+            $this->successPurchase['remaining_party_balance'] = (int) Supplier::find($this->selectedSupplierId)?->balance;
+            $this->successPurchase['remaining_stock'] = array_map(fn ($item) => [
+                'name' => $item['display_name'],
+                'quantity' => (int) InventoryBalance::where('product_variant_id', $item['variant_id'])->sum('quantity'),
+            ], $this->items);
+            if (Auth::user()?->hasPermission('view_cash') || Auth::user()?->isOwner()) {
+                $this->successPurchase['remaining_cash'] = (int) CashAccount::find($this->cashAccountId)?->balance;
+            }
+            $this->dispatch('refresh-dashboard');
+
             $this->inwardMessage = "Kirim muvaffaqiyatli qabul qilindi! Hujjat: #{$res['invoice_number']}";
 
             // Toza yangi qoralama uchun yangi operation_id

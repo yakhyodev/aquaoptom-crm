@@ -351,18 +351,17 @@ export function aquaPos() {
             const item = this.cart[index];
             if (!item) return;
 
-            let qty = parseInt(val);
-            if (isNaN(qty) || qty <= 0) {
-                this.cart.splice(index, 1);
-            } else {
-                const available = this.getAvailableStock(item.variant_id);
-                if (qty > available) {
-                    this.showAlert('warning', `'${item.product_name}' uchun mavjud limit faqat ${available} dona!`);
-                    item.quantity = available;
-                } else {
-                    item.quantity = qty;
-                }
+            const qty = Number(val);
+            if (String(val).trim() === '' || !Number.isSafeInteger(qty) || qty < 1) {
+                this.showAlert('warning', 'Dona sonini 1 yoki undan katta butun raqam bilan yozing.');
+                return;
             }
+            const available = this.getAvailableStock(item.variant_id);
+            if (qty > available) {
+                this.showAlert('warning', `'${item.product_name}' uchun mavjud miqdor ${available} dona. Miqdor o'zgartirilmadi.`);
+                return;
+            }
+            item.quantity = qty;
 
             this.autoAdjustPayment();
             await this.saveCartDraft();
@@ -375,8 +374,12 @@ export function aquaPos() {
             const item = this.cart[index];
             if (!item) return;
 
-            const price = parseInt(val);
-            if (!isNaN(price) && price >= 0) {
+            const price = Number(val);
+            if (String(val).trim() === '' || !Number.isSafeInteger(price) || price < 0) {
+                this.showAlert('warning', 'Narxni 0 yoki undan katta butun raqam bilan yozing.');
+                return;
+            }
+            if (price >= 0) {
                 item.sale_price = price;
                 item.is_system_price = false;
             }
