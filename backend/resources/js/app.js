@@ -21,6 +21,31 @@ window.AquaDB = AquaDB;
 window.AquaSync = AquaSync;
 window.aquaPos = aquaPos;
 
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab') {
+        return;
+    }
+    const dialog = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')]
+        .filter((element) => element.getClientRects().length).at(-1);
+    if (!dialog) {
+        return;
+    }
+    const controls = [...dialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')]
+        .filter((element) => element.getClientRects().length);
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (!first) {
+        return;
+    }
+    if (!dialog.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+});
+
 if (typeof window.Alpine === 'undefined') {
     window.Alpine = Alpine;
     Alpine.data('aquaPos', aquaPos);

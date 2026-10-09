@@ -83,7 +83,7 @@ $balance = (int) ($isCustomer ? $item->current_debt : $item->balance);
         @endphp
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm" x-on:keydown.escape.window="$wire.set('showSupplierPaymentModal', false)">
             <form wire:submit="submitSupplierPayment" role="dialog" aria-modal="true" aria-labelledby="supplierPaymentAmount-title" class="trade-card w-full max-w-lg max-h-[90dvh] overflow-y-auto space-y-5 shadow-2xl">
-                <div class="flex justify-between items-start gap-3"><div><h2 id="supplierPaymentAmount-title" class="text-xl font-bold">Yetkazuvchining qarzini to‘lash</h2><p class="mt-1 text-slate-600">{{ $selectedSupplier->display_name }}</p></div><button type="button" wire:click="$set('showSupplierPaymentModal', false)" aria-label="To‘lov oynasini yopish" class="trade-remove">×</button></div>
+                <div class="flex justify-between items-start gap-3"><div><h2 id="supplierPaymentAmount-title" class="text-xl font-bold">Yetkazuvchiga to‘lov qilish</h2><p class="mt-1 text-slate-600">{{ $selectedSupplier->display_name }}</p></div><button type="button" wire:click="$set('showSupplierPaymentModal', false)" aria-label="To‘lov oynasini yopish" class="trade-remove">×</button></div>
                 @if($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
                 <x-validation-errors />
                 <div class="workspace-hint"><p>{{ $partyBalance >= 0 ? 'Hozirgi qarz' : 'Oldindan to‘langan pul' }}: <strong>{{ number_format(abs($partyBalance), 0, '.', ' ') }} so‘m</strong></p><p>Kassada hozir: <strong>{{ number_format($supplierCashBalance, 0, '.', ' ') }} so‘m</strong></p></div>
