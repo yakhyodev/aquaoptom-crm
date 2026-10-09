@@ -46,7 +46,7 @@
                         <span class="text-xs bg-cyan-50 text-cyan-700 border border-cyan-200/60 px-1.5 py-0.5 rounded font-mono">PWA</span>
                     </h1>
                     <p class="text-xs text-slate-600 flex items-center gap-1">
-                        <span x-text="deviceLease ? deviceLease.device_code : 'DEV-LOCAL'"></span> •
+                        <span x-text="deviceLease ? deviceLease.device_code : 'Qurilma ulanmagan'"></span> •
                         <span x-text="warehouseName"></span>
                     </p>
                 </div>
@@ -60,7 +60,7 @@
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold border transition-colors"
                  :class="isOnline ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/80' : 'bg-rose-50/80 text-rose-700 border-rose-200/80 animate-pulse'">
                 <span class="w-2 h-2 rounded-full" :class="isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500' : 'bg-rose-500 shadow-sm shadow-rose-500'"></span>
-                <span x-text="isOnline ? 'ONLINE' : 'OFFLINE'" class="tracking-wide"></span>
+                <span x-text="isOnline ? 'Internet bor' : 'Internet yo‘q'" class="tracking-wide"></span>
             </div>
 
             <!-- Outbox queue counter & modal trigger -->
@@ -82,7 +82,7 @@
                     @click="syncNow()"
                     :disabled="isSyncing || !isOnline"
                     class="px-2.5 py-1 rounded-lg bg-cyan-600/20 text-cyan-700 border border-cyan-500/40 hover:bg-cyan-600/30 font-medium transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                    title="Hozir sinxronlash (Push + Pull)">
+                    title="Ma’lumotlarni internet orqali yangilash">
                 <span :class="isSyncing ? 'animate-spin' : ''">🔄</span>
                 <span class="hidden md:inline" x-text="isSyncing ? 'Sinxronlanmoqda...' : 'Sinxronlash'"></span>
             </button>
@@ -157,7 +157,7 @@
                 <!-- Search input -->
                 <div class="relative">
                     <input type="text"
-                           x-model="searchQuery"
+                           aria-label="Mahsulotni qidirish" x-model="searchQuery"
                            placeholder="Mahsulot nomi, litri, SKU yoki shtrix-kod..."
                            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors">
                     <span x-show="searchQuery"
@@ -219,7 +219,7 @@
                         <span class="text-4xl mb-2">📦</span>
                         <p class="font-medium text-sm">Tovar topilmadi yoki katalog bo'sh</p>
                         <p class="text-xs text-slate-600 mt-1" x-show="isOnline">
-                            Internet ulanganda yuqoridagi "Yangilash" tugmasini bosing
+                            Internet ulanganda yuqoridagi «Sinxronlash» tugmasini bosing
                         </p>
                     </div>
                 </template>
@@ -278,11 +278,11 @@
                     <button type="button"
                             @click="showNewCustomerModal = true"
                             class="text-cyan-700 hover:text-cyan-700 flex items-center gap-1 font-bold">
-                        <span>+</span> Yangi mijoz (UUID)
+                        <span>+</span> Yangi mijoz
                     </button>
                 </div>
                 <div class="relative">
-                    <select x-model="selectedCustomerId"
+                    <select aria-label="Xaridorni tanlash" x-model="selectedCustomerId"
                             @change="saveCartDraft()"
                             class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-cyan-500 font-medium">
                         <option value="">Mijozsiz tezkor sotuv (to‘liq to‘lov)</option>
@@ -414,7 +414,7 @@
                 <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                     <div>
                         <span class="text-xs text-slate-600  font-bold">Jami to'lov:</span>
-                        <p class="text-xs text-slate-600">Tannarx (WAC): <span class="text-slate-600">~serverda</span></p>
+                        <p class="text-xs text-slate-600">Kirim narxi: <span class="text-slate-600">internetda hisoblanadi</span></p>
                     </div>
                     <div class="text-right">
                         <span class="text-xl font-black text-cyan-700"
@@ -454,7 +454,7 @@
                 <h3 class="text-base font-black text-slate-900">AquaOptom CRM</h3>
                 <p class="text-xs text-slate-600">Optom Suv Do'koni</p>
                 <div class="mt-2 inline-block px-2.5 py-0.5 rounded bg-amber-50/80 border border-amber-200/80 text-amber-700 text-xs font-bold ">
-                    ⚠️ LOKAL CHEK (OFFLINE NAVBATDA)
+                    ⚠️ Internetga yuborilishi kutilayotgan chek
                 </div>
             </div>
 
@@ -526,7 +526,7 @@
          class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-slate-50 border border-slate-200 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-                <h3 class="text-sm font-bold text-slate-900">Yangi mijoz qo'shish (Offline UUID)</h3>
+                <h3 class="text-sm font-bold text-slate-900">Yangi mijoz qo‘shish</h3>
                 <button type="button" @click="showNewCustomerModal = false" class="text-slate-600 hover:text-slate-900">✕</button>
             </div>
 
