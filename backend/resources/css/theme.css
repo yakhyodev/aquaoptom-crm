@@ -1,0 +1,235 @@
+:root {
+    color-scheme: light;
+    --canvas: #f4f6fa;
+    --surface: #ffffff;
+    --surface-raised: #f8fafc;
+    --surface-hover: #edf2f8;
+    --ink: #18263c;
+    --muted: #536178;
+    --line: #dbe3ed;
+    --accent: #2456df;
+    --primary: #2456df;
+    --on-primary: #ffffff;
+    --accent-soft: #edf3ff;
+    --accent-line: #bdd0ff;
+    --success: #047857;
+    --success-solid: #047857;
+    --success-soft: #eaf8f1;
+    --success-line: #aedbc6;
+    --danger: #b42348;
+    --danger-soft: #fff0f3;
+    --danger-line: #f2b9c6;
+    --warning: #8e5700;
+    --warning-soft: #fff6df;
+    --warning-line: #efd18a;
+    --purple: #7840b2;
+    --purple-soft: #f5effc;
+    --purple-line: #dac7f0;
+    --cyan: #0b6e89;
+    --cyan-soft: #eaf7fc;
+    --cyan-line: #b2deeb;
+    --shadow: 0 3px 12px #18263c06;
+    --overlay: #09111ed9;
+}
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --canvas: #0b1220;
+    --surface: #131e30;
+    --surface-raised: #1a273b;
+    --surface-hover: #24344b;
+    --ink: #edf2fa;
+    --muted: #adbbcf;
+    --line: #31415a;
+    --accent: #98b9ff;
+    --primary: #3169ed;
+    --accent-soft: #1c3156;
+    --accent-line: #415e91;
+    --success: #70ddb1;
+    --success-soft: #15362e;
+    --success-line: #2b6655;
+    --danger: #ff9eb2;
+    --danger-soft: #3b2333;
+    --danger-line: #744058;
+    --warning: #f5cd83;
+    --warning-soft: #382f21;
+    --warning-line: #77613a;
+    --purple: #d3b3ff;
+    --purple-soft: #302841;
+    --purple-line: #65517d;
+    --cyan: #7bd8ee;
+    --cyan-soft: #18353f;
+    --cyan-line: #396674;
+    --shadow: 0 3px 12px #00000016;
+}
+
+[data-theme] .app-sidebar { width: 224px; background: var(--surface); border-right: 1px solid var(--line); color: var(--ink); }
+[data-theme] .app-brand { border-bottom: 1px solid var(--line); }
+[data-theme] .app-brand-caption { color: var(--accent); font-size: 10px; font-weight: 650; }
+[data-theme] .app-profile { border-top: 1px solid var(--line); background: var(--surface-raised); }
+[data-theme] .app-nav { gap: 2px; padding: 10px; }
+[data-theme] .app-nav-link { color: var(--ink); padding: 9px 10px; border-radius: 10px; font-size: 13px; gap: 9px; }
+[data-theme] .app-nav-link small, [data-theme] .app-nav-group { color: var(--muted); }
+[data-theme] .app-nav-link small { font-size: 11px; margin-top: 2px; }
+[data-theme] .app-nav-link > span:first-child { font-size: 18px; width: 23px; }
+[data-theme] .app-nav-link:hover { background: var(--surface-hover); transform: none; }
+[data-theme] .app-nav-link.is-active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 3px 0 var(--primary); }
+[data-theme] .app-nav-link.is-active small { color: var(--accent); }
+[data-theme] .app-nav-group { padding: 10px 10px 4px; }
+[data-theme] .app-nav-help { background: var(--surface-raised); border-color: var(--line); margin-top: 8px; }
+[data-theme] .app-nav-help > span:first-child { background: var(--surface-hover); }
+[data-theme] .app-nav-lists { margin-top: 6px; color: var(--ink); }
+[data-theme] .app-nav-lists a { color: var(--muted); }
+[data-theme] .app-nav-lists a:hover { background: var(--surface-hover); color: var(--ink); }
+[data-theme] .app-main { padding: 20px 24px 32px; min-width: 0; color: var(--ink); }
+[data-theme] .app-topbar { background: var(--surface); min-height: 58px; padding-block: 9px; }
+[data-theme] .app-header-tools { gap: 8px; }
+[data-theme] .app-theme-toggle { display: inline-flex; gap: 7px; align-items: center; justify-content: center; min-height: 38px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); color: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap; }
+[data-theme] .app-theme-toggle:hover { background: var(--surface-hover); border-color: var(--accent-line); }
+[data-theme] .app-theme-toggle > span:first-child { font-size: 19px; line-height: 1; }
+[data-theme] :where(button, a, summary):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+[data-theme] .app-skip-link { position: fixed; left: 16px; top: -70px; z-index: 100; background: var(--surface); color: var(--ink); padding: 12px 18px; border: 2px solid var(--accent); border-radius: 10px; }
+[data-theme] .app-skip-link:focus { top: 12px; }
+[data-theme] .app-main button:disabled { cursor: not-allowed; }
+[data-theme] .app-main .fixed.inset-0 { background: var(--overlay); }
+[data-theme] .workspace-guide { padding: 15px 18px; margin-bottom: 16px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
+[data-theme] .workspace-guide-title { gap: 12px; align-items: center; }
+[data-theme] .workspace-guide-icon { width: 38px; height: 38px; border-radius: 11px; background: var(--accent-soft); font-size: 21px; }
+[data-theme] .workspace-guide h1 { font-size: 23px; letter-spacing: -.5px; margin-bottom: 4px; }
+[data-theme] .workspace-guide p { font-size: 13px; line-height: 1.5; }
+[data-theme] .workspace-steps-help summary { color: var(--accent); font-size: 13px; font-weight: 650; cursor: pointer; padding: 8px 4px; }
+[data-theme] .workspace-steps-help[open] { flex-basis: 100%; }
+[data-theme] .workspace-steps { margin-top: 6px; padding-top: 12px; gap: 10px 20px; }
+[data-theme] .trade-hero { padding: 16px 20px; margin-bottom: 16px; border-radius: 14px; }
+[data-theme] .trade-hero h1 { font-size: 25px; margin: 4px 0; }
+[data-theme] .trade-hero p { font-size: 13px; }
+[data-theme] .trade-card, [data-theme] .trade-receipt { padding: 18px 20px; border-radius: 14px; box-shadow: var(--shadow); }
+[data-theme] .trade-card-heading { gap: 12px; margin-bottom: 16px; }
+[data-theme] .trade-layout { gap: 16px; grid-template-columns: minmax(0, 1fr) minmax(290px, 330px); }
+[data-theme] .trade-main { gap: 16px; }
+[data-theme] .trade-item { padding: 14px 16px; border-radius: 12px; }
+[data-theme] .trade-item-heading { margin-bottom: 12px; }
+[data-theme] .trade-empty { padding: 26px 16px; }
+[data-theme] .trade-empty > span { font-size: 30px; }
+[data-theme] .trade-button-primary { background: var(--primary); color: var(--on-primary); }
+[data-theme] .trade-receiving .trade-button-primary { background: var(--success-solid); }
+[data-theme] .trade-avatar { background: var(--primary); color: var(--on-primary); }
+[data-theme] .trade-button:disabled { color: var(--muted); background: var(--surface-hover); }
+[data-theme] .trade-offline-link { color: var(--muted); }
+[data-theme] .trade-offline-link a { color: var(--accent); }
+[data-theme] .sale-modes { margin-bottom: 12px; gap: 8px; }
+[data-theme] .sale-modes button { padding: 10px 16px; border-radius: 12px; }
+[data-theme] .dashboard-welcome h1 { font-size: 24px; margin: 0; }
+[data-theme] .dashboard-welcome p { font-size: 13px; margin-top: 4px; }
+[data-theme] .dashboard-overview { display: grid; grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); gap: 16px; align-items: stretch; }
+[data-theme] .dashboard-cash { display: flex; flex-direction: column; border-radius: 14px; background: var(--success-soft); }
+[data-theme] .dashboard-cash-total { padding: 18px 20px 12px; }
+[data-theme] .dashboard-cash-total > strong { font-size: clamp(28px, 2.5vw, 36px); margin: 7px 0; }
+[data-theme] .dashboard-cash-total a { margin-top: 8px; }
+[data-theme] .dashboard-cash-accounts { padding: 0 20px 12px; border: 0; }
+[data-theme] .dashboard-cash-accounts .workspace-caption { margin: 0; display: flex; gap: 10px; justify-content: space-between; align-items: center; }
+[data-theme] .dashboard-actions { margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+[data-theme] .dashboard-actions a { padding: 12px 14px; border-radius: 12px; display: grid; grid-template-columns: 32px 1fr; column-gap: 9px; align-content: center; }
+[data-theme] .dashboard-actions span { grid-row: span 2; font-size: 24px; margin: 0; align-self: center; }
+[data-theme] .dashboard-actions strong { font-size: 14px; }
+[data-theme] .dashboard-actions small { font-size: 12px; margin-top: 3px; }
+[data-theme] .dashboard-period { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+[data-theme] .dashboard-sync { padding: 10px 14px; border-radius: 12px; }
+[data-theme] .money-flow-cards { gap: 12px; }
+[data-theme] .money-flow-cards > div { padding: 13px 16px; border-radius: 12px; }
+[data-theme] .money-flow-cards strong { font-size: 22px; margin-top: 5px; }
+[data-theme] .cash-overview { display: grid; grid-template-columns: minmax(240px, .8fr) minmax(0, 1.2fr); gap: 4px 24px; }
+[data-theme] .cash-overview > p, [data-theme] .cash-overview > strong { grid-column: 1; }
+[data-theme] .cash-overview > .grid { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0; }
+[data-theme] .cash-overview > strong { font-size: 34px; margin-top: 3px; }
+[data-theme] .cash-overview .workspace-hint { padding: 13px; }
+[data-theme] .cash-actions .trade-card { display: grid; grid-template-columns: 40px 1fr; gap: 4px 12px; align-content: center; }
+[data-theme] .cash-actions .trade-card > span { grid-row: span 2; align-self: center; font-size: 26px; }
+[data-theme] .cash-actions h2 { margin: 0; font-size: 18px; }
+[data-theme] .cash-actions p { margin: 0; font-size: 13px; }
+[data-theme] .workspace-hint { padding: 12px 16px; border-radius: 12px; }
+[data-theme] .guide-tile { padding: 18px; border-radius: 14px; }
+[data-theme] .guide-tile > span { margin-bottom: 12px; }
+[data-theme] .app-main table { font-variant-numeric: tabular-nums; }
+[data-theme] .app-main tbody tr:hover { background-color: var(--surface-hover); }
+[data-theme] .auth-theme-control { position: absolute; right: 22px; top: 18px; }
+[data-theme] .auth-card { box-shadow: var(--shadow); }
+[data-theme] .auth-screen { background: radial-gradient(ellipse at 15% 10%, var(--accent-soft), transparent 50%), var(--canvas); }
+[data-theme] .auth-features span { background: var(--surface); }
+[data-theme] .app-main > .space-y-6, [data-theme] .dashboard-workspace { --tw-space-y-reverse: 0; }
+[data-theme] .app-main > .space-y-6 > :not(:last-child), [data-theme] .dashboard-workspace > :not(:last-child) { margin-block-end: 16px; }
+
+@media (min-width: 768px) { [data-theme] .app-content { padding-left: 224px; } }
+@media (max-width: 1150px) {
+    [data-theme] .trade-layout { grid-template-columns: 1fr; }
+    [data-theme] .trade-hero { flex-direction: row; }
+    [data-theme] .cash-overview { grid-template-columns: 1fr; }
+    [data-theme] .cash-overview > .grid { grid-column: 1; grid-row: auto; margin-top: 12px; }
+}
+@media (max-width: 900px) { [data-theme] .dashboard-overview { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+    [data-theme] .app-main { padding: 14px 12px 24px; }
+    [data-theme] .app-topbar > div:first-child { min-width: 0; flex: 1; gap: 8px; }
+    [data-theme] .app-breadcrumb { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    [data-theme] .app-header-tools { gap: 5px; }
+    [data-theme] .app-theme-toggle { padding: 7px; min-width: 38px; }
+    [data-theme] .app-theme-toggle [data-theme-label] { display: none; }
+    [data-theme] .workspace-guide { padding: 13px 14px; }
+    [data-theme] .workspace-guide h1 { font-size: 21px; }
+    [data-theme] .workspace-steps-help { margin-left: 50px; }
+    [data-theme] .workspace-steps-help[open] { margin-left: 0; }
+    [data-theme] .trade-hero { padding: 14px; flex-direction: column; gap: 10px; }
+    [data-theme] .trade-card, [data-theme] .trade-receipt { padding: 16px 14px; }
+    [data-theme] .trade-hero h1 { font-size: 23px; }
+    [data-theme] .dashboard-welcome h1 { font-size: 22px; }
+    [data-theme] .dashboard-welcome > a { padding: 8px 12px; min-height: 38px; }
+    [data-theme] .dashboard-period { padding: 10px; }
+    [data-theme] .dashboard-cash-total { padding: 16px 18px 10px; }
+    [data-theme] .dashboard-actions { gap: 8px; }
+    [data-theme] .dashboard-actions a { padding: 11px; grid-template-columns: 26px 1fr; column-gap: 6px; }
+    [data-theme] .dashboard-actions strong { font-size: 13px; }
+    [data-theme] .dashboard-actions small { font-size: 11px; }
+    [data-theme] .dashboard-actions span { font-size: 20px; }
+    [data-theme] .cash-overview > strong { font-size: 30px; }
+    [data-theme] .cash-actions h2 { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    [data-theme] :is(.app-shell, .offline-workspace, .auth-screen) *, [data-theme] :is(.app-shell, .offline-workspace, .auth-screen) *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media print {
+    :root[data-theme] { color-scheme: light; --canvas: #fff; --surface: #fff; --surface-raised: #fff; --ink: #111; --muted: #444; --line: #ddd; }
+    [data-theme] .app-sidebar, [data-theme] .app-topbar, [data-theme] .app-theme-toggle { display: none; }
+    [data-theme] .app-content { padding-left: 0; }
+}
+
+/* Compatibility for the existing Laravel/Livewire component palette. */
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-amber-100"], [class~="bg-amber-50"], [class~="bg-amber-50/20"], [class~="bg-amber-50/30"], [class~="bg-amber-50/40"], [class~="bg-amber-50/50"], [class~="bg-amber-50/60"], [class~="bg-amber-50/70"], [class~="bg-amber-50/80"], [class~="bg-amber-50/90"], [class~="bg-amber-950"], [class~="bg-amber-950/70"]) { background-color: var(--warning-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-blue-100"], [class~="bg-blue-50"], [class~="bg-blue-50/60"], [class~="bg-blue-50/90"], [class~="bg-blue-950"], [class~="bg-blue-950/40"], [class~="bg-blue-950/80"], [class~="bg-indigo-100"], [class~="bg-indigo-50"], [class~="bg-indigo-50/50"], [class~="bg-indigo-50/60"]) { background-color: var(--accent-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-cyan-50"], [class~="bg-cyan-950"], [class~="bg-cyan-950/20"], [class~="bg-cyan-950/80"]) { background-color: var(--cyan-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-emerald-100"], [class~="bg-emerald-50"], [class~="bg-emerald-50/20"], [class~="bg-emerald-50/30"], [class~="bg-emerald-50/50"], [class~="bg-emerald-50/60"], [class~="bg-emerald-50/80"], [class~="bg-emerald-50/90"], [class~="bg-emerald-950"], [class~="bg-emerald-950/80"]) { background-color: var(--success-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-gray-100"], [class~="bg-gray-200"], [class~="bg-gray-700"], [class~="bg-gray-800"], [class~="bg-gray-900"], [class~="bg-slate-100"], [class~="bg-slate-100/30"], [class~="bg-slate-100/40"], [class~="bg-slate-100/60"], [class~="bg-slate-100/70"], [class~="bg-slate-100/80"], [class~="bg-slate-200"], [class~="bg-slate-300"], [class~="bg-slate-700"], [class~="bg-slate-800"], [class~="bg-slate-800/40"], [class~="bg-slate-800/80"], [class~="bg-slate-900"], [class~="bg-slate-900/40"], [class~="bg-slate-900/60"], [class~="bg-slate-950"]) { background-color: var(--surface-raised); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-purple-100"], [class~="bg-purple-50"], [class~="bg-purple-50/50"], [class~="bg-purple-50/60"], [class~="bg-purple-50/70"], [class~="bg-purple-50/80"], [class~="bg-purple-950/80"]) { background-color: var(--purple-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-red-100"], [class~="bg-red-50"], [class~="bg-red-50/60"], [class~="bg-red-950/80"], [class~="bg-rose-100"], [class~="bg-rose-50"], [class~="bg-rose-50/30"], [class~="bg-rose-50/60"], [class~="bg-rose-50/70"], [class~="bg-rose-50/80"], [class~="bg-rose-50/90"]) { background-color: var(--danger-soft); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-slate-50"], [class~="bg-slate-50/30"], [class~="bg-slate-50/40"], [class~="bg-slate-50/50"], [class~="bg-slate-50/60"], [class~="bg-slate-50/70"], [class~="bg-slate-50/80"], [class~="bg-slate-50/90"], [class~="bg-slate-50/95"], [class~="bg-white"], [class~="bg-white/30"], [class~="bg-white/60"]) { background-color: var(--surface); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-amber-200"], [class~="border-amber-200/40"], [class~="border-amber-200/50"], [class~="border-amber-200/60"], [class~="border-amber-200/80"], [class~="border-amber-300"], [class~="border-amber-500"], [class~="border-amber-800"], [class~="border-amber-800/80"], [class~="border-amber-900/40"], [class~="border-amber-900/60"]) { border-color: var(--warning-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-blue-200"], [class~="border-blue-300"], [class~="border-blue-500"], [class~="border-blue-700"], [class~="border-blue-800"], [class~="border-blue-800/60"], [class~="border-blue-900"], [class~="border-indigo-200/50"], [class~="border-indigo-200/60"], [class~="border-indigo-300"], [class~="border-indigo-500"]) { border-color: var(--accent-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-cyan-200"], [class~="border-cyan-200/50"], [class~="border-cyan-200/60"], [class~="border-cyan-400"], [class~="border-cyan-500"], [class~="border-cyan-500/30"], [class~="border-cyan-500/40"], [class~="border-cyan-500/50"], [class~="border-cyan-500/60"], [class~="border-cyan-500/80"], [class~="border-cyan-800"], [class~="border-cyan-900"]) { border-color: var(--cyan-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-emerald-200"], [class~="border-emerald-200/50"], [class~="border-emerald-200/80"], [class~="border-emerald-500"], [class~="border-emerald-500/20"], [class~="border-emerald-800"], [class~="border-emerald-800/80"], [class~="border-emerald-900"], [class~="border-emerald-900/40"]) { border-color: var(--success-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-gray-200"], [class~="border-gray-300"], [class~="border-gray-400"], [class~="border-gray-600"], [class~="border-slate-100"], [class~="border-slate-200"], [class~="border-slate-200/40"], [class~="border-slate-200/60"], [class~="border-slate-200/80"], [class~="border-slate-300"], [class~="border-slate-300/50"], [class~="border-slate-300/60"], [class~="border-slate-600"], [class~="border-slate-700"], [class~="border-slate-700/80"], [class~="border-slate-800"], [class~="border-slate-800/50"], [class~="border-slate-800/70"], [class~="border-slate-800/80"], [class~="border-slate-800/90"], [class~="border-white"]) { border-color: var(--line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-purple-200"], [class~="border-purple-500"], [class~="border-purple-900"], [class~="border-purple-900/40"]) { border-color: var(--purple-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="border-red-200"], [class~="border-red-800"], [class~="border-rose-200"], [class~="border-rose-200/50"], [class~="border-rose-200/80"], [class~="border-rose-500"]) { border-color: var(--danger-line); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-amber-100"], [class~="text-amber-200"], [class~="text-amber-300"], [class~="text-amber-400"], [class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"], [class~="text-amber-900"]) { color: var(--warning); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-blue-300"], [class~="text-blue-400"], [class~="text-blue-600"], [class~="text-blue-700"], [class~="text-blue-800"], [class~="text-blue-950"], [class~="text-indigo-600"], [class~="text-indigo-700"], [class~="text-indigo-800"]) { color: var(--accent); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-cyan-300"], [class~="text-cyan-400"], [class~="text-cyan-600"], [class~="text-cyan-700"], [class~="text-sky-700"]) { color: var(--cyan); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-emerald-300"], [class~="text-emerald-400"], [class~="text-emerald-500"], [class~="text-emerald-500/80"], [class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-700/80"], [class~="text-emerald-800"], [class~="text-emerald-900"]) { color: var(--success); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-gray-200"], [class~="text-gray-300"], [class~="text-gray-400"], [class~="text-gray-500"], [class~="text-gray-600"], [class~="text-slate-200"], [class~="text-slate-300"], [class~="text-slate-400"], [class~="text-slate-500"], [class~="text-slate-600"]) { color: var(--muted); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-gray-700"], [class~="text-gray-800"], [class~="text-gray-900"], [class~="text-slate-700"], [class~="text-slate-800"], [class~="text-slate-800/40"], [class~="text-slate-900"], [class~="text-slate-950"]) { color: var(--ink); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-purple-300"], [class~="text-purple-400"], [class~="text-purple-600"], [class~="text-purple-700"], [class~="text-purple-800"], [class~="text-purple-900"], [class~="text-purple-950"]) { color: var(--purple); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="text-red-300"], [class~="text-red-400"], [class~="text-red-600"], [class~="text-red-700"], [class~="text-red-800"], [class~="text-rose-400"], [class~="text-rose-500"], [class~="text-rose-600"], [class~="text-rose-700"], [class~="text-rose-800"], [class~="text-rose-900"], [class~="text-rose-950"]) { color: var(--danger); }
+[data-theme] .app-main :is([class~="from-blue-50/40"], [class~="from-indigo-50"], [class~="from-indigo-50/40"], [class~="from-slate-50"]) { background-image: linear-gradient(115deg, var(--surface), var(--accent-soft)); }
+
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-blue-500"], [class~="bg-blue-600"], [class~="bg-blue-700"], [class~="bg-indigo-600"]) { background-color: var(--primary); color: var(--on-primary); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-emerald-700"]) { background-color: var(--success-solid); color: var(--on-primary); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-rose-700"], [class~="bg-red-600"]) { background-color: #b42348; color: var(--on-primary); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-amber-500"], [class~="bg-amber-600"], [class~="bg-amber-700"]) { background-color: #8e5700; color: var(--on-primary); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-purple-500"], [class~="bg-purple-600"], [class~="bg-purple-700"]) { background-color: #7840b2; color: var(--on-primary); }
+[data-theme] :is(.app-shell, .offline-workspace, .auth-screen) :is([class~="bg-cyan-500"], [class~="bg-cyan-600"]) { background-color: #0b6e89; color: var(--on-primary); }

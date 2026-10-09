@@ -2,7 +2,7 @@
     <livewire:modals.inline-product-modal />
     <livewire:modals.inline-customer-modal />
     <div class="sale-modes" aria-label="Sotuv turini tanlang"><button type="button" wire:click="setSalesMode('quick')" aria-pressed="{{ $salesMode === 'quick' ? 'true' : 'false' }}" class="{{ $salesMode === 'quick' ? 'is-active' : '' }}"><span>⚡</span><strong>Tezkor sotuv</strong><small>Mijozsiz, to‘liq to‘lov</small></button><button type="button" wire:click="setSalesMode('customer')" aria-pressed="{{ $salesMode === 'customer' ? 'true' : 'false' }}" class="{{ $salesMode === 'customer' ? 'is-active' : '' }}"><span>👤</span><strong>Mijozga sotuv</strong><small>Mijoz, to‘lov yoki nasiya</small></button></div>
-    <div class="trade-hero"><div><span class="trade-eyebrow">{{ $salesMode === 'quick' ? 'TEZKOR SOTUV' : 'MIJOZGA MAHSULOT SOTISH' }}</span><h1>Sotuvni oson rasmiylashtiring</h1><p>Mahsulotni tanlang, nechta sotilishini yozing va to‘lovni belgilang.</p></div><div class="trade-path" aria-label="Sotuv tartibi"><span><b>1</b> Mahsulot</span>@if ($salesMode === 'customer')<span><b>2</b> Mijoz</span>@endif<span><b>3</b> To‘lov</span></div></div>
+    <div class="trade-hero"><div><span class="trade-eyebrow">{{ $salesMode === 'quick' ? 'TEZKOR SOTUV' : 'MIJOZGA MAHSULOT SOTISH' }}</span><h1>{{ $salesMode === 'quick' ? 'Tezkor sotuv' : 'Mijozga sotuv' }}</h1><p>Mahsulotni tanlang, donasini yozing va sotuvni saqlang.</p></div><div class="trade-path" aria-label="Sotuv tartibi"><span><b>1</b> Mahsulot</span>@if ($salesMode === 'customer')<span><b>2</b> Mijoz</span>@endif<span><b>{{ $salesMode === 'quick' ? 2 : 3 }}</b> To‘lov</span></div></div>
     @if ($errorMessage)<div class="trade-alert trade-alert-error" role="alert">{{ $errorMessage }}</div>@endif
     @if ($posMessage && ! $completedSale)<div class="trade-alert" role="status">{{ $posMessage }}</div>@endif
     @if ($completedSale)
@@ -56,7 +56,7 @@
             @endif
         </div>
         <aside class="trade-receipt">
-            <div class="trade-heading"><span class="trade-step">3</span><div><h2>To‘lov va yakunlash</h2><p>Qancha to‘lanishini belgilang.</p></div></div>
+            <div class="trade-heading"><span class="trade-step">{{ $salesMode === 'quick' ? 2 : 3 }}</span><div><h2>To‘lov va yakunlash</h2><p>Qancha to‘lanishini belgilang.</p></div></div>
             <div class="trade-total"><span>Jami sotuv summasi</span><strong>{{ number_format($totalAmount, 0, '', ' ') }} <small>so‘m</small></strong><p>{{ count($items) }} xil mahsulot · {{ number_format(array_sum(array_column($items, 'quantity')), 0, '', ' ') }} dona</p></div>
             <fieldset class="trade-payment"><legend>Mijoz qanday to‘laydi?</legend>
                 @foreach (['FULL' => ['To‘liq to‘lov', 'Barcha summa hozir to‘lanadi'], 'PARTIAL' => ['Qisman to‘lov', 'Bir qismi hozir, qolgani qarz'], 'DEBT' => ['To‘liq nasiya', 'Barcha summa mijoz qarziga yoziladi']] as $value => $option)

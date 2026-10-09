@@ -1,11 +1,10 @@
-<div class="space-y-6" wire:poll.30s="refreshDashboard">
-    <!-- 1. Header & Period Filter Bar -->
-    <div class="bg-gradient-to-r from-blue-50/40 via-slate-50 to-slate-50 border border-slate-200 rounded-3xl p-6 sm:p-8">
+<div class="dashboard-workspace space-y-4" wire:poll.30s="refreshDashboard">
         <div class="dashboard-welcome"><div><span class="trade-eyebrow">DO‘KONNING UMUMIY HOLATI</span><h1>Xush kelibsiz, {{ auth()->user()->name }}!</h1><p>Hozirgi qoldiqlarni ko‘ring yoki yangi ish boshlang.</p></div><a href="{{ route('guide') }}" class="trade-button trade-button-secondary">🧭 Do‘kon xaritasi</a></div>
+    <div class="dashboard-overview">
+        <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
         <div class="dashboard-actions"><a href="{{ route('sales.pos') }}"><span>⚡</span><strong>Tezkor sotuv</strong><small>Mijozsiz sotish</small></a><a href="{{ route('sales.pos', ['mode' => 'customer']) }}"><span>👤</span><strong>Mijozga sotuv</strong><small>To‘lov yoki nasiya</small></a><a href="{{ route('inventory.inward') }}"><span>📥</span><strong>Mahsulot keldi</strong><small>Omborga kirim qilish</small></a><a href="{{ route('debts.index') }}"><span>🤝</span><strong>Qarz bilan ishlash</strong><small>To‘lov olish yoki berish</small></a></div>
-
-        <!-- Period Selector Tabs -->
-        <div class="mt-6 pt-5 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+    </div>
+        <div class="dashboard-period flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-1.5 bg-slate-50/80 p-1.5 rounded-2xl border border-slate-200 text-xs">
                 @php
                     $periods = [
@@ -30,14 +29,17 @@
 
             <!-- Custom date range -->
             <div class="flex items-center gap-2 text-xs">
+                <span class="text-slate-600">Boshqa sana:</span>
                 <input
                     type="date"
+                    aria-label="Boshlanish sanasi"
                     wire:model="customStart"
                     class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-blue-500"
                 />
                 <span class="text-slate-600">—</span>
                 <input
                     type="date"
+                    aria-label="Tugash sanasi"
                     wire:model="customEnd"
                     class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs focus:outline-none focus:border-blue-500"
                 />
@@ -50,10 +52,8 @@
                 </button>
             </div>
         </div>
-    </div>
-
     <!-- 2. Data Completeness & Offline Indicator Banner -->
-    <div class="p-4 rounded-2xl border {{ $dashboard['warnings']['completeness_percent'] >= 100 ? 'bg-emerald-50/20 border-emerald-200/50 text-emerald-700' : 'bg-amber-50/20 border-amber-200/50 text-amber-700' }} flex flex-wrap items-center justify-between gap-3 text-xs">
+    <div class="dashboard-sync p-3 rounded-2xl border {{ $dashboard['warnings']['completeness_percent'] >= 100 ? 'bg-emerald-50/20 border-emerald-200/50 text-emerald-700' : 'bg-amber-50/20 border-amber-200/50 text-amber-700' }} flex flex-wrap items-center justify-between gap-3 text-xs">
         <div class="flex items-center gap-3">
             <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm {{ $dashboard['warnings']['completeness_percent'] >= 100 ? 'bg-emerald-50/50 text-emerald-700' : 'bg-amber-50/50 text-amber-700' }}">
                 {{ $dashboard['warnings']['completeness_percent'] }}%
@@ -80,7 +80,6 @@
         </div>
     </div>
 
-    <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
     <div class="money-flow-cards"><div><span>Tanlangan davrda pul kirdi</span><strong>{{ number_format($dashboard['flow']['cash_in'], 0, '.', ' ') }} so‘m</strong></div><div><span>Tanlangan davrda pul chiqdi</span><strong>{{ number_format($dashboard['flow']['cash_out'], 0, '.', ' ') }} so‘m</strong></div><div><span>Shundan do‘kon xarajatlari</span><strong data-testid="dashboard-expenses">{{ number_format($dashboard['flow']['operating_expenses'], 0, '.', ' ') }} so‘m</strong></div></div>
     <p class="workspace-caption">Boshlang‘ich qoldiq tanlangan davrdagi pul kirimiga qo‘shilmaydi. Mijozdan tushgan to‘lovlar quyida alohida.</p>
     <!-- 3. DAVRIY OQIM (Flow Metrics) -->
@@ -187,22 +186,22 @@
                 </div>
             </div>
 
-            <!-- 4.2. Mijozlar Balansi: Alohida Qarzlar va Alohida Avanslar -->
+            <!-- 4.2. Mijozlarning hisobi: Alohida Qarzlar va Alohida Avanslar -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold text-slate-600">Mijozlar Balansi</span>
+                    <span class="text-xs font-semibold text-slate-600">Mijozlarning hisobi</span>
                     <span class="text-xs text-slate-600 uppercase font-mono">Qarz / oldindan to‘lov</span>
                 </div>
                 <div class="space-y-3">
                     <div>
-                        <div class="text-xs text-amber-700 font-semibold">Bizga Qarzdorlik (Qarzlar):</div>
+                        <div class="text-xs text-amber-700 font-semibold">Mijozlar bizga qarz:</div>
                         <div class="text-xl font-black text-amber-700">
                             {{ number_format($dashboard['balances']['customer_debts'], 0, '.', ' ') }} <span class="text-xs font-normal">so'm</span>
                         </div>
                         <div class="text-xs text-slate-600 mt-0.5">{{ $dashboard['balances']['debtors_count'] }} ta xaridorda mavjud</div>
                     </div>
                     <div class="pt-2 border-t border-slate-200">
-                        <div class="text-xs text-emerald-700 font-semibold">Mijozlar Avansi (Ortiqcha to'lov):</div>
+                        <div class="text-xs text-emerald-700 font-semibold">Mijozlar oldindan to‘lagan:</div>
                         <div class="text-lg font-bold text-emerald-700">
                             {{ number_format($dashboard['balances']['customer_advances'], 0, '.', ' ') }} <span class="text-xs font-normal">so'm</span>
                         </div>
@@ -211,10 +210,10 @@
                 </div>
             </div>
 
-            <!-- 4.3. Ta'minotchilar Balansi: Alohida Bizning Qarzimiz va Alohida Avansimiz -->
+            <!-- 4.3. Yetkazuvchilar hisobi: Alohida Bizning Qarzimiz va Alohida Avansimiz -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-semibold text-slate-600">Ta'minotchilar Balansi</span>
+                    <span class="text-xs font-semibold text-slate-600">Yetkazuvchilar hisobi</span>
                     <span class="text-xs text-slate-600 uppercase font-mono">Qarz / oldindan to‘lov</span>
                 </div>
                 <div class="space-y-3">
@@ -226,7 +225,7 @@
                         <div class="text-xs text-slate-600 mt-0.5">To'lanishi kutilayotgan pul</div>
                     </div>
                     <div class="pt-2 border-t border-slate-200">
-                        <div class="text-xs text-cyan-700 font-semibold">Bizning Avansimiz (Oldindan to'lov):</div>
+                        <div class="text-xs text-cyan-700 font-semibold">Yetkazuvchiga oldindan to‘laganmiz:</div>
                         <div class="text-lg font-bold text-cyan-700">
                             {{ number_format($dashboard['balances']['supplier_advances'], 0, '.', ' ') }} <span class="text-xs font-normal">so'm</span>
                         </div>
@@ -261,7 +260,7 @@
                     </div>
                     @if($dashboard['can_view_cost'])
                         <div class="flex items-center justify-between text-cyan-700 font-medium pt-1">
-                            <span>Kutilayotgan foyda:</span>
+                            <span>Sotilsa kutilayotgan foyda:</span>
                             <span class="font-mono font-bold">{{ number_format($dashboard['balances']['potential_gross_profit'] ?? 0, 0, '.', ' ') }} so'm</span>
                         </div>
                     @endif
@@ -369,7 +368,7 @@
         <div class="flex items-center justify-between mb-4">
             <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                 <span>⚡</span>
-                <span>Oxirgi Operatsiyalar Lentasi (Jonli oqim)</span>
+                <span>Oxirgi amallar</span>
             </h4>
             <span class="text-xs text-slate-600">Savdo, kirim, to'lov va xarajatlar</span>
         </div>
@@ -378,8 +377,8 @@
             <table class="w-full text-left text-xs text-slate-700">
                 <thead class="text-xs  text-slate-600 border-b border-slate-200 bg-slate-50/60">
                     <tr>
-                        <th class="px-4 py-3">Turi & Hujjat</th>
-                        <th class="px-4 py-3">Taraf (Mijoz / Ta'minotchi)</th>
+                        <th class="px-4 py-3">Nima bo‘ldi?</th>
+                        <th class="px-4 py-3">Mijoz yoki yetkazuvchi</th>
                         <th class="px-4 py-3 text-right">Summa</th>
                         <th class="px-4 py-3 text-right">To'landi</th>
                         <th class="px-4 py-3 text-right">Qarz</th>

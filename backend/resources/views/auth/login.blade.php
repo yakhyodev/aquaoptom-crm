@@ -4,9 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Kirish — AquaOptom</title>
+    <meta name="theme-color" content="#f4f6fa">
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="auth-screen">
+    <div class="auth-theme-control"><x-theme-toggle /></div>
     @php($isPreview = config('app.preview_mode') && app()->environment(['local', 'staging', 'testing']))
     <main class="auth-shell">
         <div class="auth-intro"><div class="auth-brand"><span class="auth-logo">💧</span>AquaOptom</div><h1>Do‘kon ishlari.<br>Endi ancha oson.</h1><p>Mahsulot kirimi, savdo va mijozlar hisobi — hammasi bir joyda.</p><div class="auth-features"><span>📦 Ombor</span><span>🛒 Sotuv</span><span>📊 Hisobotlar</span></div></div>

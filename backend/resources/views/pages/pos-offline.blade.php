@@ -13,6 +13,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="AquaOptom POS">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
+    <x-theme-init />
 
     <!-- Local Built CSS & JS via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -54,6 +55,7 @@
 
         <!-- Status Badges & Quick Tools -->
         <div class="flex items-center gap-2 sm:gap-3 text-xs">
+            <x-theme-toggle />
             <!-- Online / Offline Indicator -->
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold border transition-colors"
                  :class="isOnline ? 'bg-emerald-50/80 text-emerald-700 border-emerald-200/80' : 'bg-rose-50/80 text-rose-700 border-rose-200/80 animate-pulse'">

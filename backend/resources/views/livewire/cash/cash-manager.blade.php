@@ -1,11 +1,11 @@
 <div class="space-y-6" wire:poll.15s>
     @if($feedbackMessage && ! $showExpenseModal && ! $showOwnerFundsModal)<div class="trade-alert {{ $feedbackType === 'error' ? 'trade-alert-error' : '' }}" role="{{ $feedbackType === 'error' ? 'alert' : 'status' }}">{{ $feedbackMessage }}</div>@endif
-    <section class="trade-card">
+    <section class="trade-card cash-overview">
         <p class="text-slate-600">Kassada hozir bor pul</p><strong class="block mt-2 text-4xl font-black text-emerald-700" data-testid="cash-balance">{{ number_format($totalBalance, 0, '.', ' ') }} <small class="text-lg">so‘m</small></strong>
         <p class="mt-2 text-sm text-slate-600">Barcha pul bitta kassada hisoblanadi. Pul qo‘shilsa ko‘payadi, to‘lov va xarajat qilinsa kamayadi.</p>
         <div class="grid gap-3 mt-5 sm:grid-cols-3"><div class="workspace-hint">Bugun kassaga kirgan pul<strong class="block mt-1 text-emerald-700">+{{ number_format($todayCashIn, 0, '.', ' ') }} so‘m</strong></div><div class="workspace-hint">Bugun kassadan chiqqan pul<strong class="block mt-1 text-rose-700">−{{ number_format($todayCashOut, 0, '.', ' ') }} so‘m</strong></div><div class="workspace-hint">Shundan do‘kon xarajatlari<strong class="block mt-1">{{ number_format($todayExpenses, 0, '.', ' ') }} so‘m</strong></div></div>
     </section>
-    <div class="grid gap-4 sm:grid-cols-2">
+    <div class="cash-actions grid gap-4 sm:grid-cols-2">
         @can('manage_cash')<button type="button" wire:click="openOwnerFundsModal('DEPOSIT')" class="trade-card text-left hover:ring-2 hover:ring-emerald-500"><span class="text-3xl">📥</span><h2 class="mt-3 text-xl font-bold">Kassaga pul qo‘shish</h2><p class="mt-2 text-slate-600">Do‘kon egasi kiritgan pul yoki qo‘shimcha mablag‘.</p></button>@endcan
         @can('record_expense')<button type="button" wire:click="openExpenseModal" class="trade-card text-left hover:ring-2 hover:ring-rose-500"><span class="text-3xl">📤</span><h2 class="mt-3 text-xl font-bold">Xarajat yozish</h2><p class="mt-2 text-slate-600">Transport, ijara, ish haqi yoki boshqa do‘kon xarajati.</p></button>@endcan
     </div>
