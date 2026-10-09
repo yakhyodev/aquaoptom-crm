@@ -4,9 +4,12 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Ombordagi mahsulotlar</h1>
-                <p class="text-sm text-slate-600 mt-1">Yangi tovar qabul qilish uchun «Kirim qilish» tugmasini bosing. Qoldiqlar va kalkulyator alohida oynalarda.</p>
+                <p class="text-sm text-slate-600 mt-1">Do‘konda avvaldan bor mahsulotlar — «Boshlang‘ich qoldiq». Keyin yangi kelgan tovarlar — «Kirim qilish».</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+                @if(auth()->user()->hasRole(['OWNER', 'ADMIN']))
+                    <button type="button" wire:click="$set('activeTab', 'opening')" class="trade-button {{ $activeTab === 'opening' ? 'trade-button-primary' : 'trade-button-secondary' }}">+ Boshlang‘ich qoldiq</button>
+                @endif
                 <a href="{{ route('inventory.inward') }}"
                     class="px-4 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 bg-emerald-600 text-slate-900 hover:bg-emerald-700 shadow-sm">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -47,6 +50,10 @@
     </div>
 
     @if($lastOperationOutcome)<div class="operation-outcome" role="status"><h3>{{ $lastOperationOutcome['title'] }}</h3>@foreach($lastOperationOutcome['stock'] as $stock)<p><span>{{ $stock['name'] }} — omborda</span><strong>{{ number_format($stock['quantity'], 0, '.', ' ') }} dona</strong></p>@endforeach @if(isset($lastOperationOutcome['cash']))<p><span>Hozir barcha hisoblarda bor pul</span><strong>{{ number_format($lastOperationOutcome['cash'], 0, '.', ' ') }} so‘m</strong></p>@endif<button wire:click="$set('activeTab', 'balances')" class="trade-button trade-button-secondary">Ombor qoldiqlarini ko‘rish →</button></div>@endif
+
+    @if($activeTab === 'opening' && auth()->user()->hasRole(['OWNER', 'ADMIN']))
+        <livewire:inventory.stock-opening />
+    @endif
 
     @if($activeTab === 'balances')
         <!-- TAB 1: OMBOR QOLDIQLARI -->
