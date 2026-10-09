@@ -240,7 +240,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate deployment script
-        run: bash -n deploy/deploy.sh
+        run: |
+          bash -n deploy/deploy.sh
+          sh -n docker/railway-entrypoint.sh
       - name: Validate compose configuration
         env:
           DB_PASSWORD: ci-only-password
@@ -258,3 +260,43 @@ jobs:
         run: |
           docker run --rm aquaoptom:ci sh -c 'php artisan --version && php artisan reverb:start --help && test -f public/build/manifest.json && test ! -f .env && test ! -f .env.production'
           docker run --rm aquaoptom-nginx:ci sh -c 'test -f /var/www/html/public/build/manifest.json'
+      - name: Build Railway combined web and API image
+        run: docker build --target railway --build-arg VITE_REVERB_APP_KEY=ci-public-key -f docker/Dockerfile -t aquaoptom-railway:ci .
+      - name: Verify Railway startup, persistence and WebSockets
+        run: |
+          docker network create aquaoptom-ci
+          docker run -d --name railway-pg --network aquaoptom-ci -e POSTGRES_DB=aquaoptom_staging -e POSTGRES_PASSWORD=ci-only-password postgres:16-alpine
+          docker run -d --name railway-redis --network aquaoptom-ci redis:7-alpine
+          for attempt in $(seq 1 40); do docker exec railway-pg pg_isready -U postgres && break || sleep 1; done
+          docker run -d --name railway-web --network aquaoptom-ci -p 127.0.0.1:18081:8080 \
+            -e PORT=8080 -e APP_ENV=staging -e APP_DEBUG=false -e PREVIEW_MODE=true \
+            -e APP_URL=https://localhost:18081 -e APP_KEY=base64:$(openssl rand -base64 32) \
+            -e DB_CONNECTION=pgsql -e DB_HOST=railway-pg -e DB_PORT=5432 \
+            -e DB_DATABASE=aquaoptom_staging -e DB_USERNAME=postgres -e DB_PASSWORD=ci-only-password \
+            -e REDIS_CLIENT=predis -e REDIS_HOST=railway-redis -e CACHE_STORE=redis \
+            -e SESSION_DRIVER=redis -e QUEUE_CONNECTION=redis -e LOG_CHANNEL=stderr \
+            -e REVERB_APP_ID=ci-app -e REVERB_APP_KEY=ci-public-key -e REVERB_APP_SECRET=ci-only-secret \
+            -e REVERB_HOST=127.0.0.1 -e REVERB_PORT=8081 -e REVERB_SCHEME=http \
+            -e RAILWAY_INITIALIZE=true -e RAILWAY_OWNER_EMAIL=owner@preview.aquaoptom.test \
+            -e RAILWAY_OWNER_PASSWORD=ci-only-password aquaoptom-railway:ci
+          trap 'docker logs railway-web; docker rm -f railway-web railway-pg railway-redis' EXIT
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:18081/api/health/ready > /tmp/railway-ready.json && break || sleep 2
+          done
+          python3 - <<'PY'
+          import json, socket
+          with open('/tmp/railway-ready.json') as source:
+              readiness = json.load(source)
+          assert readiness['status'] == 'READY', readiness
+          assert 'notice' not in readiness['checks']['redis'], readiness
+          with socket.create_connection(('127.0.0.1', 18081), timeout=10) as client:
+              client.sendall(b'GET /app/ci-public-key?protocol=7&client=js&version=8.0.0 HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n')
+              assert b'101 Switching Protocols' in client.recv(4096)
+          print('Railway readiness and proxied Reverb handshake passed')
+          PY
+          curl -fsS http://127.0.0.1:18081/login > /tmp/railway-login.html
+          grep -q 'Panelga kirish' /tmp/railway-login.html
+          docker restart railway-web
+          for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null && break || sleep 2; done
+          curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null
+          docker exec railway-web php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if (App\Models\User::where("role", "OWNER")->count() !== 1 || App\Models\CashAccount::count() !== 1 || App\Models\CashAccount::sum("balance") != 0 || App\Models\Sale::count() !== 0 || App\Models\Product::count() !== 0) { exit(1); } echo "Restart preserved one owner, one empty cash account and zero business fixtures\n";'

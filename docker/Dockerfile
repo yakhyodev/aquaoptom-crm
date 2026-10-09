@@ -113,3 +113,17 @@ CMD ["php-fpm", "-F"]
 FROM nginx:alpine AS nginx
 COPY --from=production /var/www/html/public /var/www/html/public
 COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Railway serves the Laravel web UI, API and workers in one service.
+FROM production AS railway
+USER root
+COPY docker/railway-nginx.conf /etc/nginx/railway.conf.template
+COPY docker/railway-supervisord.conf /etc/supervisor.d/railway.ini
+COPY docker/railway-entrypoint.sh /usr/local/bin/railway-entrypoint
+RUN chmod +x /usr/local/bin/railway-entrypoint \
+    && sed -i 's/^user = www-data/user = aquaoptom/; s/^group = www-data/group = aquaoptom/' /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /var/lib/nginx /var/log/nginx \
+    && chown -R aquaoptom:aquaoptom /var/lib/nginx /var/log/nginx
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/railway-entrypoint"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.d/railway.ini"]

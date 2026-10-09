@@ -5,6 +5,8 @@
 **/vendor
 **/node_modules
 **/storage
+**/bootstrap/cache
+backend/public/hot
 **/test-results
 mobile/build
 **/*.jks
