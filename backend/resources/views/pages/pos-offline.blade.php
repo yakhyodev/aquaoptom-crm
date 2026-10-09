@@ -33,7 +33,7 @@
 <body class="offline-workspace bg-slate-50 text-slate-900 min-h-screen font-sans antialiased flex flex-col select-none" x-data="aquaPos()" x-cloak>
 
     <!-- 1. HEADER BAR -->
-    <header class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-md sticky top-0 z-30">
+    <header class="bg-slate-50 border-b border-slate-200 px-4 py-2.5 flex flex-wrap gap-2 items-center justify-between shadow-md sticky top-0 z-30">
         <!-- Brand & Device info -->
         <div class="flex items-center gap-3">
             <a href="/dashboard" class="flex items-center gap-2.5 group" title="Boshqaruv paneliga qaytish">
@@ -54,7 +54,7 @@
         </div>
 
         <!-- Status Badges & Quick Tools -->
-        <div class="flex items-center gap-2 sm:gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
             <x-theme-toggle />
             <!-- Online / Offline Indicator -->
             <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full font-semibold border transition-colors"
