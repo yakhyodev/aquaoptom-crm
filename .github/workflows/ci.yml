@@ -283,8 +283,12 @@ jobs:
           for attempt in $(seq 1 60); do
             curl -fsS http://127.0.0.1:18081/api/health/ready > /tmp/railway-ready.json && break || sleep 2
           done
+          docker exec railway-web php artisan schedule:list --json > /tmp/railway-schedule.json
           python3 - <<'PY'
           import json, socket
+          with open('/tmp/railway-schedule.json') as source:
+              scheduled_tasks = json.load(source)
+          assert any(task['description'] == 'telegram:retry-failed-deliveries' for task in scheduled_tasks), scheduled_tasks
           with open('/tmp/railway-ready.json') as source:
               readiness = json.load(source)
           assert readiness['status'] == 'READY', readiness

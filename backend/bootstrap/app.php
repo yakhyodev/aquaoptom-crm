@@ -37,7 +37,11 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('app:backup-create')->everyFifteenMinutes()->withoutOverlapping(30)->onOneServer();
-        $schedule->call(fn () => app(TelegramNotificationService::class)->retryFailedDeliveries())->everyMinute()->withoutOverlapping()->onOneServer();
+        $schedule->call(fn () => app(TelegramNotificationService::class)->retryFailedDeliveries())
+            ->name('telegram:retry-failed-deliveries')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->onOneServer();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
