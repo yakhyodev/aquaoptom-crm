@@ -112,6 +112,7 @@
                         <button
                             type="submit"
                             title="Tizimdan chiqish"
+                            aria-label="Tizimdan chiqish"
                             class="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
                         >
                             🚪

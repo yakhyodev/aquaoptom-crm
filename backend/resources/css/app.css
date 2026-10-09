@@ -35,7 +35,7 @@
 .app-main > :not(.fixed) { animation: workspace-fade .35s ease; }
 @keyframes workspace-fade { from { opacity: 0; } to { opacity: 1; } }
 .app-main :where(.text-xs, .text-\[10px\], .text-\[11px\]) { font-size: 13px; line-height: 1.5; }
-.app-main :where(input, select, textarea), .offline-workspace :where(input, select, textarea) { color: var(--ink); background-color: var(--on-primary); color-scheme: inherit; font-size: 15px; border-color: var(--line); accent-color: var(--accent); }
+.app-main :where(input, select, textarea), .offline-workspace :where(input, select, textarea) { color: var(--ink); background-color: var(--surface); color-scheme: inherit; font-size: 15px; border-color: var(--line); accent-color: var(--accent); }
 .app-main :where(input:not([type=checkbox]):not([type=radio]), select, textarea) { min-height: 42px; }
 .app-main input::placeholder, .app-main textarea::placeholder, .offline-workspace input::placeholder { color: var(--muted); opacity: 1; }
 .app-main input:focus-visible, .app-main select:focus-visible, .app-main textarea:focus-visible, .offline-workspace input:focus-visible { outline: 3px solid var(--accent-line); outline-offset: 1px; border-color: var(--accent); }
