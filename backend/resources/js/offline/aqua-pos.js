@@ -14,6 +14,7 @@ export function aquaPos() {
         isOnline: navigator.onLine,
         isProcessing: false,
         isBootstrapping: false,
+        needsDeviceSetup: false,
         isSyncing: false,
         lastSyncTime: null,
         leaseWarning: null,
@@ -229,6 +230,7 @@ export function aquaPos() {
          * 3. Serverdan ma'lumotlarni tortib olish (Online Bootstrap)
          */
         async bootstrapFromServer() {
+            if (this.isBootstrapping) return;
             if (!this.isOnline) {
                 this.showAlert('warning', "Offline rejimdasiz. Serverdan yuklab bo'lmaydi.");
                 return;
@@ -249,14 +251,31 @@ export function aquaPos() {
                     })
                 });
 
+                if (response.status === 422 || response.status === 404) {
+                    this.needsDeviceSetup = true;
+                    this.showAlert('warning', 'Internetsiz sotuv uchun avval qurilmani xodimga biriktiring. Quyidagi yo‘riqnomaga amal qiling.');
+                    return;
+                }
+                if (response.status === 401 || response.status === 419) {
+                    this.showAlert('warning', 'Kirish muddati tugagan. Bosh sahifaga qaytib, tizimga qayta kiring.');
+                    return;
+                }
+                if (response.status === 403) {
+                    this.showAlert('warning', 'Bu qurilma yoki internetsiz sotuv uchun ruxsat yetarli emas. Do‘kon egasiga murojaat qiling.');
+                    return;
+                }
                 if (!response.ok) {
-                    throw new Error(`Server xatosi: ${response.status}`);
+                    throw new Error('Ma’lumotlar yuklanmadi. Internetni tekshirib, qayta urinib ko‘ring.');
                 }
 
                 const data = await response.json();
                 const b = data.data || data.bootstrap;
+                if (!data.success || !b) {
+                    throw new Error('Ma’lumotlar to‘liq kelmadi. Qayta yuklashga urinib ko‘ring.');
+                }
                 if (data.success && b) {
                     await this.db.applyBootstrap(b);
+                    this.needsDeviceSetup = false;
 
                     await this.loadLocalData(false);
                     this.showAlert('success', "Katalog va qurilma ajratmalari serverdan muvaffaqiyatli yuklandi!");
@@ -683,6 +702,10 @@ export function aquaPos() {
          * 14. Qo'lda (Manual) Sinxronizatsiya chaqirish
          */
         async syncNow() {
+            if (!this.deviceLease || this.needsDeviceSetup) {
+                await this.bootstrapFromServer();
+                return;
+            }
             if (!this.syncEngine) this.syncEngine = new AquaSync(this.db);
             if (this.isSyncing) return;
 

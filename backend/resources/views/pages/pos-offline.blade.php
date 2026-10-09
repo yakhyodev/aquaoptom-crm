@@ -80,7 +80,7 @@
             <!-- Sync Now Button -->
             <button type="button"
                     @click="syncNow()"
-                    :disabled="isSyncing || !isOnline"
+                    :disabled="isSyncing || isBootstrapping || !isOnline"
                     class="px-2.5 py-1 rounded-lg bg-cyan-600/20 text-cyan-700 border border-cyan-500/40 hover:bg-cyan-600/30 font-medium transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     title="Ma’lumotlarni internet orqali yangilash">
                 <span :class="isSyncing ? 'animate-spin' : ''">🔄</span>
@@ -118,6 +118,17 @@
             </button>
         </div>
     </header>
+
+    <section x-show="!deviceLease || needsDeviceSetup" class="px-4 py-3 bg-blue-50 text-blue-700 border-b border-blue-200" aria-label="Internetsiz sotuvni tayyorlash">
+        <h2 class="text-sm font-bold">Bu qurilmani internetsiz sotuvga tayyorlang</h2>
+        <p class="text-xs mt-1">Do‘kon egasi «Sozlamalar → Qurilmalar» bo‘limida qurilmani xodimga biriktiradi va sotiladigan mahsulotlarni ajratadi. Keyin ma’lumotlarni shu brauzerga yuklang.</p>
+        <p class="text-xs mt-1">Bitta xodimga bir nechta qurilma biriktirilgan bo‘lsa, egasi bilan qurilma ulanishini aniqlashtiring.</p>
+        <div class="flex flex-wrap gap-2 mt-2">
+            <a href="/admin" class="px-3 py-1.5 rounded-lg bg-white border border-blue-200 font-semibold text-xs">Sozlamalarni ochish</a>
+            <button type="button" @click="bootstrapFromServer()" :disabled="isBootstrapping || !isOnline" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs disabled:opacity-50" x-text="isBootstrapping ? 'Yuklanmoqda…' : 'Ma’lumotlarni yuklash'"></button>
+            <a href="/sotuv" class="px-3 py-1.5 rounded-lg border border-blue-200 font-semibold text-xs">Internet orqali sotuv qilish →</a>
+        </div>
+    </section>
 
     <!-- 1.1 LEASE EXPIRY WARNING BANNER -->
     <div x-show="leaseWarning"
@@ -217,8 +228,8 @@
                 <template x-if="filteredCatalog.length === 0">
                     <div class="h-64 flex flex-col items-center justify-center text-center p-6 text-slate-600">
                         <span class="text-4xl mb-2">📦</span>
-                        <p class="font-medium text-sm">Tovar topilmadi yoki katalog bo'sh</p>
-                        <p class="text-xs text-slate-600 mt-1" x-show="isOnline">
+                        <p class="font-medium text-sm" x-text="!deviceLease || needsDeviceSetup ? 'Avval qurilmani tayyorlab, mahsulotlarni yuklang' : (catalog.length ? 'Qidiruvga mos mahsulot topilmadi' : 'Hali mahsulotlar yuklanmagan')"></p>
+                        <p class="text-xs text-slate-600 mt-1" x-show="isOnline && deviceLease && !needsDeviceSetup">
                             Internet ulanganda yuqoridagi «Sinxronlash» tugmasini bosing
                         </p>
                     </div>
@@ -395,8 +406,8 @@
                 <!-- Paid Amount & Debt Calculation -->
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                        <label class="text-xs font-semibold text-slate-600 block mb-1">Olingan pul (so'm):</label>
-                        <input type="number"
+                        <label for="offline-paid-amount" class="text-xs font-semibold text-slate-600 block mb-1">Olingan pul (so'm):</label>
+                        <input id="offline-paid-amount" type="number"
                                x-model.number="paidAmount"
                                @input="saveCartDraft()"
                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm font-bold text-slate-900 text-right focus:outline-none focus:border-cyan-500">
