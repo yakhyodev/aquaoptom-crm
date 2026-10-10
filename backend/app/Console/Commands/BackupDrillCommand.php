@@ -21,6 +21,13 @@ class BackupDrillCommand extends Command
         $this->info('=== AquaOptom CRM: Automated Backup & Disaster Recovery Drill ===');
         $drillStart = microtime(true);
         $isolatedDb = $this->option('target-db');
+        if (! preg_match('/^aquaoptom_restore_[a-z0-9_]{1,40}$/', $isolatedDb)
+            || $isolatedDb === config('database.connections.pgsql.database')
+            || DB::selectOne('SELECT 1 AS present FROM pg_database WHERE datname = ?', [$isolatedDb])) {
+            $this->error('Restore drill requires a new isolated aquaoptom_restore_* database. Existing databases are protected.');
+
+            return self::FAILURE;
+        }
 
         // 1. Zaxira nusxa yaratish
         $this->line('1. Creating full encrypted backup...');

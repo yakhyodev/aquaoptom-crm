@@ -158,6 +158,7 @@ class BackupService
             return ['status' => 'NOT_CONFIGURED'];
         }
         $stream = null;
+        $remoteStream = null;
         try {
             if (! $encrypted || ! str_ends_with($filePath, '.enc') || ! hash_equals($checksum, hash_file('sha256', $filePath))) {
                 throw new \RuntimeException('Only verified encrypted backups may leave the server.');
@@ -171,6 +172,15 @@ class BackupService
                 || $disk->size($remotePath) !== filesize($filePath)) {
                 throw new \RuntimeException('Backup upload verification failed.');
             }
+            $remoteStream = $disk->readStream($remotePath);
+            if (! is_resource($remoteStream)) {
+                throw new \RuntimeException('Uploaded backup cannot be read back.');
+            }
+            $hash = hash_init('sha256');
+            hash_update_stream($hash, $remoteStream);
+            if (! hash_equals($checksum, hash_final($hash))) {
+                throw new \RuntimeException('Uploaded backup checksum mismatch.');
+            }
             AuditLog::create(['action' => 'BACKUP_OFFSITE_COPIED', 'new_values' => [
                 'disk' => $diskName, 'path' => $remotePath, 'checksum' => $checksum,
                 'size_bytes' => filesize($filePath),
@@ -183,6 +193,11 @@ class BackupService
                     continue;
                 }
                 if ($disk->delete([$path, $path.'.sha256'])) {
+                    $localPath = $this->getBackupStoragePath().'/'.basename($path);
+                    if (is_file($localPath) && isset($old->new_values['checksum'])
+                        && hash_equals($old->new_values['checksum'], hash_file('sha256', $localPath))) {
+                        File::delete([$localPath, $localPath.'.sha256']);
+                    }
                     $old->update(['action' => 'BACKUP_OFFSITE_EXPIRED']);
                 }
             }
@@ -196,6 +211,9 @@ class BackupService
         } finally {
             if (is_resource($stream)) {
                 fclose($stream);
+            }
+            if (is_resource($remoteStream)) {
+                fclose($remoteStream);
             }
         }
     }

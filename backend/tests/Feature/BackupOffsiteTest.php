@@ -14,6 +14,13 @@ class BackupOffsiteTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_restore_drill_refuses_the_current_database_before_creating_a_backup(): void
+    {
+        $this->artisan('app:backup-drill', ['--target-db' => config('database.connections.pgsql.database')])
+            ->assertExitCode(1);
+        $this->assertDatabaseCount('audit_logs', 0);
+    }
+
     public function test_verified_encrypted_copy_and_checksum_are_private_and_old_owned_copies_expire(): void
     {
         config(['backup.offsite_disk' => 'offsite-test', 'backup.retention_days' => 14]);
