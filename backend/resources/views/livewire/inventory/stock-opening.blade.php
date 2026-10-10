@@ -26,7 +26,7 @@
                 <div class="trade-heading"><span class="trade-step">1</span><div><h2>Do‘konda avvaldan bor mahsulot</h2><p>Mahsulotlarni bittalab kiriting. Saqlagach, keyingisiga o‘tasiz.</p></div></div>
                 <div class="trade-two-fields">
                     <div class="trade-field">
-                        <x-searchable-select id="opening-product" label="Mahsulot nomi" model="productSelection" placeholder="Mahsulot nomini yozing" create-value="new" :options="$products->map(fn ($product) => ['value' => $product->id, 'label' => $product->name])->prepend(['value' => 'new', 'label' => 'Yangi mahsulot nomi'])->values()->all()" />
+                        <x-searchable-select id="opening-product" label="Mahsulot nomi" :empty-value="''" model="productSelection" placeholder="Mahsulot nomini yozing" create-value="new" :options="$products->map(fn ($product) => ['value' => $product->id, 'label' => $product->name])->prepend(['value' => 'new', 'label' => 'Yangi mahsulot nomi'])->values()->all()" />
                         @error('productSelection')<p class="trade-input-error">{{ $message }}</p>@enderror
                     </div>
                     <div class="trade-field">

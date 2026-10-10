@@ -88,7 +88,7 @@ class CustomerService
         $term = trim($query);
         if ($term === '') {
             return Customer::where('status', 'active')
-                ->orderBy('name')->orderBy('id')
+                ->orderByRaw('LOWER(name)')->orderBy('id')
                 ->limit($limit)
                 ->get();
         }
@@ -110,7 +110,7 @@ class CustomerService
         }
 
         return $customers
-            ->orderBy('name')->orderBy('id')
+            ->orderByRaw('LOWER(name)')->orderBy('id')
             ->limit($limit)
             ->get();
     }

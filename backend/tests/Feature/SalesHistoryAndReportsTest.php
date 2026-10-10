@@ -92,11 +92,11 @@ class SalesHistoryAndReportsTest extends TestCase
 
     public function test_customer_search_combines_name_store_and_formatted_phone_in_alphabetical_order(): void
     {
-        $this->customer->update(['name' => 'Akmal', 'store_name' => 'Bahor Market', 'phone' => '+998 (90) 111-22-33']);
+        $this->customer->update(['name' => 'akmal', 'store_name' => 'Bahor Market', 'phone' => '+998 (90) 111-22-33']);
         Customer::create(['name' => 'Zafar', 'store_name' => 'Bahor Market', 'phone' => '+998901112233']);
         $service = app(CustomerService::class);
         $this->assertSame([$this->customer->id], $service->search('akmal bahor 901112233')->pluck('id')->all());
-        $this->assertSame(['Akmal', 'Zafar'], $service->search('bahor')->pluck('name')->all());
+        $this->assertSame(['akmal', 'Zafar'], $service->search('bahor')->pluck('name')->all());
     }
 
     protected function setUp(): void

@@ -657,6 +657,7 @@ export function aquaPos() {
 
                 // Yangi mijozni ro'yxatga qo'shamiz va savatga tanlaymiz
                 this.customers.push(createdCust);
+                this.customers.sort((a, b) => a.name.localeCompare(b.name, 'uz', { numeric: true }));
                 this.selectedCustomerId = createdCust.id;
 
                 this.newCustomer = { name: '', phone: '', store_name: '' };
