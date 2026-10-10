@@ -48,7 +48,7 @@ export class AquaSync {
     /**
      * 2. To'liq Sinxronizatsiya sikli: Push + Pull + Multi-tab Mutex
      */
-    async syncNow(triggerSource = 'manual') {
+    async syncNow(triggerSource = 'manual', renewLease = false) {
         if (this.isSyncing) {
             return { status: 'IN_PROGRESS', message: "Sinxronlash allaqachon bajarilmoqda." };
         }
@@ -93,6 +93,10 @@ export class AquaSync {
             const pushResult = await this.pushPendingQueue();
             if (pushResult.recoveryHold) return pushResult;
 
+            if (lease?.device_uuid && (renewLease || new Date(lease.expires_at).getTime() - Date.now() < 4 * 3600000)) {
+                await this.renewDeviceLease(lease);
+            }
+
             // D. 2-bosqich: Kursor bo'yicha yangi o'zgarishlarni Pull qilish
             const pullResult = await this.pullServerChanges();
 
@@ -125,6 +129,20 @@ export class AquaSync {
             this.isSyncing = false;
             await this.db.releaseSyncLock(this.tabId);
         }
+    }
+
+    async renewDeviceLease(lease) {
+        const headers = {'Content-Type': 'application/json', Accept: 'application/json'};
+        const csrf = globalThis.document?.querySelector('meta[name="csrf-token"]')?.content;
+        if (csrf) headers['X-CSRF-TOKEN'] = csrf;
+        if (lease.api_token) headers.Authorization = `Bearer ${lease.api_token}`;
+        const response = await fetch(`${this.apiBase}/sync/renew-lease`, {
+            method: 'POST', headers, signal: AbortSignal.timeout(15000),
+            body: JSON.stringify({device_uuid: lease.device_uuid})
+        });
+        if (!response.ok) throw new Error('Qurilma ruxsati yangilanmadi. Tizimga qayta kiring yoki do‘kon egasiga murojaat qiling.');
+        const result = await response.json();
+        await this.db.put('device_lease', {...lease, ...result.data, key: 'current'});
     }
 
     /**

@@ -13,12 +13,15 @@ use App\Models\InventoryMovement;
 use App\Models\Product;
 use App\Models\ProductPackage;
 use App\Models\ProductVariant;
+use App\Models\Purchase;
+use App\Models\ReportExport;
 use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Volume;
 use App\Models\Warehouse;
+use App\Services\Parties\CustomerService;
 use App\Services\Payments\CustomerPaymentService;
 use App\Services\Reports\Exceptions\UnauthorizedExportException;
 use App\Services\Reports\ExportService;
@@ -53,6 +56,48 @@ class SalesHistoryAndReportsTest extends TestCase
     protected ReportQueryService $reportQueryService;
 
     protected ExportService $exportService;
+
+    public function test_every_report_tab_downloads_its_own_real_excel_workbook(): void
+    {
+        Purchase::create([
+            'operation_id' => (string) Str::uuid(), 'invoice_number' => 'KIRIM-XLSX-42',
+            'supplier_id' => $this->supplier->id, 'warehouse_id' => 1, 'status' => 'POSTED',
+            'total_amount' => 123456, 'paid_amount' => 23456, 'debt_amount' => 100000,
+            'posted_at' => now(), 'source' => 'WEB', 'created_by' => $this->owner->id,
+        ]);
+        $this->supplier->update(['name' => '=HYPERLINK("https://example.invalid")']);
+
+        foreach (['sales', 'profit_loss', 'purchases', 'inventory', 'statements', 'cash', 'staff', 'sync'] as $type) {
+            Livewire::actingAs($this->owner)->test(ReportDashboard::class)
+                ->call('setTab', $type)->call('export', 'xlsx')->assertHasNoErrors();
+            $export = ReportExport::latest('id')->firstOrFail();
+            $this->assertSame($type === 'statements' ? 'statement' : $type, $export->report_type);
+            $this->assertSame('xlsx', $export->format);
+            $zip = new \ZipArchive;
+            $this->assertTrue($zip->open(Storage::disk('local')->path($export->file_path)));
+            $this->assertNotFalse($zip->getFromName('xl/workbook.xml'));
+            $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $this->assertNotFalse($xml);
+            $this->assertDoesNotMatchRegularExpression('/<f(?:\s|>)/', $xml, 'User-entered names must never become Excel formulas');
+            if ($type === 'purchases') {
+                $this->assertStringContainsString('KIRIM-XLSX-42', $xml);
+                $this->assertStringContainsString('<v>123456</v>', $xml, 'Amounts must be numeric Excel cells');
+                $this->assertStringContainsString('HYPERLINK', $xml);
+            }
+            $zip->close();
+            $this->actingAs($this->owner)->get(route('exports.download', $export->uuid))->assertOk()
+                ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        }
+    }
+
+    public function test_customer_search_combines_name_store_and_formatted_phone_in_alphabetical_order(): void
+    {
+        $this->customer->update(['name' => 'Akmal', 'store_name' => 'Bahor Market', 'phone' => '+998 (90) 111-22-33']);
+        Customer::create(['name' => 'Zafar', 'store_name' => 'Bahor Market', 'phone' => '+998901112233']);
+        $service = app(CustomerService::class);
+        $this->assertSame([$this->customer->id], $service->search('akmal bahor 901112233')->pluck('id')->all());
+        $this->assertSame(['Akmal', 'Zafar'], $service->search('bahor')->pluck('name')->all());
+    }
 
     protected function setUp(): void
     {

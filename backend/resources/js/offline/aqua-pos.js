@@ -32,6 +32,7 @@ export function aquaPos() {
         // Katalog va Mijozlar
         catalog: [],
         customers: [],
+        customerQuery: '',
         stockAllocations: new Map(),
         creditAllocations: new Map(),
 
@@ -43,7 +44,9 @@ export function aquaPos() {
         operationId: null,
         cart: [],
         selectedCustomerId: '',
+        saleMode: 'quick',
         paymentMethod: 'CASH',
+        paymentMode: 'FULL',
         paidAmount: 0,
         notes: '',
 
@@ -179,7 +182,7 @@ export function aquaPos() {
                     const now = Date.now();
                     const diffHours = (expiresAt - now) / (1000 * 60 * 60);
                     if (diffHours < 0) {
-                        this.leaseWarning = "Qurilma ruxsat (lease) muddati tugagan! Iltimos, serverdan yangilang.";
+                        this.leaseWarning = "Internetsiz ishlash muddati tugagan. Internetga ulanib, qurilma ruxsatini yangilang.";
                     } else if (diffHours < 4) {
                         this.leaseWarning = `Diqqat: Qurilma ruxsat muddati ${Math.ceil(diffHours)} soatda tugaydi.`;
                     } else {
@@ -204,10 +207,11 @@ export function aquaPos() {
 
             // D. Katalog
             const catList = await this.db.getAll('catalog');
-            this.catalog = catList.filter(item => item.status === 'ACTIVE');
+            this.catalog = catList.filter(item => item.status === 'ACTIVE').sort((a, b) =>
+                a.product_name.localeCompare(b.product_name, 'uz', { numeric: true }) || Number(a.volume_litres) - Number(b.volume_litres));
 
             // E. Mijozlar
-            this.customers = await this.db.getAll('customers');
+            this.customers = (await this.db.getAll('customers')).sort((a, b) => a.name.localeCompare(b.name, 'uz', { numeric: true }));
 
             // F. Oxirgi savdolar
             const allSales = await this.db.getAll('sales');
@@ -309,12 +313,9 @@ export function aquaPos() {
 
             // Qidiruv filtri
             if (this.searchQuery.trim()) {
-                const q = this.searchQuery.toLowerCase().trim();
-                list = list.filter(item =>
-                    item.product_name?.toLowerCase().includes(q) ||
-                    item.sku?.toLowerCase().includes(q) ||
-                    item.barcode?.toLowerCase().includes(q)
-                );
+                const terms = this.searchQuery.toLocaleLowerCase('uz').trim().split(/\s+/);
+                list = list.filter(item => terms.every(term =>
+                    `${item.product_name} ${item.volume_name} ${item.sku || ''} ${item.barcode || ''}`.toLocaleLowerCase('uz').includes(term)));
             }
 
             return list;
@@ -430,6 +431,21 @@ export function aquaPos() {
         /**
          * 6. Hisob-kitoblar (Total, Debt)
          */
+        get filteredCustomers() {
+            const normalize = value => String(value || '').toLocaleLowerCase('uz').normalize('NFKD').replace(/[‘’ʻʼ`']/g, '').trim();
+            const terms = normalize(this.customerQuery).split(/\s+/).filter(Boolean);
+            return this.customers.filter(customer => {
+                const text = normalize(`${customer.name} ${customer.store_name || ''} ${customer.phone || ''} ${customer.address || ''}`);
+                const phone = (customer.phone || '').replace(/\D/g, '');
+                return terms.every(term => text.includes(term) || (/^[\d+()-]+$/.test(term) && phone.includes(term.replace(/\D/g, ''))));
+            }).slice(0, 20);
+        },
+
+        get selectedCustomerLabel() {
+            const customer = this.customers.find(item => String(item.id) === String(this.selectedCustomerId));
+            return customer ? [customer.name, customer.store_name, customer.phone].filter(Boolean).join(' · ') : '';
+        },
+
         get totalAmount() {
             return this.cart.reduce((sum, it) => sum + (it.quantity * it.sale_price), 0);
         },
@@ -439,19 +455,28 @@ export function aquaPos() {
         },
 
         autoAdjustPayment() {
-            if (this.paymentMethod === 'DEBT') {
+            if (this.paymentMode === 'DEBT') {
                 this.paidAmount = 0;
-            } else if (this.paidAmount === 0 || this.paidAmount > this.totalAmount) {
+            } else if (this.paymentMode === 'FULL') {
                 this.paidAmount = this.totalAmount;
+            } else {
+                this.paidAmount = Math.min(this.totalAmount, Math.max(0, Number(this.paidAmount) || 0));
             }
         },
 
         onPaymentMethodChange(method) {
-            this.paymentMethod = method;
-            if (method === 'DEBT') {
-                this.paidAmount = 0;
-            } else {
-                this.paidAmount = this.totalAmount;
+            this.paymentMode = method === 'CASH' ? 'FULL' : method;
+            this.paymentMethod = this.paymentMode === 'DEBT' ? 'DEBT' : 'CASH';
+            if (this.paymentMode === 'PARTIAL') this.paidAmount = 0;
+            this.autoAdjustPayment();
+            this.saveCartDraft();
+        },
+
+        switchSaleMode(mode) {
+            this.saleMode = mode;
+            if (mode === 'quick') {
+                this.selectedCustomerId = '';
+                this.onPaymentMethodChange('FULL');
             }
             this.saveCartDraft();
         },
@@ -479,8 +504,10 @@ export function aquaPos() {
                 key: 'current_cart',
                 operation_id: this.operationId,
                 customer_id: this.selectedCustomerId || null,
+                sale_mode: this.saleMode,
                 cart: this.cart,
                 payment_method: this.paymentMethod,
+                payment_mode: this.paymentMode,
                 paid_amount: this.paidAmount,
                 notes: this.notes,
                 updated_at: new Date().toISOString()
@@ -494,9 +521,12 @@ export function aquaPos() {
             if (draft) {
                 this.operationId = draft.operation_id || null;
                 this.selectedCustomerId = draft.customer_id || '';
+                this.saleMode = draft.sale_mode || (this.selectedCustomerId ? 'customer' : 'quick');
                 this.cart = Array.isArray(draft.cart) ? draft.cart : [];
                 this.paymentMethod = draft.payment_method || 'CASH';
                 this.paidAmount = draft.paid_amount || 0;
+                this.paymentMode = draft.payment_mode || (this.paymentMethod === 'DEBT' ? 'DEBT' : (this.paidAmount < this.totalAmount ? 'PARTIAL' : 'FULL'));
+                this.autoAdjustPayment();
                 this.notes = draft.notes || '';
             }
 
@@ -511,6 +541,22 @@ export function aquaPos() {
         async completeSale() {
             // Ko'p bosishdan himoya (Multi-click protection)
             if (this.isProcessing) return;
+
+            const leaseExpiry = new Date(this.deviceLease?.expires_at).getTime();
+            if (!Number.isFinite(leaseExpiry) || leaseExpiry <= Date.now()) {
+                this.showAlert('warning', 'Avval internetga ulanib, qurilma ruxsatini yangilang. Savatingiz saqlanib turibdi.');
+                return;
+            }
+            this.autoAdjustPayment();
+
+            if (this.saleMode === 'customer' && !this.selectedCustomerId) {
+                this.showAlert('warning', 'Mijozni tanlang yoki yangi mijoz qo‘shing. Mijozsiz sotish uchun «Tezkor sotuv»ni tanlang.');
+                return;
+            }
+            if (this.paymentMode === 'PARTIAL' && (!Number.isSafeInteger(Number(this.paidAmount)) || this.paidAmount <= 0 || this.paidAmount >= this.totalAmount)) {
+                this.showAlert('warning', 'Qisman to‘lov jami summadan kam va 0 dan katta bo‘lsin. Aks holda to‘liq to‘lov yoki to‘liq nasiyani tanlang.');
+                return;
+            }
             this.isProcessing = true;
 
             try {
@@ -566,6 +612,9 @@ export function aquaPos() {
                 this.paidAmount = 0;
                 this.notes = '';
                 this.selectedCustomerId = '';
+                this.paymentMode = 'FULL';
+                this.paymentMethod = 'CASH';
+                this.customerQuery = '';
                 this.generateNewOperationId();
 
                 // Lokal xotirani qayta yuklaymiz (kamaygan ajratmalar bilan)
@@ -712,7 +761,7 @@ export function aquaPos() {
             this.isProcessing = true;
             this.isSyncing = true;
             try {
-                const res = await this.syncEngine.syncNow('manual');
+                const res = await this.syncEngine.syncNow('manual', true);
                 if (res.status === 'SUCCESS') {
                     await this.loadLocalData(false);
                     await this.updateOutboxCount();

@@ -82,6 +82,7 @@ class ReportDashboard extends Component
                 'inventory' => $this->exportService->exportInventoryReport($user, $filters, $format),
                 'statements' => $this->exportService->exportPartyStatementReport($user, $this->statementPartyType, $this->statementPartyId, $filters, $format),
                 'cash' => $this->exportService->exportCashReport($user, $filters, $format),
+                'purchases', 'staff', 'sync' => $this->exportService->exportAdditionalReport($user, $this->activeTab, $filters, $format),
                 default => $this->exportService->exportSalesReport($user, $filters, $format),
             };
 

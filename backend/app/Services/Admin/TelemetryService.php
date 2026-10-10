@@ -2,6 +2,7 @@
 
 namespace App\Services\Admin;
 
+use App\Models\AuditLog;
 use App\Models\Device;
 use App\Models\OutboxEvent;
 use App\Models\ReportExport;
@@ -54,6 +55,16 @@ class TelemetryService
 
         // 4. Oxirgi Eksport / Zaxira nusxasi
         $lastExport = ReportExport::latest()->first();
+        $lastBackup = AuditLog::where('action', 'BACKUP_CREATED')->latest('created_at')->first();
+        $lastOffsite = AuditLog::where('action', 'BACKUP_OFFSITE_COPIED')->latest('created_at')->first();
+        $lastDrill = AuditLog::where('action', 'RESTORE_DRILL_PASSED')->latest('created_at')->first();
+        $lastFailure = AuditLog::whereIn('action', ['BACKUP_FAILED', 'BACKUP_OFFSITE_FAILED', 'RESTORE_DRILL_FAILED'])->latest('created_at')->first();
+        $latestSuccess = match ($lastFailure?->action) {
+            'BACKUP_OFFSITE_FAILED' => $lastOffsite?->created_at,
+            'RESTORE_DRILL_FAILED' => $lastDrill?->created_at,
+            default => $lastBackup?->created_at,
+        };
+        $backupIssue = $lastFailure && (! $latestSuccess || $lastFailure->created_at->greaterThanOrEqualTo($latestSuccess));
 
         // 5. Qurilmalar holati
         $totalDevices = Device::count();
@@ -92,6 +103,12 @@ class TelemetryService
             'backup' => [
                 'last_export_at' => $lastExport?->created_at?->format('d.m.Y H:i:s') ?? 'Mavjud emas',
                 'total_exports' => ReportExport::count(),
+                'last_backup_at' => $lastBackup?->created_at?->timezone('Asia/Tashkent')->format('d.m.Y H:i:s') ?? 'Hali yaratilmagan',
+                'last_offsite_at' => $lastOffsite?->created_at?->timezone('Asia/Tashkent')->format('d.m.Y H:i:s') ?? 'Hali ko‘chirilmagan',
+                'last_drill_at' => $lastDrill?->created_at?->timezone('Asia/Tashkent')->format('d.m.Y H:i:s') ?? 'Hali tekshirilmagan',
+                'offsite_configured' => (bool) config('backup.offsite_disk'),
+                'needs_attention' => $backupIssue || ! config('backup.offsite_disk') || ! $lastDrill || ! $lastBackup || $lastBackup->created_at->lt(now()->subMinutes(30))
+                    || (config('backup.offsite_disk') && (! $lastOffsite || $lastOffsite->created_at->lt(now()->subMinutes(30)))),
             ],
             'devices' => [
                 'total' => $totalDevices,

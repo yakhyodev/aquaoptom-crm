@@ -51,6 +51,13 @@
 
     @if($lastOperationOutcome)<div class="operation-outcome" role="status"><h3>{{ $lastOperationOutcome['title'] }}</h3>@foreach($lastOperationOutcome['stock'] as $stock)<p><span>{{ $stock['name'] }} — omborda</span><strong>{{ number_format($stock['quantity'], 0, '.', ' ') }} dona</strong></p>@endforeach @if(isset($lastOperationOutcome['cash']))<p><span>Hozir barcha hisoblarda bor pul</span><strong>{{ number_format($lastOperationOutcome['cash'], 0, '.', ' ') }} so‘m</strong></p>@endif<button wire:click="$set('activeTab', 'balances')" class="trade-button trade-button-secondary">Ombor qoldiqlarini ko‘rish →</button></div>@endif
 
+    @if(in_array($activeTab, ['balances', 'opening', 'audits']))
+        <div class="grid gap-3 md:grid-cols-2" aria-label="Qoldiq bilan nima qilmoqchisiz?">
+            @if(auth()->user()->hasRole(['OWNER', 'ADMIN']))<button type="button" wire:click="$set('activeTab', 'opening')" class="trade-card text-left"><strong>+ Tizimga hali kiritilmagan mahsulotni qo‘shish</strong><p class="trade-help">Avvaldan bor 50 donani qo‘shaman: tizimdagi 100 + 50 = 150 dona. Pul va qarz o‘zgarmaydi.</p></button>@endif
+            @can('stock_adjustment')<button type="button" wire:click="$set('activeTab', 'audits')" class="trade-card text-left"><strong>Omborda haqiqatan nechta borligini sanash</strong><p class="trade-help">Tizimda 100 dona, omborda 90 dona. Sanash natijasi bo‘yicha farq alohida qayd qilinadi.</p></button>@endcan
+        </div>
+    @endif
+
     @if($activeTab === 'opening' && auth()->user()->hasRole(['OWNER', 'ADMIN']))
         <livewire:inventory.stock-opening />
     @endif

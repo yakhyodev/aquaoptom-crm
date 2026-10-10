@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Inventory;
 
+use App\Models\InventoryMovement;
+use App\Models\OperationResult;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Volume;
@@ -34,6 +36,12 @@ class StockOpening extends Component
 
     public string $salePrice = '';
 
+    public string $costMode = 'known';
+
+    public bool $confirmFreeStock = false;
+
+    private const DRAFT_FIELDS = ['productSelection', 'newProductName', 'volumeSelection', 'customLitres', 'quantity', 'unitCost', 'salePrice', 'costMode', 'confirmFreeStock', 'operationId', 'savedOpening'];
+
     public ?string $errorMessage = null;
 
     #[Locked]
@@ -44,26 +52,84 @@ class StockOpening extends Component
 
     public function mount(): void
     {
-        $this->startNextProduct();
+        $this->authorizeOwner();
+        $draft = session()->get($this->draftKey());
+        if (is_array($draft) && Str::isUuid($draft['operationId'] ?? '')) {
+            foreach (self::DRAFT_FIELDS as $field) {
+                if (array_key_exists($field, $draft)) {
+                    $this->{$field} = $draft[$field];
+                }
+            }
+            $this->recoverSavedOpening();
+        } else {
+            $this->startNextProduct();
+        }
+        if (request()->filled('opening_variant') && $this->quantity === '' && $this->savedOpening === null) {
+            $variant = ProductVariant::find(request()->integer('opening_variant'));
+            if ($variant) {
+                $this->productSelection = (string) $variant->product_id;
+                $this->volumeSelection = (string) $variant->volume_id;
+            }
+        }
+    }
+
+    protected function draftKey(): string
+    {
+        return 'stock-opening.'.Auth::id();
+    }
+
+    public function dehydrate(): void
+    {
+        $draft = [];
+        foreach (self::DRAFT_FIELDS as $field) {
+            $draft[$field] = $this->{$field};
+        }
+        session()->put($this->draftKey(), $draft);
+    }
+
+    protected function recoverSavedOpening(): void
+    {
+        $operation = OperationResult::where('operation_id', $this->operationId)
+            ->where('actor_id', Auth::id())->where('operation_type', 'RECORD_STOCK_OPENING')
+            ->where('status', 'PROCESSED')->first();
+        if (! $operation) {
+            return;
+        }
+        $movement = InventoryMovement::with(['variant.product', 'variant.volume'])
+            ->where('operation_id', $this->operationId)->where('movement_type', 'OPENING_BALANCE')->firstOrFail();
+        $this->savedOpening = [
+            'name' => $movement->variant->product->name.' — '.$movement->variant->volume->name,
+            'added' => (int) $movement->quantity,
+            'quantity' => (int) $movement->balance_after_quantity,
+            'total_cost' => $movement->total_cost,
+            'document_number' => $operation->result_payload['document_number'],
+            'saved_at' => $movement->created_at->timezone('Asia/Tashkent')->format('d.m.Y H:i:s'),
+        ];
     }
 
     public function startNextProduct(): void
     {
         $this->authorizeOwner();
-        $this->reset(['productSelection', 'newProductName', 'volumeSelection', 'customLitres', 'quantity', 'unitCost', 'salePrice', 'errorMessage', 'savedOpening']);
+        $this->reset(['productSelection', 'newProductName', 'volumeSelection', 'customLitres', 'quantity', 'unitCost', 'salePrice', 'costMode', 'confirmFreeStock', 'errorMessage', 'savedOpening']);
         $this->resetValidation();
         $this->operationId = (string) Str::uuid();
+        $this->dehydrate();
     }
 
     public function save(CatalogService $catalogService, OpeningBalanceService $openingService): void
     {
         $this->authorizeOwner();
+        $this->recoverSavedOpening();
         if ($this->savedOpening !== null) {
             return;
         }
 
         $this->errorMessage = null;
         $this->newProductName = trim($this->newProductName);
+        if ($this->costMode === 'free') {
+            $this->unitCost = '0';
+        }
+        $this->dehydrate();
         $this->validate([
             'productSelection' => $this->productSelection === 'new'
                 ? ['required', 'in:new']
@@ -74,13 +140,17 @@ class StockOpening extends Component
                 : ['bail', 'required', 'integer', Rule::exists('volumes', 'id')->whereNull('deleted_at')->where('status', 'active')],
             'customLitres' => $this->volumeSelection === 'new' ? ['required', 'max:20', 'regex:/^\d+(?:[.,]\d{1,3})?$/'] : ['nullable'],
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
-            'unitCost' => ['required', 'integer', 'min:0', 'max:1000000000'],
+            'costMode' => ['required', 'in:known,free'],
+            'confirmFreeStock' => $this->costMode === 'free' ? ['accepted'] : ['boolean'],
+            'unitCost' => ['required', 'integer', $this->costMode === 'free' ? 'min:0' : 'min:1', 'max:1000000000'],
             'salePrice' => ['nullable', 'integer', 'min:0', 'max:1000000000'],
         ], [
             'customLitres.regex' => 'Litrni raqam bilan yozing. Masalan: 0.75 yoki 1,5.',
             'quantity.integer' => 'Dona butun son bo‘lishi kerak. Masalan: 150.',
             'quantity.min' => 'Kamida 1 dona yozing.',
             'unitCost.integer' => 'Narxni butun so‘mda yozing.',
+            'unitCost.min' => 'Tannarx noma’lum bo‘lsa 0 yozmang. Haqiqiy tannarxni aniqlang yoki bepul kelganini alohida belgilang.',
+            'confirmFreeStock.accepted' => 'Mahsulot haqiqatan bepul kelganini tasdiqlang.',
         ], [
             'productSelection' => 'Mahsulot', 'newProductName' => 'Yangi mahsulot nomi',
             'volumeSelection' => 'Litri', 'customLitres' => 'Yangi hajm',
@@ -138,6 +208,7 @@ class StockOpening extends Component
                     'quantity' => $result['stock']['balance_quantity'],
                     'total_cost' => $result['stock']['total_cost'],
                     'document_number' => $result['document_number'],
+                    'saved_at' => now()->timezone('Asia/Tashkent')->format('d.m.Y H:i:s'),
                 ];
             });
             $this->dispatch('refresh-dashboard');
@@ -183,6 +254,8 @@ class StockOpening extends Component
             'products' => Product::where('status', 'active')->orderBy('name')->get(),
             'volumes' => Volume::where('status', 'active')->orderBy('value_ml')->get(),
             'selectedVariant' => $this->selectedVariant(),
+            'recentOpenings' => InventoryMovement::with(['variant.product', 'variant.volume', 'creator'])
+                ->where('movement_type', 'OPENING_BALANCE')->latest('created_at')->limit(12)->get(),
         ]);
     }
 }

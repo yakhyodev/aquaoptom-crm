@@ -1,14 +1,6 @@
 @props(['products', 'volumes', 'selectedProduct', 'selectedVolume'])
 <div class="trade-picker">
-    <div class="trade-field">
-        <label for="trade-product">Mahsulot</label>
-        <select id="trade-product" wire:model.live="selectedProductId">
-            <option value="">Mahsulotni tanlang</option>
-            @foreach ($products as $product)
-                <option value="{{ $product->id }}">{{ $product->name }}</option>
-            @endforeach
-        </select>
-    </div>
+    <x-searchable-select id="trade-product" label="Mahsulot" model="selectedProductId" placeholder="Mahsulot nomini yozing" create-event="open-inline-product-modal" :options="$products->map(fn ($product) => ['value' => $product->id, 'label' => $product->name])->values()->all()" />
     <div class="trade-field">
         <label for="trade-volume">Hajmi / litri</label>
         <select id="trade-volume" wire:model.live="selectedVolumeId" @disabled(! $selectedProduct)>

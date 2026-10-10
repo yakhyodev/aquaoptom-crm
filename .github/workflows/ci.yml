@@ -234,11 +234,14 @@ jobs:
   production-image:
     name: Production container & deployment syntax
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
       - name: Validate deployment script
         run: |
           bash -n deploy/deploy.sh
@@ -270,7 +273,7 @@ jobs:
           for attempt in $(seq 1 40); do docker exec railway-pg pg_isready -U postgres && break || sleep 1; done
           docker run -d --name railway-web --network aquaoptom-ci -p 127.0.0.1:18081:8080 \
             -e PORT=8080 -e APP_ENV=staging -e APP_DEBUG=false -e PREVIEW_MODE=true \
-            -e APP_URL=https://localhost:18081 -e APP_KEY=base64:$(openssl rand -base64 32) \
+            -e APP_URL=http://127.0.0.1:18081 -e SESSION_SECURE_COOKIE=false -e APP_KEY=base64:$(openssl rand -base64 32) \
             -e DB_CONNECTION=pgsql -e DB_HOST=railway-pg -e DB_PORT=5432 \
             -e DB_DATABASE=aquaoptom_staging -e DB_USERNAME=postgres -e DB_PASSWORD=ci-only-password \
             -e REDIS_CLIENT=predis -e REDIS_HOST=railway-redis -e CACHE_STORE=redis \
@@ -304,3 +307,14 @@ jobs:
           for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null && break || sleep 2; done
           curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null
           docker exec railway-web php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if (App\Models\User::where("role", "OWNER")->count() !== 1 || App\Models\CashAccount::count() !== 1 || App\Models\CashAccount::sum("balance") != 0 || App\Models\Sale::count() !== 0 || App\Models\Product::count() !== 0) { exit(1); } echo "Restart preserved one owner, one empty cash account and zero business fixtures\n";'
+          npm install --prefix "$RUNNER_TEMP/browser" --no-save playwright@1.63.0
+          "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/browser/node_modules" PREVIEW_URL=http://127.0.0.1:18081 PREVIEW_OWNER_PASSWORD=ci-only-password BROWSER_SCENARIO=full node backend/tests/web-preview-ui.cjs
+      - name: Save browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: browser-ui-evidence
+          path: ui-evidence/
+          if-no-files-found: ignore
+          retention-days: 7

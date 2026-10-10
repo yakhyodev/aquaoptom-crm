@@ -88,18 +88,29 @@ class CustomerService
         $term = trim($query);
         if ($term === '') {
             return Customer::where('status', 'active')
-                ->latest()
+                ->orderBy('name')->orderBy('id')
                 ->limit($limit)
                 ->get();
         }
 
-        return Customer::where(function ($q) use ($term) {
-            $q->where('name', 'ilike', "%{$term}%")
-                ->orWhere('store_name', 'ilike', "%{$term}%")
-                ->orWhere('phone', 'like', "%{$term}%")
-                ->orWhere('address', 'ilike', "%{$term}%");
-        })
-            ->where('status', 'active')
+        $customers = Customer::where('status', 'active');
+        foreach (preg_split('/\s+/u', $term) as $word) {
+            $customers->where(function ($query) use ($word) {
+                $query->where('name', 'ilike', "%{$word}%")
+                    ->orWhere('store_name', 'ilike', "%{$word}%")
+                    ->orWhere('phone', 'like', "%{$word}%")
+                    ->orWhere('address', 'ilike', "%{$word}%");
+                if (preg_match('/^[\d+()\-]+$/', $word)) {
+                    $digits = preg_replace('/\D/', '', $word);
+                    if ($digits !== '') {
+                        $query->orWhereRaw("regexp_replace(phone, '[^0-9]', '', 'g') LIKE ?", ["%{$digits}%"]);
+                    }
+                }
+            });
+        }
+
+        return $customers
+            ->orderBy('name')->orderBy('id')
             ->limit($limit)
             ->get();
     }

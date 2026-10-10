@@ -7,6 +7,7 @@ use App\Models\Device;
 use App\Models\OperationResult;
 use App\Models\SyncConflict;
 use App\Models\SystemSetting;
+use App\Services\Devices\OfflineLeaseService;
 use App\Services\Sync\Exceptions\RecoveryReconciliationRequiredException;
 use App\Services\Sync\RecoveryReconciliationService;
 use App\Services\Sync\SyncBootstrapService;
@@ -89,6 +90,17 @@ class SyncApiController extends Controller
             'success' => true,
             'data' => $data,
         ]);
+    }
+
+    public function renewLease(Request $request, OfflineLeaseService $leaseService): JsonResponse
+    {
+        $input = $request->validate(['device_uuid' => ['required', 'uuid']]);
+        $user = $request->user();
+        $device = Device::where('device_uuid', $input['device_uuid'])->firstOrFail();
+        abort_unless($device->isActive() && $user->isActive() && $user->hasPermission('offline_sales')
+            && ($device->assigned_user_id === $user->id || $user->hasRole(['OWNER', 'ADMIN'])), 403);
+
+        return response()->json(['success' => true, 'data' => $leaseService->issueLease($device, $user, actor: $user)]);
     }
 
     /**

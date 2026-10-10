@@ -8,10 +8,10 @@
 
         <div class="flex items-center gap-2">
             @if ($activeTab === 'stock')
-                <button wire:click="openStockModal" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-semibold shadow-sm transition">
+                <a href="{{ route('inventory.index', ['tab' => 'opening']) }}" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-semibold shadow-sm transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Ombor qoldig‘i kiritish
-                </button>
+                </a>
             @elseif ($activeTab === 'cash')
                 <button wire:click="openCashModal" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-semibold shadow-sm transition">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -98,7 +98,7 @@
                                 <td class="px-4 py-3 text-right text-slate-700">{{ number_format($wac, 0, '', ' ') }} so‘m</td>
                                 <td class="px-4 py-3 text-right font-semibold text-cyan-700">{{ number_format($val, 0, '', ' ') }} so‘m</td>
                                 <td class="px-4 py-3 text-right">
-                                    <button wire:click="$set('stockVariantId', {{ $variant->id }}); openStockModal();" class="text-xs text-cyan-700 hover:text-cyan-700 font-medium">Qoldiq qo‘shish</button>
+                                    <a href="{{ route('inventory.index', ['tab' => 'opening', 'opening_variant' => $variant->id]) }}" class="text-xs text-cyan-700 hover:text-cyan-700 font-medium">Omborda qoldiq qo‘shish →</a>
                                 </td>
                             </tr>
                         @empty
@@ -415,7 +415,7 @@
                             <label class="flex items-center gap-2 p-3 rounded-xl border {{ $customerBalanceType === 'DEBT' ? 'border-rose-500 bg-rose-50/30 text-rose-700' : 'border-slate-200 bg-slate-50 text-slate-600' }} cursor-pointer">
                                 <input type="radio" wire:model.live="customerBalanceType" value="DEBT" class="text-rose-700">
                                 <div>
-                                    <span class="font-bold block">Qarz (Musbat)</span>
+                                    <span class="font-bold block">Mijoz bizga qarz</span>
                                     <span class="text-xs text-slate-600">Mijoz bizdan qarzdor</span>
                                 </div>
                             </label>
@@ -423,7 +423,7 @@
                             <label class="flex items-center gap-2 p-3 rounded-xl border {{ $customerBalanceType === 'ADVANCE' ? 'border-emerald-500 bg-emerald-50/30 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600' }} cursor-pointer">
                                 <input type="radio" wire:model.live="customerBalanceType" value="ADVANCE" class="text-emerald-700">
                                 <div>
-                                    <span class="font-bold block">Avans (Manfiy)</span>
+                                    <span class="font-bold block">Mijoz oldindan to‘lagan</span>
                                     <span class="text-xs text-slate-600">Oldindan to‘langan pul</span>
                                 </div>
                             </label>
@@ -480,7 +480,7 @@
                             <label class="flex items-center gap-2 p-3 rounded-xl border {{ $supplierBalanceType === 'ADVANCE' ? 'border-emerald-500 bg-emerald-50/30 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600' }} cursor-pointer">
                                 <input type="radio" wire:model.live="supplierBalanceType" value="ADVANCE" class="text-emerald-700">
                                 <div>
-                                    <span class="font-bold block">Avansimiz</span>
+                                    <span class="font-bold block">Biz oldindan to‘laganmiz</span>
                                     <span class="text-xs text-slate-600">Oldindan to‘langan summa</span>
                                 </div>
                             </label>

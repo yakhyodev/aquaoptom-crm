@@ -25,11 +25,17 @@ class BackupCreateCommand extends Command
             'user_id' => null,
         ]);
 
-        $this->info("Backup successfully created!");
+        if (($result['offsite']['status'] ?? null) === 'FAILED') {
+            $this->error('Local backup created, but offsite copy failed. Check backup status in Settings.');
+
+            return self::FAILURE;
+        }
+
+        $this->info('Backup successfully created!');
         $this->line("File: {$result['file_name']}");
-        $this->line("Size: " . round($result['size_bytes'] / 1024, 2) . " KB");
+        $this->line('Size: '.round($result['size_bytes'] / 1024, 2).' KB');
         $this->line("SHA-256: {$result['checksum']}");
-        $this->line("Encrypted: " . ($result['is_encrypted'] ? 'YES (AES-256-CBC)' : 'NO'));
+        $this->line('Encrypted: '.($result['is_encrypted'] ? 'YES (AES-256-CBC)' : 'NO'));
         $this->line("RPO Target: {$result['manifest']['rpo_target']}");
         $this->line("RTO Target: {$result['manifest']['rto_target']}");
 

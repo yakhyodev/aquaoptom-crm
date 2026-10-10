@@ -25,7 +25,11 @@ class ReportExportController extends Controller
             abort(404, 'Eksport fayli topilmadi yoki muddati o\'tgan.');
         }
 
-        $mimeType = $export->format === 'pdf' ? 'application/pdf' : 'text/csv; charset=UTF-8';
+        $mimeType = match ($export->format) {
+            'pdf' => 'application/pdf',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            default => 'text/csv; charset=UTF-8',
+        };
 
         return Storage::disk('local')->download(
             $export->file_path,

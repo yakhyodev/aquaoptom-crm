@@ -7,6 +7,8 @@ use App\Models\SystemSetting;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use ZipArchive;
@@ -125,6 +127,8 @@ class BackupService
                 'created_at' => now(),
             ]);
 
+            $offsite = $this->copyToOffsite($finalPath, $checksum, $isEncrypted);
+
             return [
                 'success' => true,
                 'backup_id' => $backupId,
@@ -134,10 +138,64 @@ class BackupService
                 'is_encrypted' => $isEncrypted,
                 'checksum' => $checksum,
                 'manifest' => $manifest,
+                'offsite' => $offsite,
             ];
+        } catch (\Throwable $exception) {
+            Log::error('Backup creation failed.', ['exception_type' => $exception::class]);
+            AuditLog::create(['action' => 'BACKUP_FAILED', 'new_values' => ['exception_type' => $exception::class], 'created_at' => now()]);
+            throw $exception;
         } finally {
             if (File::exists($tmpDir)) {
                 File::deleteDirectory($tmpDir);
+            }
+        }
+    }
+
+    public function copyToOffsite(string $filePath, string $checksum, bool $encrypted): array
+    {
+        $diskName = config('backup.offsite_disk');
+        if (! $diskName) {
+            return ['status' => 'NOT_CONFIGURED'];
+        }
+        $stream = null;
+        try {
+            if (! $encrypted || ! str_ends_with($filePath, '.enc') || ! hash_equals($checksum, hash_file('sha256', $filePath))) {
+                throw new \RuntimeException('Only verified encrypted backups may leave the server.');
+            }
+            $disk = Storage::disk($diskName);
+            $prefix = 'aquaoptom/'.app()->environment().'/';
+            $remotePath = $prefix.basename($filePath);
+            $stream = fopen($filePath, 'rb');
+            if (! $disk->put($remotePath, $stream, ['visibility' => 'private'])
+                || ! $disk->put($remotePath.'.sha256', $checksum, ['visibility' => 'private'])
+                || $disk->size($remotePath) !== filesize($filePath)) {
+                throw new \RuntimeException('Backup upload verification failed.');
+            }
+            AuditLog::create(['action' => 'BACKUP_OFFSITE_COPIED', 'new_values' => [
+                'disk' => $diskName, 'path' => $remotePath, 'checksum' => $checksum,
+                'size_bytes' => filesize($filePath),
+            ], 'created_at' => now()]);
+            $cutoff = now()->subDays(config('backup.retention_days'));
+            foreach (AuditLog::where('action', 'BACKUP_OFFSITE_COPIED')->where('created_at', '<', $cutoff)->get() as $old) {
+                $path = $old->new_values['path'] ?? '';
+                if (($old->new_values['disk'] ?? '') !== $diskName || ! str_starts_with($path, $prefix)
+                    || ! preg_match('/^aquaoptom_backup_\d{8}_\d{6}_[a-f0-9-]{36}\.zip\.enc$/', basename($path))) {
+                    continue;
+                }
+                if ($disk->delete([$path, $path.'.sha256'])) {
+                    $old->update(['action' => 'BACKUP_OFFSITE_EXPIRED']);
+                }
+            }
+
+            return ['status' => 'COPIED', 'path' => $remotePath];
+        } catch (\Throwable $exception) {
+            Log::error('Offsite backup copy failed; local backup retained.', ['exception_type' => $exception::class]);
+            AuditLog::create(['action' => 'BACKUP_OFFSITE_FAILED', 'new_values' => ['exception_type' => $exception::class], 'created_at' => now()]);
+
+            return ['status' => 'FAILED'];
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
             }
         }
     }

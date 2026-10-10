@@ -62,6 +62,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Sync Protocol Endpoints (Prompt 12 & 14)
     Route::get('/sync/health', [SyncApiController::class, 'health']);
     Route::post('/sync/bootstrap', [SyncApiController::class, 'bootstrap']);
+    Route::post('/sync/renew-lease', [SyncApiController::class, 'renewLease']);
     Route::get('/sync/pull', [SyncApiController::class, 'pull']);
     Route::post('/sync/push', [SyncApiController::class, 'push']);
     Route::post('/sync/reconcile-recovery', [SyncApiController::class, 'reconcileRecovery']);

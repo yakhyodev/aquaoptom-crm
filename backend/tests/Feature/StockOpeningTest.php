@@ -122,6 +122,39 @@ class StockOpeningTest extends TestCase
         Livewire::actingAs(User::factory()->cashier()->create())->test(StockOpening::class)->assertForbidden();
     }
 
+    public function test_draft_survives_reload_and_missing_ack_recovers_the_saved_result(): void
+    {
+        $component = Livewire::actingAs($this->owner)->test(StockOpening::class)
+            ->set('productSelection', 'new')->set('newProductName', 'Qoralama suv')
+            ->set('volumeSelection', 'new')->set('customLitres', '0.75')
+            ->set('quantity', '200')->set('unitCost', '4000');
+        $operationId = $component->get('operationId');
+        $draft = session()->get('stock-opening.'.$this->owner->id);
+
+        $reloaded = Livewire::test(StockOpening::class)->assertSet('operationId', $operationId)
+            ->assertSet('quantity', '200')->assertSet('newProductName', 'Qoralama suv');
+        $reloaded->call('save')->assertHasNoErrors()->assertSet('savedOpening.quantity', 200);
+        session()->put('stock-opening.'.$this->owner->id, $draft);
+
+        Livewire::test(StockOpening::class)->assertSet('operationId', $operationId)
+            ->assertSet('savedOpening.quantity', 200)->call('save');
+        $this->assertDatabaseCount('opening_balance_documents', 1);
+        $this->assertDatabaseCount('inventory_movements', 1);
+    }
+
+    public function test_unknown_cost_cannot_be_disguised_as_free_stock(): void
+    {
+        $component = Livewire::actingAs($this->owner)->test(StockOpening::class)
+            ->set('productSelection', 'new')->set('newProductName', 'Bepul suv')
+            ->set('volumeSelection', 'new')->set('customLitres', '1')
+            ->set('quantity', '10')->set('unitCost', '0')->call('save')->assertHasErrors('unitCost');
+        $this->assertDatabaseCount('products', 0);
+        $component->set('costMode', 'free')->call('save')->assertHasErrors('confirmFreeStock');
+        $this->assertDatabaseCount('products', 0);
+        $component->set('confirmFreeStock', true)->call('save')->assertHasNoErrors()
+            ->assertSet('savedOpening.total_cost', 0)->assertSet('savedOpening.quantity', 10);
+    }
+
     public function test_warehouse_provides_owner_with_a_direct_opening_stock_entry(): void
     {
         $this->actingAs($this->owner)->get('/ombor?tab=opening')->assertOk()

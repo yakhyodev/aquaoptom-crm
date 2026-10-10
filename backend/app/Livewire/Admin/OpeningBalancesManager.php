@@ -89,9 +89,10 @@ class OpeningBalancesManager extends Component
     }
 
     // --- Stock Modal ---
-    public function openStockModal(): void
+    public function openStockModal(?int $variantId = null): void
     {
         $this->reset(['stockVariantId', 'stockQuantity', 'stockUnitCost']);
+        $this->stockVariantId = $variantId;
         $this->stockOperationId = Str::uuid()->toString();
         $this->showStockModal = true;
     }

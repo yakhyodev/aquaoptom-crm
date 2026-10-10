@@ -79,7 +79,7 @@
                     <span>📱</span>
                     <span>Ro'yxatdan o'tgan qurilmalar va Offline holati</span>
                 </h3>
-                <p class="text-xs text-slate-600 mt-0.5">Qurilmalar oxirgi aloqa vaqti, ruxsat guvohnomasi (lease) va faol ajratmalar.</p>
+                <p class="text-xs text-slate-600 mt-0.5">Qurilmalar oxirgi aloqa vaqti, internetsiz ishlash muddati va faol ajratmalar.</p>
             </div>
             <span class="text-xs font-mono text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
                 Jami: {{ $devices->count() }} ta qurilma
@@ -94,7 +94,7 @@
                         <th class="p-3">Turi / Mas'ul</th>
                         <th class="p-3">Holat</th>
                         <th class="p-3">Oxirgi aloqa</th>
-                        <th class="p-3">Ruxsat (Lease)</th>
+                        <th class="p-3">Ishlash muddati</th>
                         <th class="p-3">Tovar rezervi</th>
                         <th class="p-3">Kredit rezervi</th>
                         <th class="p-3 text-right">Amallar</th>
@@ -352,7 +352,7 @@
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
             <div class="w-full max-w-md bg-slate-50 border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-4">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-200">
-                    <h3 class="text-base font-bold text-slate-900">Ruxsat guvohnomasi (Lease) berish</h3>
+                    <h3 class="text-base font-bold text-slate-900">Internetsiz ishlashga ruxsat berish</h3>
                     <button wire:click="$set('showLeaseModal', false)" class="text-slate-600 hover:text-slate-900">&times;</button>
                 </div>
 

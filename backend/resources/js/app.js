@@ -4,6 +4,7 @@ import Pusher from 'pusher-js';
 import { aquaPos } from './offline/aqua-pos.js';
 import { AquaDB } from './offline/aqua-db.js';
 import { AquaSync } from './offline/aqua-sync.js';
+import { searchableSelect } from './searchable-select.js';
 
 if (import.meta.env.VITE_REVERB_APP_KEY) {
     window.Pusher = Pusher;
@@ -20,6 +21,7 @@ if (import.meta.env.VITE_REVERB_APP_KEY) {
 window.AquaDB = AquaDB;
 window.AquaSync = AquaSync;
 window.aquaPos = aquaPos;
+window.aquaSearchSelect = searchableSelect;
 
 document.addEventListener('keydown', (event) => {
     if (event.key !== 'Tab') {

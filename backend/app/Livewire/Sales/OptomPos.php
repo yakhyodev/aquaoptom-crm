@@ -440,7 +440,7 @@ class OptomPos extends Component
         return view('livewire.sales.optom-pos', [
             'products' => $products,
             'availableVolumes' => $availableVolumes,
-            'recentCustomers' => Customer::where('status', 'active')->latest()->take(6)->get(),
+            'recentCustomers' => Customer::where('status', 'active')->orderBy('name')->orderBy('id')->take(12)->get(),
             'customerResults' => trim($this->customerSearch) !== ''
                 ? app(CustomerService::class)->search($this->customerSearch) : collect(),
             'cashAccounts' => CashAccount::all(),

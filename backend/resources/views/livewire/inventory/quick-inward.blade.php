@@ -58,7 +58,7 @@
 
                 <section class="trade-card">
                     <div class="trade-card-heading"><div class="trade-heading"><span class="trade-step">2</span><div><h2>Kimdan olindi?</h2><p>Mahsulotni olib kelgan yetkazuvchini tanlang.</p></div></div><button type="button" wire:click="$dispatch('open-inline-supplier-modal')" class="trade-button trade-button-secondary">+ Yangi yetkazuvchi</button></div>
-                    <div class="trade-field"><label for="inward-supplier">Ta’minotchi / yetkazuvchi</label><select id="inward-supplier" wire:model.live="selectedSupplierId"><option value="">Yetkazuvchini tanlang</option>@foreach ($suppliers as $supplier)<option value="{{ $supplier->id }}">{{ $supplier->display_name }}</option>@endforeach</select></div>
+                    <x-searchable-select id="inward-supplier" label="Ta’minotchi / yetkazuvchi" model="selectedSupplierId" placeholder="Ism, kompaniya yoki telefonni yozing" create-event="open-inline-supplier-modal" :options="$suppliers->map(fn ($supplier) => ['value' => $supplier->id, 'label' => $supplier->display_name])->values()->all()" />
                     <details class="trade-details"><summary>Izoh <span>ixtiyoriy</span></summary><div class="trade-field"><label for="inward-notes">Izoh</label><input id="inward-notes" type="text" wire:model="notes" placeholder="Qo‘shimcha ma’lumot"></div></details>
                 </section>
             </div>

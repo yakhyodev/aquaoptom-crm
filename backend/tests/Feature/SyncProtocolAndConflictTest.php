@@ -30,6 +30,29 @@ class SyncProtocolAndConflictTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_expired_device_permission_can_be_renewed_without_changing_allocations(): void
+    {
+        $old = $this->leaseService->issueLease($this->device, $this->cashier, durationHours: 1);
+        $this->travel(2)->hours();
+        $stockBefore = $this->device->activeInventoryAllocations()->get()->toArray();
+        $creditBefore = $this->device->activeCreditAllocations()->get()->toArray();
+        $response = $this->actingAs($this->cashier, 'sanctum')->postJson('/api/sync/renew-lease', ['device_uuid' => $this->device->device_uuid]);
+        $response->assertOk()->assertJsonPath('success', true);
+        $this->assertNotSame($old['lease_token'], $response->json('data.lease_token'));
+        $this->assertTrue(Carbon::parse($response->json('data.expires_at'))->isFuture());
+        $this->assertSame($stockBefore, $this->device->activeInventoryAllocations()->get()->toArray());
+        $this->assertSame($creditBefore, $this->device->activeCreditAllocations()->get()->toArray());
+        $this->travelBack();
+    }
+
+    public function test_device_renewal_rejects_an_unassigned_user_and_a_revoked_device(): void
+    {
+        $other = User::factory()->salesManager()->create();
+        $this->actingAs($other, 'sanctum')->postJson('/api/sync/renew-lease', ['device_uuid' => $this->device->device_uuid])->assertForbidden();
+        $this->device->update(['status' => 'REVOKED', 'is_active' => false]);
+        $this->actingAs($this->cashier, 'sanctum')->postJson('/api/sync/renew-lease', ['device_uuid' => $this->device->device_uuid])->assertStatus(403);
+    }
+
     protected User $owner;
 
     protected User $cashier;

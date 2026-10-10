@@ -3,6 +3,7 @@
 namespace App\Services\Reports;
 
 use App\Models\Device;
+use App\Models\Purchase;
 use App\Models\ReportExport;
 use App\Models\User;
 use App\Services\Reports\Exceptions\UnauthorizedExportException;
@@ -10,6 +11,10 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use OpenSpout\Common\Entity\Cell;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Common\Entity\Style\Style;
+use OpenSpout\Writer\XLSX\Writer;
 
 class ExportService
 {
@@ -371,6 +376,46 @@ class ExportService
         );
     }
 
+    public function exportAdditionalReport(User $user, string $reportType, array $filters, string $format = 'xlsx'): ReportExport
+    {
+        $this->authorize($user);
+        $totals = [];
+        if ($reportType === 'purchases') {
+            if (! $user->isOwner() && ! $user->hasPermission('view_cost_price')) {
+                throw new UnauthorizedExportException('Kirim narxlarini ko‘rish huquqi kerak.');
+            }
+            $report = $this->reportQueryService->getPurchasesSummary($filters);
+            $title = 'Mahsulot kirimi';
+            $headers = ['Kirim raqami', 'Sana (Toshkent)', 'Yetkazuvchi', 'Dona', 'Jami summa', 'To‘langan', 'Qarz', 'Xodim'];
+            $rows = Purchase::with(['supplier', 'creator', 'items'])
+                ->where('status', 'POSTED')->whereBetween('created_at', [$report['period']['start_utc'], $report['period']['end_utc']])
+                ->when($filters['supplier_id'] ?? null, fn ($query, $id) => $query->where('supplier_id', $id))
+                ->orderByDesc('created_at')->get()->map(fn ($purchase) => [
+                    $purchase->invoice_number,
+                    $purchase->created_at->timezone(ReportPeriod::TIMEZONE)->format('d.m.Y H:i:s'),
+                    $purchase->supplier?->display_name ?? 'Yetkazuvchi ko‘rsatilmagan',
+                    (int) $purchase->items->sum('quantity'), (int) $purchase->total_amount,
+                    (int) $purchase->paid_amount, (int) $purchase->debt_amount, $purchase->creator?->name ?? '',
+                ])->all();
+            $totals = ['Jami', '', '', $report['total_units_inward'], $report['total_inward_amount'], $report['total_paid_amount'], $report['total_debt_amount'], ''];
+        } elseif ($reportType === 'staff') {
+            $report = $this->reportQueryService->getStaffSummary($filters);
+            $title = 'Xodimlar savdosi';
+            $headers = ['Xodim', 'Sotuvlar soni', 'Jami sotuv', 'To‘langan pul', 'Qarzga berilgan'];
+            $rows = array_map(fn ($row) => [$row['name'], $row['orders_count'], $row['total_amount'], $row['paid_cash'] + $row['paid_card'] + $row['paid_bank'], $row['debt_amount']], $report['staff']);
+        } elseif ($reportType === 'sync') {
+            $report = $this->reportQueryService->getSyncSummary($filters);
+            $title = 'Qurilmalarning hozirgi holati';
+            $headers = ['Qurilma', 'Holati', 'Oxirgi ulanish (Toshkent)', 'Ajratilgan mahsulot turlari', 'Ajratilgan dona', 'Sanash uchun to‘xtatildi', 'To‘xtash tasdiqlandi'];
+            $rows = array_map(fn ($row) => [$row['device_name'], $row['status'], $row['last_seen_at'], $row['active_allocations_count'], $row['total_reserved_units'], $row['freeze_requested'] ? 'Ha' : 'Yo‘q', $row['freeze_acknowledged'] ? 'Ha' : 'Yo‘q'], $report['devices']);
+        } else {
+            throw new \InvalidArgumentException('Bunday hisobot turi mavjud emas.');
+        }
+
+        return $this->generateExport(user: $user, reportType: $reportType, format: $format, title: $title,
+            period: $report['period'], headers: $headers, rows: $rows, totals: $totals, filters: $filters);
+    }
+
     /**
      * Faylni generatsiya qilish va saqlash
      */
@@ -387,6 +432,9 @@ class ExportService
         array $alignRightColumns = [],
         array $filters = []
     ): ReportExport {
+        if (! in_array($format, ['csv', 'xlsx', 'pdf'], true)) {
+            throw new \InvalidArgumentException('Fayl turi Excel, CSV yoki PDF bo‘lishi kerak.');
+        }
         $uuid = (string) Str::uuid();
         $dateStamp = Carbon::now(ReportPeriod::TIMEZONE)->format('Ymd_His');
         $fileName = "{$reportType}_report_{$dateStamp}.{$format}";
@@ -426,6 +474,29 @@ class ExportService
 
             Storage::disk('local')->put($relativePath, $pdfContent);
             $fileSize = strlen($pdfContent);
+        } elseif ($format === 'xlsx') {
+            $disk = Storage::disk('local');
+            $disk->makeDirectory('exports');
+            $path = $disk->path($relativePath);
+            $writer = new Writer;
+            $writer->openToFile($path);
+            try {
+                $writer->addRow(Row::fromValues(['AquaOptom CRM', $metadata['title']]));
+                $writer->addRow(Row::fromValues(['Davr', $metadata['period_label']]));
+                $writer->addRow(Row::fromValues(['Tayyorlangan vaqt (Toshkent)', $metadata['exported_at']]));
+                $writer->addRow(Row::fromValues(['Ma’lumot holati', $metadata['completeness_status']]));
+                $writer->addRow(Row::fromValuesWithStyle($headers, new Style(fontBold: true, backgroundColor: 'DBEAFE')));
+                foreach ($rows as $row) {
+                    $writer->addRow(new Row(array_map(static fn ($value) => is_string($value)
+                        ? new Cell\StringCell($value) : Cell::fromValue($value), $row)));
+                }
+                if ($totals !== []) {
+                    $writer->addRow(Row::fromValuesWithStyle($totals, new Style(fontBold: true)));
+                }
+            } finally {
+                $writer->close();
+            }
+            $fileSize = filesize($path);
         } else {
             // CSV / Excel format (UTF-8 with BOM and formula injection protection)
             $content = self::buildCsvContent($metadata, $headers, $rows, $totals);

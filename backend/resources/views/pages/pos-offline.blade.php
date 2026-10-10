@@ -138,7 +138,7 @@
             <span>⚠️</span>
             <span x-text="leaseWarning"></span>
         </div>
-        <button type="button" @click="syncNow()" class="underline text-amber-700 hover:text-slate-900">Yangilash</button>
+        <button type="button" @click="syncNow()" :disabled="isProcessing || !isOnline" class="underline text-amber-700 hover:text-slate-900">Qurilma ruxsatini yangilash</button>
     </div>
 
     <!-- 2. GLOBAL ALERT BANNER -->
@@ -283,6 +283,12 @@
         <section class="w-full lg:w-[440px] xl:w-[480px] flex flex-col bg-slate-50 border-t lg:border-t-0 lg:border-l border-slate-200 overflow-hidden shadow-xl shrink-0">
 
             <!-- Customer Selector Bar -->
+            <div class="grid grid-cols-2 gap-2 p-3 border-b border-slate-200">
+                <button type="button" @click="switchSaleMode('quick')" :aria-pressed="saleMode === 'quick'" class="trade-button" :class="saleMode === 'quick' ? 'trade-button-primary' : 'trade-button-secondary'">⚡ Tezkor sotuv</button>
+                <button type="button" @click="switchSaleMode('customer')" :aria-pressed="saleMode === 'customer'" class="trade-button" :class="saleMode === 'customer' ? 'trade-button-primary' : 'trade-button-secondary'">👤 Mijozga sotuv</button>
+            </div>
+            <p x-show="saleMode === 'quick'" class="p-3 text-xs text-slate-600">Mijoz tanlanmaydi. Jami summa to‘liq to‘lanadi. Donani klaviaturada yozishingiz mumkin.</p>
+            <div x-show="saleMode === 'customer'">
             <div class="p-3 border-b border-slate-200 bg-slate-50/70 space-y-2">
                 <div class="flex items-center justify-between text-xs font-semibold text-slate-700">
                     <span>Xaridor (Mijoz):</span>
@@ -293,17 +299,17 @@
                     </button>
                 </div>
                 <div class="relative">
-                    <select aria-label="Xaridorni tanlash" x-model="selectedCustomerId"
-                            @change="saveCartDraft()"
-                            class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-cyan-500 font-medium">
-                        <option value="">Mijozsiz tezkor sotuv (to‘liq to‘lov)</option>
-                        <template x-for="c in customers" :key="c.id">
-                            <option :value="c.id"
-                                    x-text="`${c.name} ${c.store_name ? `(${c.store_name})` : ''} ${c.current_debt > 0 ? `[Qarz: ${c.current_debt.toLocaleString('uz-UZ')}]` : ''}`">
-                            </option>
-                        </template>
-                    </select>
+                    <div x-show="selectedCustomerId" class="flex items-center justify-between gap-2 p-2"><strong class="text-sm" x-text="selectedCustomerLabel"></strong><button type="button" @click="selectedCustomerId = ''; customerQuery = ''; saveCartDraft()" class="trade-button trade-button-secondary">Almashtirish</button></div>
+                    <div x-show="!selectedCustomerId">
+                        <input type="search" x-model="customerQuery" aria-label="Mijozni qidirish" placeholder="Ism, telefon yoki do‘kon nomini yozing" class="w-full rounded-xl border border-slate-300 p-3 text-sm" @keydown.enter.prevent="if (filteredCustomers[0]) { selectedCustomerId = String(filteredCustomers[0].id); saveCartDraft(); }">
+                        <div class="max-h-48 overflow-y-auto mt-2">
+                            <template x-for="c in filteredCustomers" :key="c.id"><button type="button" @click="selectedCustomerId = String(c.id); saveCartDraft()" class="block w-full p-3 text-left text-sm border-b border-slate-200" x-text="[c.name, c.store_name, c.phone].filter(Boolean).join(' · ')"></button></template>
+                            <p x-show="!filteredCustomers.length" class="p-3 text-sm">Topilmadi. «Yangi mijoz» orqali qo‘shing.</p>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-2">Birinchi 20 ta mijoz alifbo bo‘yicha. Keraklisini yozib qidiring.</p>
+                    </div>
                 </div>
+            </div>
             </div>
 
             <!-- Cart Table Items -->
@@ -385,20 +391,21 @@
                 <!-- Payment Method Buttons -->
                 <div>
                     <label class="text-xs font-semibold text-slate-600 block mb-1">To'lov usuli:</label>
-                    <div class="grid grid-cols-2 gap-1.5 text-xs font-bold">
+                    <div class="grid grid-cols-3 gap-1.5 text-xs font-bold" x-show="saleMode === 'customer'">
                         <button type="button"
                                 @click="onPaymentMethodChange('CASH')"
                                 class="py-2 rounded-lg border transition-colors flex flex-col items-center gap-0.5"
-                                :class="paymentMethod === 'CASH' ? 'bg-emerald-600 text-slate-900 border-emerald-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
+                                :class="paymentMode === 'FULL' ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
                             <span>💵</span>
                             <span class="text-xs">To‘liq to‘lov</span>
                         </button>
+                        <button type="button" @click="onPaymentMethodChange('PARTIAL')" class="py-2 rounded-lg border transition-colors" :class="paymentMode === 'PARTIAL' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-50 text-slate-600 border-slate-200'">Qisman to‘lov</button>
                         <button type="button"
                                 @click="onPaymentMethodChange('DEBT')"
                                 class="py-2 rounded-lg border transition-colors flex flex-col items-center gap-0.5"
-                                :class="paymentMethod === 'DEBT' ? 'bg-amber-600 text-slate-900 border-amber-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
+                                :class="paymentMode === 'DEBT' ? 'bg-amber-600 text-white border-amber-500 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'">
                             <span>⏳</span>
-                            <span class="text-xs">Nasiya</span>
+                            <span class="text-xs">To‘liq nasiya</span>
                         </button>
                     </div>
                 </div>
@@ -409,6 +416,7 @@
                         <label for="offline-paid-amount" class="text-xs font-semibold text-slate-600 block mb-1">Olingan pul (so'm):</label>
                         <input id="offline-paid-amount" type="number"
                                x-model.number="paidAmount"
+                               :readonly="paymentMode !== 'PARTIAL'" min="0" :max="totalAmount" step="1" inputmode="numeric"
                                @input="saveCartDraft()"
                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm font-bold text-slate-900 text-right focus:outline-none focus:border-cyan-500">
                     </div>
@@ -425,7 +433,7 @@
                 <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                     <div>
                         <span class="text-xs text-slate-600  font-bold">Jami to'lov:</span>
-                        <p class="text-xs text-slate-600">Kirim narxi: <span class="text-slate-600">internetda hisoblanadi</span></p>
+                        <p class="text-xs text-slate-600" x-text="paymentMode === 'FULL' ? 'Hammasi hozir to‘lanadi. Qarz qolmaydi.' : 'Olingan pul va qoladigan qarzni tekshiring.'"></p>
                     </div>
                     <div class="text-right">
                         <span class="text-xl font-black text-cyan-700"

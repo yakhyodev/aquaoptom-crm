@@ -552,11 +552,16 @@
                     <div class="flex items-center justify-between mb-4">
                         <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span>💾</span>
-                            <span>Eksport & Zaxira Nusxalari</span>
+                            <span>Zaxira va tiklash holati</span>
                         </h4>
                         <span class="text-xs text-slate-600 font-mono">{{ $telemetry['backup']['total_exports'] }} ta</span>
                     </div>
                     <div class="space-y-2.5 text-xs text-slate-700">
+                        <div class="trade-alert {{ $telemetry['backup']['needs_attention'] ? 'trade-alert-error' : '' }}">{{ $telemetry['backup']['needs_attention'] ? 'Zaxira holatini tekshirish kerak' : 'Oxirgi zaxira va nusxa vaqtlari yangilangan' }}</div>
+                        <div class="flex justify-between gap-3"><span>Serverdagi oxirgi zaxira</span><strong>{{ $telemetry['backup']['last_backup_at'] }}</strong></div>
+                        <div class="flex justify-between gap-3"><span>Alohida saqlash joyidagi nusxa</span><strong>{{ $telemetry['backup']['offsite_configured'] ? $telemetry['backup']['last_offsite_at'] : 'Hali ulanmagan' }}</strong></div>
+                        <div class="flex justify-between gap-3"><span>Bazani tiklash sinovi</span><strong>{{ $telemetry['backup']['last_drill_at'] }}</strong></div>
+                        <p class="trade-help">Hisobot eksporti zaxira o‘rnini bosmaydi. Alohida nusxalar shifrlanadi; tiklash sinovi boshqa bazada bajariladi.</p>
                         <div class="flex justify-between">
                             <span class="text-slate-600">Oxirgi eksport vaqti:</span>
                             <span class="font-mono text-slate-900">{{ $telemetry['backup']['last_export_at'] }}</span>
