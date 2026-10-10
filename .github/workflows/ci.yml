@@ -307,6 +307,9 @@ jobs:
           for attempt in $(seq 1 60); do curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null && break || sleep 2; done
           curl -fsS http://127.0.0.1:18081/api/health/ready > /dev/null
           docker exec railway-web php -r 'require "vendor/autoload.php"; $app = require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); if (App\Models\User::where("role", "OWNER")->count() !== 1 || App\Models\CashAccount::count() !== 1 || App\Models\CashAccount::sum("balance") != 0 || App\Models\Sale::count() !== 0 || App\Models\Product::count() !== 0) { exit(1); } echo "Restart preserved one owner, one empty cash account and zero business fixtures\n";'
+          # This disposable loopback container has no Railway HTTPS edge proxy.
+          # Keep the shipped Nginx template unchanged; override only this test instance.
+          docker exec railway-web sh -c "sed -i 's/fastcgi_param HTTPS on;/fastcgi_param HTTPS off;/; s/fastcgi_param SERVER_PORT 443;/fastcgi_param SERVER_PORT 8080;/' /etc/nginx/nginx.conf && nginx -s reload"
           npm install --prefix "$RUNNER_TEMP/browser" --no-save playwright@1.63.0
           "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
           NODE_PATH="$RUNNER_TEMP/browser/node_modules" PREVIEW_URL=http://127.0.0.1:18081 PREVIEW_OWNER_PASSWORD=ci-only-password BROWSER_SCENARIO=full node backend/tests/web-preview-ui.cjs
