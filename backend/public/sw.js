@@ -3,10 +3,9 @@
  * Version: 1.0.0
  */
 
-const CACHE_NAME = 'aquaoptom-pos-v1';
+const CACHE_NAME = 'aquaoptom-pos-v2';
 
 const PRECACHE_ASSETS = [
-    '/pos',
     '/offline.html',
     '/manifest.json',
     '/icons/icon.svg',
@@ -46,8 +45,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
+    if (url.origin === self.location.origin && ['/login', '/logout'].includes(url.pathname)) {
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.delete('/pos')));
+        return;
+    }
+
     // Faqat bir xil domen (same-origin) so'rovlarini boshqaramiz
-    if (url.origin !== self.location.origin) {
+    if (url.origin !== self.location.origin || event.request.method !== 'GET') {
         return;
     }
 
@@ -78,7 +82,7 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(event.request).then((networkResponse) => {
                 // Tarmoq bor bo'lsa, /pos sahifasining yangi keshini saqlab qo'yamiz
-                if (networkResponse.status === 200 && url.pathname.startsWith('/pos')) {
+                if (networkResponse.status === 200 && !networkResponse.redirected && url.pathname === '/pos') {
                     const responseClone = networkResponse.clone();
                     caches.open(CACHE_NAME).then((cache) => {
                         cache.put(event.request, responseClone);
@@ -87,13 +91,13 @@ self.addEventListener('fetch', (event) => {
                 return networkResponse;
             }).catch(async () => {
                 // Tarmoq uzilganda keshdan qidiramiz
-                const cachedPage = await caches.match(event.request);
+                const cachedPage = url.pathname === '/pos' ? await caches.match('/pos') : null;
                 if (cachedPage) {
                     return cachedPage;
                 }
                 // Agar aynan o'sha sahifa bo'lmasa, /pos keshini yoki /offline.html ni beramiz
                 const posShell = await caches.match('/pos');
-                if (posShell) {
+                if (posShell && url.pathname === '/pos') {
                     return posShell;
                 }
                 return caches.match('/offline.html');
@@ -101,6 +105,8 @@ self.addEventListener('fetch', (event) => {
         );
         return;
     }
+
+    if (!['style', 'script', 'font', 'image'].includes(event.request.destination)) return;
 
     // C. Statik resurslar (CSS, JS, Fonts, Images)
     // Stale-While-Revalidate yoki Cache-First

@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/offline_sales_service.dart';
 import '../utils/formatters.dart';
 import '../utils/operation_id.dart';
+import '../utils/search_picker.dart';
 
 /// Savat qatori. Miqdor faqat butun dona (backend kasr donani rad etadi),
 /// narx butun so'm. UI dagi jami faqat ko'rinish uchun (preview) — yakuniy
@@ -29,12 +30,12 @@ class CartItem {
   int get lineTotal => quantity * salePrice;
 
   Map<String, dynamic> toPayload() => {
-        'variant_id': variant.id,
-        'quantity': quantity,
-        'package_name': 'dona',
-        'is_system_price': isSystemPrice,
-        if (!isSystemPrice) 'sale_price': salePrice,
-      };
+    'variant_id': variant.id,
+    'quantity': quantity,
+    'package_name': 'dona',
+    'is_system_price': isSystemPrice,
+    if (!isSystemPrice) 'sale_price': salePrice,
+  };
 }
 
 class PosScreen extends StatefulWidget {
@@ -177,16 +178,20 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: Text('${item.productName} (${item.variant.displayVolume}) narxi'),
+          title: Text(
+            '${item.productName} (${item.variant.displayVolume}) narxi',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
                 key: const Key('pos_system_price_switch'),
                 title: const Text('Tizim narxi'),
-                subtitle: Text(hasSystemPrice
-                    ? Formatters.formatMoney(item.variant.defaultSalePrice)
-                    : 'Belgilanmagan'),
+                subtitle: Text(
+                  hasSystemPrice
+                      ? Formatters.formatMoney(item.variant.defaultSalePrice)
+                      : 'Belgilanmagan',
+                ),
                 value: useSystem,
                 onChanged: hasSystemPrice
                     ? (v) => setDlg(() => useSystem = v)
@@ -261,13 +266,17 @@ class _PosScreenState extends State<PosScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: storeCtrl,
-                decoration: const InputDecoration(labelText: 'Do\'kon / Savdo nuqtasi'),
+                decoration: const InputDecoration(
+                  labelText: 'Do\'kon / Savdo nuqtasi',
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: limitCtrl,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Qarz limiti (so\'m)'),
+                decoration: const InputDecoration(
+                  labelText: 'Qarz limiti (so\'m)',
+                ),
               ),
             ],
           ),
@@ -283,8 +292,12 @@ class _PosScreenState extends State<PosScreen> {
               try {
                 final newCust = await _api.createCustomer(
                   name: nameCtrl.text.trim(),
-                  phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                  storeName: storeCtrl.text.trim().isEmpty ? null : storeCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim().isEmpty
+                      ? null
+                      : phoneCtrl.text.trim(),
+                  storeName: storeCtrl.text.trim().isEmpty
+                      ? null
+                      : storeCtrl.text.trim(),
                   debtLimit: int.tryParse(limitCtrl.text) ?? 0,
                 );
                 if (!ctx.mounted) return;
@@ -310,107 +323,23 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  void _showProductSelectorDialog() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (_, scrollCtrl) {
-            return Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFF334155))),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.inventory_2, color: Colors.cyanAccent),
-                      SizedBox(width: 8),
-                      Text(
-                        'Mahsulot tanlang',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollCtrl,
-                    itemCount: _catalog.length,
-                    itemBuilder: (_, idx) {
-                      final prod = _catalog[idx];
-                      return ExpansionTile(
-                        title: Text(
-                          prod.name,
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          '${prod.variants.length} ta hajm',
-                          style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
-                        ),
-                        children: prod.variants.map((v) {
-                          return ListTile(
-                            leading: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.blueAccent.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                v.displayVolume,
-                                style: const TextStyle(
-                                    color: Colors.cyanAccent,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                            title: Text(
-                              'Qoldiq: ${v.stockQty} dona',
-                              style: const TextStyle(color: Colors.white),
-                            ),
-                            subtitle: Text(
-                              Formatters.formatMoney(v.defaultSalePrice),
-                              style: const TextStyle(color: Colors.greenAccent),
-                            ),
-                            trailing: ElevatedButton(
-                              onPressed: () {
-                                _addToCart(prod, v);
-                                Navigator.pop(ctx);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blueAccent,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
-                              ),
-                              child: const Text('Qo\'shish',
-                                  style: TextStyle(fontSize: 12)),
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+  Future<void> _showProductSelectorDialog() async {
+    final choices = _catalog
+        .expand(
+          (product) => product.variants.map(
+            (variant) => (product: product, variant: variant),
+          ),
+        )
+        .toList();
+    final selected = await chooseFromList(
+      context,
+      title: 'Mahsulot nomi yoki hajmini qidiring',
+      items: choices,
+      labelFor: (item) =>
+          '${item.product.name} — ${item.variant.displayVolume} · ${item.variant.stockQty} dona',
     );
+    if (selected != null && mounted)
+      _addToCart(selected.product, selected.variant);
   }
 
   void _showReceiptDialog(SaleRecord sale) {
@@ -418,7 +347,7 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: Row(
           children: [
             const Icon(Icons.check_circle, color: Colors.greenAccent),
@@ -426,8 +355,8 @@ class _PosScreenState extends State<PosScreen> {
             Expanded(
               child: Text(
                 'Chek #${sale.invoiceNumber}',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -442,42 +371,63 @@ class _PosScreenState extends State<PosScreen> {
             children: [
               Text(
                 'Mijoz: ${sale.customerName}',
-                style: const TextStyle(color: Colors.cyanAccent, fontSize: 13),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 13,
+                ),
               ),
               Text(
                 'Vaqt: ${Formatters.formatDateTime(sale.createdAt)}',
-                style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
-              const Divider(color: Color(0xFF334155), height: 20),
-              ...sale.items.map((it) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${it.productName} (${it.volumeName}) x ${it.quantity}',
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 12),
+              Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                height: 20,
+              ),
+              ...sale.items.map(
+                (it) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${it.productName} (${it.volumeName}) x ${it.quantity}',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 12,
                           ),
                         ),
-                        Text(
-                          Formatters.formatMoney(it.totalPrice),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12),
+                      ),
+                      Text(
+                        Formatters.formatMoney(it.totalPrice),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
-                      ],
-                    ),
-                  )),
-              const Divider(color: Color(0xFF334155), height: 20),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                height: 20,
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Jami Summa:',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Jami Summa:',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   Text(
                     Formatters.formatMoney(sale.totalAmount),
                     style: const TextStyle(
@@ -492,11 +442,19 @@ class _PosScreenState extends State<PosScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('To\'langan:',
-                      style: TextStyle(color: Colors.blueGrey, fontSize: 13)),
+                  Text(
+                    'To\'langan:',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
                   Text(
                     Formatters.formatMoney(sale.paidAmount),
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 13,
+                    ),
                   ),
                 ],
               ),
@@ -505,14 +463,17 @@ class _PosScreenState extends State<PosScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Nasiya Qarz:',
-                        style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    const Text(
+                      'Nasiya Qarz:',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                    ),
                     Text(
                       Formatters.formatMoney(sale.debtAmount),
                       style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13),
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -541,7 +502,7 @@ class _PosScreenState extends State<PosScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: Row(
           children: [
             const Icon(Icons.cloud_off, color: Colors.amberAccent),
@@ -549,8 +510,8 @@ class _PosScreenState extends State<PosScreen> {
             Expanded(
               child: Text(
                 'Chek #${result.tempInvoiceNumber}',
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -564,7 +525,10 @@ class _PosScreenState extends State<PosScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.amberAccent.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(6),
@@ -578,13 +542,22 @@ class _PosScreenState extends State<PosScreen> {
               const SizedBox(height: 12),
               Text(
                 'Mijoz: ${_isQuickSale ? "Tezkor Xaridor" : (_selectedCustomer?.name ?? "Tezkor")}',
-                style: const TextStyle(color: Colors.cyanAccent, fontSize: 13),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontSize: 13,
+                ),
               ),
               Text(
                 'Vaqt: ${Formatters.formatDateTime(DateTime.now())}',
-                style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
               ),
-              const Divider(color: Color(0xFF334155), height: 20),
+              Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                height: 20,
+              ),
               ...((result.receipt['items'] as List<dynamic>?) ?? []).map((it) {
                 final item = it as Map<String, dynamic>;
                 return Padding(
@@ -595,29 +568,46 @@ class _PosScreenState extends State<PosScreen> {
                       Expanded(
                         child: Text(
                           '${item['product_name']} x${item['quantity']}',
-                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                       Text(
-                        Formatters.formatMoney((item['total_price'] as num).toInt()),
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        Formatters.formatMoney(
+                          (item['total_price'] as num).toInt(),
+                        ),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                 );
               }),
-              const Divider(color: Color(0xFF334155), height: 20),
+              Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                height: 20,
+              ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Jami:',
-                      style: TextStyle(color: Colors.blueGrey, fontSize: 13)),
+                  Text(
+                    'Jami:',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                    ),
+                  ),
                   Text(
                     Formatters.formatMoney(result.totalAmount),
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
                   ),
                 ],
               ),
@@ -625,14 +615,17 @@ class _PosScreenState extends State<PosScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('To\'landi:',
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 13)),
+                  const Text(
+                    'To\'landi:',
+                    style: TextStyle(color: Colors.greenAccent, fontSize: 13),
+                  ),
                   Text(
                     Formatters.formatMoney(result.paidAmount),
                     style: const TextStyle(
-                        color: Colors.greenAccent,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14),
+                      color: Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -641,14 +634,17 @@ class _PosScreenState extends State<PosScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Nasiya Qarz:',
-                        style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    const Text(
+                      'Nasiya Qarz:',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                    ),
                     Text(
                       Formatters.formatMoney(result.debtAmount),
                       style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13),
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -682,7 +678,9 @@ class _PosScreenState extends State<PosScreen> {
 
     if (!_isQuickSale && _selectedCustomer == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xaridorni tanlang yoki Tezkor savdoni belgilang.')),
+        const SnackBar(
+          content: Text('Xaridorni tanlang yoki Tezkor savdoni belgilang.'),
+        ),
       );
       return;
     }
@@ -690,15 +688,21 @@ class _PosScreenState extends State<PosScreen> {
     if (_paymentMode != 'FULL' && _isQuickSale) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text(
-                'Tezkor (nomsiz) xaridor faqat to\'liq to\'laydi. Qisman/nasiya uchun mijoz tanlang!')),
+          content: Text(
+            'Tezkor (nomsiz) xaridor faqat to\'liq to\'laydi. Qisman/nasiya uchun mijoz tanlang!',
+          ),
+        ),
       );
       return;
     }
 
     if (_cart.any((it) => !it.isSystemPrice && it.salePrice <= 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Narxi belgilanmagan qatorlar bor — manual narx kiriting.')),
+        const SnackBar(
+          content: Text(
+            'Narxi belgilanmagan qatorlar bor — manual narx kiriting.',
+          ),
+        ),
       );
       return;
     }
@@ -736,7 +740,9 @@ class _PosScreenState extends State<PosScreen> {
           final offlineResult = await offlineService.confirmSaleOffline(
             items: itemsPayload,
             customerId: _isQuickSale ? null : _selectedCustomer?.id,
-            customerName: _isQuickSale ? 'Tezkor Mijoz' : _selectedCustomer?.name,
+            customerName: _isQuickSale
+                ? 'Tezkor Mijoz'
+                : _selectedCustomer?.name,
             paymentType: _paymentMode == 'FULL'
                 ? _paymentMethod
                 : (_paymentMode == 'DEBT' ? 'DEBT' : 'PARTIAL'),
@@ -758,7 +764,10 @@ class _PosScreenState extends State<PosScreen> {
             _isLoading = false;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Offline savdo xatosi: $offlineErr'), backgroundColor: Colors.redAccent),
+            SnackBar(
+              content: Text('Offline savdo xatosi: $offlineErr'),
+              backgroundColor: Colors.redAccent,
+            ),
           );
           return;
         }
@@ -770,7 +779,10 @@ class _PosScreenState extends State<PosScreen> {
         _isLoading = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Savdo xatosi: $e'), backgroundColor: Colors.redAccent),
+        SnackBar(
+          content: Text('Savdo xatosi: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
       );
     }
   }
@@ -778,7 +790,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading && _catalog.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -786,7 +798,7 @@ class _PosScreenState extends State<PosScreen> {
                 // Customer & Quick Sale Header
                 Container(
                   padding: const EdgeInsets.all(12),
-                  color: const Color(0xFF1E293B),
+                  color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     children: [
                       Row(
@@ -815,7 +827,10 @@ class _PosScreenState extends State<PosScreen> {
                           ),
                           const Spacer(),
                           IconButton(
-                            icon: const Icon(Icons.person_add, color: Colors.cyanAccent),
+                            icon: Icon(
+                              Icons.person_add,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             tooltip: 'Yangi mijoz yaratish',
                             onPressed: _showAddCustomerDialog,
                           ),
@@ -823,32 +838,16 @@ class _PosScreenState extends State<PosScreen> {
                       ),
                       if (!_isQuickSale) ...[
                         const SizedBox(height: 8),
-                        DropdownButtonFormField<CustomerModel>(
+                        SearchPicker<CustomerModel>(
+                          items: _customers,
                           initialValue: _selectedCustomer,
-                          dropdownColor: const Color(0xFF1E293B),
-                          decoration: InputDecoration(
-                            labelText: 'Mijozni tanlang',
-                            labelStyle: const TextStyle(color: Colors.blueGrey),
-                            filled: true,
-                            fillColor: const Color(0xFF0F172A),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          items: _customers.map((c) {
-                            return DropdownMenuItem(
-                              value: c,
-                              child: Text(
-                                '${c.name} ${c.currentDebt > 0 ? "(${Formatters.formatMoney(c.currentDebt)} qarz)" : ""}',
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (val) {
-                            setState(() {
-                              _selectedCustomer = val;
-                            });
-                          },
+                          label: 'Mijozni qidiring',
+                          labelFor: (c) =>
+                              '${c.name} · ${c.storeName ?? ""} · ${c.phone ?? ""}',
+                          onChanged: (val) => setState(() {
+                            _selectedCustomer = val;
+                            _touchDraft();
+                          }),
                         ),
                       ],
                     ],
@@ -862,12 +861,22 @@ class _PosScreenState extends State<PosScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.shopping_cart_outlined,
-                                  size: 48, color: Colors.blueGrey),
+                              Icon(
+                                Icons.shopping_cart_outlined,
+                                size: 48,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                               const SizedBox(height: 12),
-                              const Text(
+                              Text(
                                 'Savat hozircha bo\'sh',
-                                style: TextStyle(color: Colors.blueGrey, fontSize: 15),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  fontSize: 15,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               ElevatedButton.icon(
@@ -887,11 +896,15 @@ class _PosScreenState extends State<PosScreen> {
                           itemBuilder: (ctx, idx) {
                             final item = _cart[idx];
                             return Card(
-                              color: const Color(0xFF1E293B),
+                              color: Theme.of(context).colorScheme.surface,
                               margin: const EdgeInsets.only(bottom: 8),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                side: const BorderSide(color: Color(0xFF334155)),
+                                side: BorderSide(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.outlineVariant,
+                                ),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(10.0),
@@ -902,16 +915,21 @@ class _PosScreenState extends State<PosScreen> {
                                         Expanded(
                                           child: Text(
                                             '${item.productName} (${item.variant.displayVolume})',
-                                            style: const TextStyle(
-                                              color: Colors.white,
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSurface,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
                                           ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline,
-                                              color: Colors.redAccent, size: 20),
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.redAccent,
+                                            size: 20,
+                                          ),
                                           onPressed: () {
                                             setState(() {
                                               _cart.removeAt(idx);
@@ -925,8 +943,12 @@ class _PosScreenState extends State<PosScreen> {
                                       children: [
                                         // Quantity Controls
                                         IconButton(
-                                          icon: const Icon(Icons.remove_circle_outline,
-                                              color: Colors.cyanAccent),
+                                          icon: Icon(
+                                            Icons.remove_circle_outline,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
                                           onPressed: () {
                                             setState(() {
                                               if (item.quantity > 1) {
@@ -938,13 +960,20 @@ class _PosScreenState extends State<PosScreen> {
                                         ),
                                         Text(
                                           '${item.quantity} dona',
-                                          style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold),
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurface,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.add_circle_outline,
-                                              color: Colors.cyanAccent),
+                                          icon: Icon(
+                                            Icons.add_circle_outline,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primary,
+                                          ),
                                           onPressed: () {
                                             setState(() {
                                               item.quantity += 1;
@@ -955,14 +984,19 @@ class _PosScreenState extends State<PosScreen> {
                                         const Spacer(),
                                         // Price (system/manual)
                                         InkWell(
-                                          key: Key('pos_price_${item.variant.id}'),
+                                          key: Key(
+                                            'pos_price_${item.variant.id}',
+                                          ),
                                           onTap: () => _showPriceDialog(item),
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
                                             children: [
                                               Text(
                                                 item.salePrice > 0
-                                                    ? Formatters.formatMoney(item.lineTotal)
+                                                    ? Formatters.formatMoney(
+                                                        item.lineTotal,
+                                                      )
                                                     : 'Narx kiriting',
                                                 style: TextStyle(
                                                   color: item.salePrice > 0
@@ -978,7 +1012,9 @@ class _PosScreenState extends State<PosScreen> {
                                                     : 'manual narx ✎',
                                                 style: TextStyle(
                                                   color: item.isSystemPrice
-                                                      ? Colors.blueGrey
+                                                      ? Theme.of(context)
+                                                            .colorScheme
+                                                            .onSurfaceVariant
                                                       : Colors.amberAccent,
                                                   fontSize: 10,
                                                 ),
@@ -1000,10 +1036,16 @@ class _PosScreenState extends State<PosScreen> {
                 if (_cart.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF1E293B),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                      border: Border(top: BorderSide(color: Color(0xFF334155))),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(16),
+                      ),
+                      border: Border(
+                        top: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1012,12 +1054,12 @@ class _PosScreenState extends State<PosScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
+                            Text(
                               'Jami Summa:',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             Text(
@@ -1037,27 +1079,45 @@ class _PosScreenState extends State<PosScreen> {
                           children: [
                             Expanded(
                               child: ChoiceChip(
-                                label: const Center(child: Text('To\'liq', style: TextStyle(fontSize: 12))),
+                                label: const Center(
+                                  child: Text(
+                                    'To\'liq',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
                                 selected: _paymentMode == 'FULL',
-                                onSelected: (_) => setState(() => _paymentMode = 'FULL'),
+                                onSelected: (_) =>
+                                    setState(() => _paymentMode = 'FULL'),
                                 selectedColor: Colors.blueAccent,
                               ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: ChoiceChip(
-                                label: const Center(child: Text('Qisman', style: TextStyle(fontSize: 12))),
+                                label: const Center(
+                                  child: Text(
+                                    'Qisman',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
                                 selected: _paymentMode == 'PARTIAL',
-                                onSelected: (_) => setState(() => _paymentMode = 'PARTIAL'),
+                                onSelected: (_) =>
+                                    setState(() => _paymentMode = 'PARTIAL'),
                                 selectedColor: Colors.blueAccent,
                               ),
                             ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: ChoiceChip(
-                                label: const Center(child: Text('Nasiya', style: TextStyle(fontSize: 12))),
+                                label: const Center(
+                                  child: Text(
+                                    'Nasiya',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                ),
                                 selected: _paymentMode == 'DEBT',
-                                onSelected: (_) => setState(() => _paymentMode = 'DEBT'),
+                                onSelected: (_) =>
+                                    setState(() => _paymentMode = 'DEBT'),
                                 selectedColor: Colors.blueAccent,
                               ),
                             ),
@@ -1070,12 +1130,20 @@ class _PosScreenState extends State<PosScreen> {
                           TextField(
                             controller: _partialAmountController,
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                             decoration: InputDecoration(
                               labelText: 'Hozir to\'lanadigan summa (so\'m)',
-                              labelStyle: const TextStyle(color: Colors.blueGrey),
+                              labelStyle: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                               filled: true,
-                              fillColor: const Color(0xFF0F172A),
+                              fillColor: Theme.of(
+                                context,
+                              ).scaffoldBackgroundColor,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
@@ -1089,7 +1157,10 @@ class _PosScreenState extends State<PosScreen> {
                           children: [
                             Text(
                               'To\'lanadi: ${Formatters.formatMoney(_calculatedPaidAmount)}',
-                              style: const TextStyle(color: Colors.white, fontSize: 12),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontSize: 12,
+                              ),
                             ),
                             Text(
                               'Nasiya: ${Formatters.formatMoney(_calculatedDebtAmount)}',
@@ -1097,7 +1168,9 @@ class _PosScreenState extends State<PosScreen> {
                               style: TextStyle(
                                 color: _calculatedDebtAmount > 0
                                     ? Colors.amberAccent
-                                    : Colors.blueGrey,
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1108,7 +1181,10 @@ class _PosScreenState extends State<PosScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _errorMessage!,
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
                         const SizedBox(height: 12),
@@ -1127,23 +1203,33 @@ class _PosScreenState extends State<PosScreen> {
                                 onPressed: _isLoading ? null : _submitSale,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  foregroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                 ),
                                 child: _isLoading
-                                    ? const SizedBox(
+                                    ? SizedBox(
                                         height: 20,
                                         width: 20,
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2, color: Colors.white),
+                                          strokeWidth: 2,
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
+                                        ),
                                       )
                                     : Text(
                                         'Yakunlash: ${Formatters.formatMoney(_calculatedPaidAmount)}',
                                         style: const TextStyle(
-                                            fontSize: 15, fontWeight: FontWeight.bold),
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                               ),
                             ),

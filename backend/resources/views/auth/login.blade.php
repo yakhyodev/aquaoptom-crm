@@ -24,6 +24,7 @@
                 <button type="submit">Panelga kirish →</button>
             </form>
             @if ($isPreview)<div class="auth-demo">Test paneli uchun<br>Login: <b>admin</b> · Parol: <b>admin1</b></div>@endif
+            <x-android-app-download />
         </section>
     </main>
 </body>

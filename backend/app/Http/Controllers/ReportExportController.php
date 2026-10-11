@@ -3,12 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\ReportExport;
+use App\Services\Reports\ExportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportExportController extends Controller
 {
+    public function create(Request $request, ExportService $service): JsonResponse
+    {
+        $filters = $request->validate([
+            'type' => 'required|in:sales,profit_loss,purchases,inventory,statements,cash,staff,sync',
+            'period' => 'required|in:today,yesterday,this_week,this_month,last_month,all_time,custom',
+            'from_date' => 'nullable|date_format:Y-m-d',
+            'to_date' => 'nullable|date_format:Y-m-d|after_or_equal:from_date',
+            'party_type' => 'nullable|in:customer,supplier', 'party_id' => 'nullable|integer|min:1',
+        ]);
+        $user = $request->user();
+        $export = match ($filters['type']) {
+            'profit_loss' => $service->exportProfitLossReport($user, $filters, 'xlsx'),
+            'inventory' => $service->exportInventoryReport($user, $filters, 'xlsx'),
+            'statements' => $service->exportPartyStatementReport($user, $filters['party_type'] ?? 'customer', $filters['party_id'] ?? null, $filters, 'xlsx'),
+            'cash' => $service->exportCashReport($user, $filters, 'xlsx'),
+            'purchases', 'staff', 'sync' => $service->exportAdditionalReport($user, $filters['type'], $filters, 'xlsx'),
+            default => $service->exportSalesReport($user, $filters, 'xlsx'),
+        };
+
+        return response()->json(['status' => 'success', 'data' => ['file_name' => $export->file_name, 'uuid' => $export->uuid]]);
+    }
+
     /**
      * Yopiq, xavfsiz va ruxsatli eksport faylini yuklab olish
      */

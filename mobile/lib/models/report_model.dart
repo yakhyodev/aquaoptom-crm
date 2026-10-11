@@ -22,6 +22,7 @@ class SalesReport {
   });
 
   factory SalesReport.fromJson(Map<String, dynamic> json) {
+    json = json['kpi'] as Map<String, dynamic>? ?? json;
     return SalesReport(
       totalGrossSales: (json['total_gross_sales'] as num?)?.toInt() ?? 0,
       totalInitialPaid: (json['total_initial_paid'] as num?)?.toInt() ?? 0,
@@ -31,7 +32,10 @@ class SalesReport {
       cardAtPos: (json['card_at_pos'] as num?)?.toInt() ?? 0,
       bankAtPos: (json['bank_at_pos'] as num?)?.toInt() ?? 0,
       totalUnitsSold: (json['total_units_sold'] as num?)?.toInt() ?? 0,
-      totalReturnsAmount: (json['total_returns_amount'] as num?)?.toInt() ?? 0,
+      totalReturnsAmount:
+          ((json['total_returns'] ?? json['total_returns_amount']) as num?)
+              ?.toInt() ??
+          0,
     );
   }
 }
@@ -50,11 +54,23 @@ class CashReport {
   });
 
   factory CashReport.fromJson(Map<String, dynamic> json) {
+    json = json['summary'] as Map<String, dynamic>? ?? json;
     return CashReport(
-      initialBalance: (json['initial_balance'] as num?)?.toInt() ?? 0,
-      totalInflow: (json['total_inflow'] as num?)?.toInt() ?? 0,
-      totalOutflow: (json['total_outflow'] as num?)?.toInt() ?? 0,
-      closingBalance: (json['closing_balance'] as num?)?.toInt() ?? 0,
+      initialBalance:
+          ((json['total_opening_cash'] ?? json['initial_balance']) as num?)
+              ?.toInt() ??
+          0,
+      totalInflow:
+          ((json['total_inflows'] ?? json['total_inflow']) as num?)?.toInt() ??
+          0,
+      totalOutflow:
+          ((json['total_outflows'] ?? json['total_outflow']) as num?)
+              ?.toInt() ??
+          0,
+      closingBalance:
+          ((json['total_closing_cash'] ?? json['closing_balance']) as num?)
+              ?.toInt() ??
+          0,
     );
   }
 }
@@ -62,16 +78,19 @@ class CashReport {
 class ReportsData {
   final SalesReport sales;
   final CashReport cash;
+  final bool canViewCash;
 
   const ReportsData({
     required this.sales,
     required this.cash,
+    this.canViewCash = true,
   });
 
   factory ReportsData.fromJson(Map<String, dynamic> json) {
     return ReportsData(
       sales: SalesReport.fromJson(json['sales'] as Map<String, dynamic>? ?? {}),
       cash: CashReport.fromJson(json['cash'] as Map<String, dynamic>? ?? {}),
+      canViewCash: json['can_view_cash'] as bool? ?? json['cash'] != null,
     );
   }
 }

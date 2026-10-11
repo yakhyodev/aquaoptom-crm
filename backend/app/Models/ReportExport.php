@@ -50,6 +50,9 @@ class ReportExport extends Model
 
     public function canBeDownloadedBy(User $user): bool
     {
+        if ($this->report_type === 'cash' && ! $user->can('view_cash')) {
+            return false;
+        }
         if (! $user->isOwner() && (! $user->hasPermission('export_reports') || (int) $this->user_id !== (int) $user->id)) {
             return false;
         }

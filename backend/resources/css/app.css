@@ -286,3 +286,12 @@
 }
 
 .app-nav-lists { margin-top: 12px; color: #d7e1ef; font-size: 13px; }.app-nav-lists summary { cursor: pointer; padding: 10px 12px; }.app-nav-lists a { display: block; padding: 9px 15px 9px 30px; color: var(--muted); border-radius: 10px; }.app-nav-lists a:hover { color: var(--on-primary); background: #1d2d48; }.guide-directory-links { flex-wrap: wrap; }
+
+.apk-offer { display:flex; align-items:center; gap:12px; padding:14px 18px; margin-bottom:16px; border:1px solid var(--line, #bfdbfe); border-radius:16px; background:var(--surface, #eff6ff); color:var(--ink, #0f172a); }
+.apk-offer > span { font-size:26px; }
+.apk-offer > div { flex:1; min-width:0; }
+.apk-offer p { margin:4px 0 0; font-size:12px; line-height:1.5; }
+.apk-offer > button { padding:6px 10px; font-size:22px; }
+.auth-card .apk-offer { margin-top:20px; flex-wrap:wrap; }
+@media (max-width:640px) { .apk-offer { flex-wrap:wrap; padding:12px; } .apk-offer .trade-button { width:100%; order:3; text-align:center; } }
+html[data-theme="dark"] .apk-offer { background:#172554; color:#e2e8f0; border-color:#334155; }

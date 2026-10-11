@@ -16,6 +16,47 @@ class SyncChangeLogService
     // PostgreSQL advisory lock ID commit-order kafolati uchun
     private const ADVISORY_LOCK_ID = 987654321;
 
+    /** Publish ordinary web/API writes using the same protocol as offline writes. */
+    public function registerModelChanges(): void
+    {
+        foreach ([Product::class => 'PRODUCT', Volume::class => 'VOLUME', ProductVariant::class => 'PRODUCT_VARIANT', Customer::class => 'CUSTOMER'] as $modelClass => $entityType) {
+            $publish = function ($model, string $changeType = 'UPDATED') use ($entityType): void {
+                $deleted = method_exists($model, 'trashed') && $model->trashed();
+                $payload = $model->toArray();
+                $payload['status'] = strtoupper($deleted ? 'ARCHIVED' : ($model->status ?? 'active'));
+                if ($model instanceof ProductVariant) {
+                    $model->load(['product', 'volume']);
+                    $payload['product_name'] = $model->product?->name;
+                    $payload['volume_name'] = $model->volume?->name;
+                    $payload['volume_ml'] = $model->volume?->value_ml;
+                    $payload['volume_litres'] = (string) (($model->volume?->value_ml ?? 0) / 1000);
+                    if (strtolower($model->product?->status ?? '') !== 'active' || strtolower($model->volume?->status ?? '') !== 'active') {
+                        $payload['status'] = 'ARCHIVED';
+                    }
+                }
+                $this->logChange($entityType, $model->getKey(), $changeType, $payload, (int) ($model->version ?? 1), $deleted);
+                if ($model instanceof Product || $model instanceof Volume) {
+                    $foreignKey = $model instanceof Product ? 'product_id' : 'volume_id';
+                    ProductVariant::where($foreignKey, $model->getKey())->each(function ($variant): void {
+                        $variant->load(['product', 'volume']);
+                        $payload = $variant->toArray();
+                        $payload['product_name'] = $variant->product?->name;
+                        $payload['volume_name'] = $variant->volume?->name;
+                        $payload['volume_ml'] = $variant->volume?->value_ml;
+                        $payload['volume_litres'] = (string) (($variant->volume?->value_ml ?? 0) / 1000);
+                        $payload['status'] = strtolower($variant->status) === 'active'
+                            && strtolower($variant->product?->status ?? '') === 'active'
+                            && strtolower($variant->volume?->status ?? '') === 'active' ? 'ACTIVE' : 'ARCHIVED';
+                        $this->logChange('PRODUCT_VARIANT', $variant->id, 'UPDATED', $payload, (int) $variant->version);
+                    });
+                }
+            };
+            $modelClass::created(fn ($model) => $publish($model, 'CREATED'));
+            $modelClass::updated($publish);
+            $modelClass::deleted($publish);
+        }
+    }
+
     /**
      * Entity o'zgarishini change logga yozish.
      * PostgreSQL advisory lock orqali ID lar qat'iy commit tartibida beriladi,
@@ -38,7 +79,7 @@ class SyncChangeLogService
             $variant = ProductVariant::with('volume')->find($entityId);
             if ($variant?->volume) {
                 $payload += ['volume_id' => $variant->volume_id, 'volume_ml' => $variant->volume->value_ml,
-                    'volume_litres' => (string) $variant->volume->litres];
+                    'volume_litres' => (string) ($variant->volume->value_ml / 1000)];
             }
         }
 

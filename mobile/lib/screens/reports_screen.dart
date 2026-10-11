@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/report_model.dart';
 import '../services/api_service.dart';
 import '../utils/formatters.dart';
+import '../services/session_service.dart';
+import '../utils/search_picker.dart';
 
 class ReportsScreen extends StatefulWidget {
   final ApiService? apiService;
@@ -18,6 +20,49 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedPeriod = 'today';
+  bool _isExporting = false;
+
+  Future<void> _downloadExcel() async {
+    const reports = {
+      'sales': 'Savdolar',
+      'profit_loss': 'Foyda va xarajatlar',
+      'purchases': 'Mahsulot kirimi',
+      'inventory': 'Ombor qiymati',
+      'statements': 'Mijozlar hisobi',
+      'cash': 'Kassa',
+      'staff': 'Xodimlar',
+      'sync': 'Qurilmalar',
+    };
+    final types = reports.keys
+        .where((type) => type != 'cash' || (_reportsData?.canViewCash ?? false))
+        .toList();
+    final type = await chooseFromList(
+      context,
+      title: 'Qaysi hisobot kerak?',
+      items: types,
+      labelFor: (type) => reports[type]!,
+    );
+    if (type == null || !mounted || _isExporting) return;
+    setState(() => _isExporting = true);
+    try {
+      await _api.downloadReport(type: type, period: _selectedPeriod);
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Excel yuklanmoqda. Telefonning Yuklamalar bo‘limidan oching.',
+            ),
+          ),
+        );
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
 
   @override
   void initState() {
@@ -60,9 +105,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
         }
       },
       selectedColor: Colors.blueAccent,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.blueGrey,
+        color: isSelected
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurfaceVariant,
         fontSize: 12,
       ),
     );
@@ -74,12 +121,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
-              color: valueColor ?? Colors.white,
+              color: valueColor ?? Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.bold,
               fontSize: 13,
             ),
@@ -92,10 +144,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
+        actions: [
+          if (SessionService().currentUser?.hasPermission('export_reports') ??
+              false)
+            IconButton(
+              onPressed: _isExporting ? null : _downloadExcel,
+              tooltip: 'Excel yuklash',
+              icon: const Icon(Icons.download),
+            ),
+        ],
         title: const Text('Hisobotlar (Savdo & Kassa)'),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
       body: RefreshIndicator(
         onRefresh: _loadReports,
@@ -103,7 +164,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             // Period Selector
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildPeriodChip('Bugun', 'today'),
                 const SizedBox(width: 8),
@@ -124,8 +187,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.redAccent),
                 ),
-                child: Text(_errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent)),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
               ),
               const SizedBox(height: 16),
             ],
@@ -135,35 +200,41 @@ class _ReportsScreenState extends State<ReportsScreen> {
             else if (_reportsData != null) ...[
               // Sales Summary Card
               Card(
-                color: const Color(0xFF1E293B),
+                color: Theme.of(context).colorScheme.surface,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFF334155)),
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(Icons.bar_chart, color: Colors.blueAccent),
                           SizedBox(width: 8),
                           Text(
                             'Savdo Xulosasi',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                               fontSize: 16,
                             ),
                           ),
                         ],
                       ),
-                      const Divider(color: Color(0xFF334155), height: 20),
+                      Divider(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                        height: 20,
+                      ),
                       _buildReportRow(
                         'Jami Sotuv:',
                         Formatters.formatMoney(
-                            _reportsData!.sales.totalGrossSales),
+                          _reportsData!.sales.totalGrossSales,
+                        ),
                         valueColor: Colors.greenAccent,
                       ),
                       _buildReportRow(
@@ -177,23 +248,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       _buildReportRow(
                         'Kassaga tushgan:',
                         Formatters.formatMoney(
-                            _reportsData!.sales.totalInitialPaid),
+                          _reportsData!.sales.totalInitialPaid,
+                        ),
                       ),
                       _buildReportRow(
                         'Nasiyaga berilgan:',
                         Formatters.formatMoney(
-                            _reportsData!.sales.totalInitialDebt),
+                          _reportsData!.sales.totalInitialDebt,
+                        ),
                         valueColor: Colors.amberAccent,
                       ),
                       _buildReportRow(
                         'Sotuvda to‘langan pul:',
-                        Formatters.formatMoney(_reportsData!.sales.cashAtPos + _reportsData!.sales.cardAtPos + _reportsData!.sales.bankAtPos),
+                        Formatters.formatMoney(
+                          _reportsData!.sales.cashAtPos +
+                              _reportsData!.sales.cardAtPos +
+                              _reportsData!.sales.bankAtPos,
+                        ),
                       ),
                       if (_reportsData!.sales.totalReturnsAmount > 0)
                         _buildReportRow(
                           'Qaytarishlar (Return):',
                           Formatters.formatMoney(
-                              _reportsData!.sales.totalReturnsAmount),
+                            _reportsData!.sales.totalReturnsAmount,
+                          ),
                           valueColor: Colors.redAccent,
                         ),
                     ],
@@ -203,58 +281,72 @@ class _ReportsScreenState extends State<ReportsScreen> {
               const SizedBox(height: 16),
 
               // Cash Summary Card
-              Card(
-                color: const Color(0xFF1E293B),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFF334155)),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.account_balance_wallet,
-                              color: Colors.cyanAccent),
-                          SizedBox(width: 8),
-                          Text(
-                            'Kassa Harakati',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+              if (_reportsData!.canViewCash)
+                Card(
+                  color: Theme.of(context).colorScheme.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kassa Harakati',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Divider(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          height: 20,
+                        ),
+                        _buildReportRow(
+                          'Boshlang\'ich qoldiq:',
+                          Formatters.formatMoney(
+                            _reportsData!.cash.initialBalance,
                           ),
-                        ],
-                      ),
-                      const Divider(color: Color(0xFF334155), height: 20),
-                      _buildReportRow(
-                        'Boshlang\'ich qoldiq:',
-                        Formatters.formatMoney(
-                            _reportsData!.cash.initialBalance),
-                      ),
-                      _buildReportRow(
-                        'Jami Kirim:',
-                        Formatters.formatMoney(_reportsData!.cash.totalInflow),
-                        valueColor: Colors.greenAccent,
-                      ),
-                      _buildReportRow(
-                        'Jami Chiqim:',
-                        Formatters.formatMoney(_reportsData!.cash.totalOutflow),
-                        valueColor: Colors.redAccent,
-                      ),
-                      _buildReportRow(
-                        'Yakuniy qoldiq:',
-                        Formatters.formatMoney(
-                            _reportsData!.cash.closingBalance),
-                        valueColor: Colors.cyanAccent,
-                      ),
-                    ],
+                        ),
+                        _buildReportRow(
+                          'Jami Kirim:',
+                          Formatters.formatMoney(
+                            _reportsData!.cash.totalInflow,
+                          ),
+                          valueColor: Colors.greenAccent,
+                        ),
+                        _buildReportRow(
+                          'Jami Chiqim:',
+                          Formatters.formatMoney(
+                            _reportsData!.cash.totalOutflow,
+                          ),
+                          valueColor: Colors.redAccent,
+                        ),
+                        _buildReportRow(
+                          'Yakuniy qoldiq:',
+                          Formatters.formatMoney(
+                            _reportsData!.cash.closingBalance,
+                          ),
+                          valueColor: Theme.of(context).colorScheme.primary,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
             ],
           ],
         ),

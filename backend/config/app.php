@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'android_download_url' => env('ANDROID_DOWNLOAD_URL', 'https://github.com/yakhyodev/aquaoptom-crm/releases/download/android-test/aquaoptom-android-test.apk'),
 
     /*
     |--------------------------------------------------------------------------

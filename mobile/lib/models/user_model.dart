@@ -19,7 +19,8 @@ class UserModel {
       name: json['name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       role: (json['role'] as String? ?? 'CASHIER').toUpperCase(),
-      permissions: (json['permissions'] as List<dynamic>?)
+      permissions:
+          (json['permissions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
@@ -40,13 +41,13 @@ class UserModel {
   bool get isAdmin => role.toUpperCase() == 'ADMIN' || isOwner;
   bool get isSalesManager => role.toUpperCase() == 'SALES_MANAGER' || isAdmin;
   bool get isCashier => role.toUpperCase() == 'CASHIER' || isAdmin;
-  bool get isWarehouse => role.toUpperCase() == 'WAREHOUSE' || isAdmin;
+  bool get isWarehouse =>
+      ['WAREHOUSE', 'WAREHOUSE_MANAGER'].contains(role.toUpperCase()) ||
+      isAdmin;
 
-  bool hasPermission(String perm) =>
-      isAdmin || permissions.contains(perm);
+  bool hasPermission(String perm) => isOwner || permissions.contains(perm);
 
-  bool get canViewCost =>
-      isOwner || hasPermission('view_cost_price');
+  bool get canViewCost => isOwner || hasPermission('view_cost_price');
 
   bool get canReceiveStock =>
       isAdmin || isWarehouse || hasPermission('receive_stock');

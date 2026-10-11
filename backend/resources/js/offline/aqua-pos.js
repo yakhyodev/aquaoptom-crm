@@ -207,7 +207,7 @@ export function aquaPos() {
 
             // D. Katalog
             const catList = await this.db.getAll('catalog');
-            this.catalog = catList.filter(item => item.status === 'ACTIVE').sort((a, b) =>
+            this.catalog = catList.filter(item => String(item.status || '').toUpperCase() === 'ACTIVE').sort((a, b) =>
                 a.product_name.localeCompare(b.product_name, 'uz', { numeric: true }) || Number(a.volume_litres) - Number(b.volume_litres));
 
             // E. Mijozlar

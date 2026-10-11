@@ -45,6 +45,17 @@ class DashboardQueryService
         // 4. OXIRGI AMALLAR (Recent Activity Feed)
         $recentActivities = $this->getRecentActivities(12, $tz, $canViewCost);
 
+        $canViewCash = $user->isOwner() || $user->hasPermission('view_cash');
+        if (! $canViewCash) {
+            $balances['total_cash'] = null;
+            $balances['cash_accounts'] = [];
+            foreach (['cash_in', 'cash_out', 'cash_collected', 'operating_expenses', 'supplier_paid', 'paid_at_pos', 'debt_collected'] as $field) {
+                $flow[$field] = null;
+            }
+            $flow['payments_by_method'] = [];
+            $recentActivities = array_values(array_filter($recentActivities, fn ($activity) => ! in_array($activity['type'] ?? '', ['PAYMENT_IN', 'PAYMENT_OUT', 'EXPENSE'], true)));
+        }
+
         return [
             'period' => [
                 'key' => $period,
@@ -54,6 +65,7 @@ class DashboardQueryService
                 'timezone' => $tz,
             ],
             'can_view_cost' => $canViewCost,
+            'can_view_cash' => $canViewCash,
             'flow' => $flow,
             'balances' => $balances,
             'warnings' => $warnings,
@@ -194,6 +206,8 @@ class DashboardQueryService
             'total_sales' => $totalSales,
             'sales_count' => $salesCount,
             'cash_collected' => $totalCashCollected,
+            'paid_at_pos' => (int) (clone $salesQuery)->sum('paid_amount'),
+            'debt_collected' => (int) DB::table('cash_movements')->whereBetween('created_at', [$startUtc, $endUtc])->where('direction', 'IN')->where('type', 'CUSTOMER_PAYMENT')->sum('amount'),
             'new_debt' => $newDebt,
             'gross_profit' => $grossProfit,
             'total_cost' => $totalCost,
@@ -313,7 +327,9 @@ class DashboardQueryService
         $staleCount = count($staleDevices);
 
         $completenessPercent = 100;
-        $completenessNote = "Barcha ma'lumotlar to'liq va server bilan sinxronlangan.";
+        $completenessNote = $totalActiveDevices > 0
+            ? 'Qurilmalar yaqinda aloqaga chiqqan. Hisobotlar server tasdiqlagan amallarni ko‘rsatadi; qurilmada yuborilmagan savdo qolgan bo‘lishi mumkin.'
+            : 'Hisobotlar server tasdiqlagan amallar asosida. Oflayn qurilma ulanmagan.';
 
         if ($totalActiveDevices > 0 && $staleCount > 0) {
             $activeSynced = $totalActiveDevices - $staleCount;

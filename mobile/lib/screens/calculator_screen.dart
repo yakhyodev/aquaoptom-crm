@@ -115,18 +115,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final canViewCost = user?.canViewCost ?? false;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Ombor Rentabellik Kalkulyatori'),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         actions: [
           IconButton(
-            icon: const Icon(Icons.select_all, color: Colors.cyanAccent),
+            icon: Icon(
+              Icons.select_all,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             tooltip: 'Barchasini tanlash',
             onPressed: () => _selectAll(true),
           ),
           IconButton(
-            icon: const Icon(Icons.deselect, color: Colors.blueGrey),
+            icon: Icon(
+              Icons.deselect,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             tooltip: 'Tozalash',
             onPressed: () => _selectAll(false),
           ),
@@ -139,14 +145,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text(_errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent)),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
                   ),
 
                 // Calculation Summary Cards
                 Container(
                   padding: const EdgeInsets.all(16),
-                  color: const Color(0xFF1E293B),
+                  color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     children: [
                       Row(
@@ -165,7 +173,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         ],
                       ),
                       if (canViewCost) ...[
-                        const Divider(color: Color(0xFF334155), height: 16),
+                        Divider(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          height: 16,
+                        ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -177,7 +188,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                             _buildSummaryItem(
                               'Kutilayotgan Yalpi Foyda',
                               Formatters.formatMoney(_expectedProfit),
-                              Colors.cyanAccent,
+                              Theme.of(context).colorScheme.primary,
                             ),
                           ],
                         ),
@@ -194,29 +205,36 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     itemBuilder: (ctx, idx) {
                       final prod = _products[idx];
                       return Card(
-                        color: const Color(0xFF1E293B),
+                        color: Theme.of(context).colorScheme.surface,
                         margin: const EdgeInsets.only(bottom: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color(0xFF334155)),
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                         ),
                         child: ExpansionTile(
                           initiallyExpanded: true,
                           title: Text(
                             prod.name,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           subtitle: Text(
                             '${prod.variants.length} ta hajm',
-                            style: const TextStyle(
-                                color: Colors.blueGrey, fontSize: 12),
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                           ),
                           children: prod.variants.map((v) {
-                            final isChecked =
-                                _selectedVariantIds.contains(v.id);
+                            final isChecked = _selectedVariantIds.contains(
+                              v.id,
+                            );
                             return CheckboxListTile(
                               value: isChecked,
                               onChanged: (val) {
@@ -231,12 +249,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                               activeColor: Colors.blueAccent,
                               title: Text(
                                 '${v.displayVolume} — ${v.stockQty} dona',
-                                style: const TextStyle(color: Colors.white),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
                               ),
                               subtitle: Text(
                                 'Sotuv: ${Formatters.formatMoney(v.defaultSalePrice)} ${canViewCost && v.costPrice != null ? "| Tannarx: ${Formatters.formatMoney(v.costPrice!)}" : ""}',
-                                style: const TextStyle(
-                                    color: Colors.blueGrey, fontSize: 12),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
                               ),
                             );
                           }).toList(),
@@ -254,7 +280,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.blueGrey, fontSize: 11)),
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
+        ),
         const SizedBox(height: 2),
         Text(
           value,

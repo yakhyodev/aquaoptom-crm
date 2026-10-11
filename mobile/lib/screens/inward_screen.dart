@@ -1,3 +1,4 @@
+import '../utils/search_picker.dart';
 import 'package:flutter/material.dart';
 import '../utils/operation_id.dart';
 import '../models/product_model.dart';
@@ -214,10 +215,10 @@ class _InwardScreenState extends State<InwardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Omborga Kirim Qilish'),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
       body: _isLoading && _products.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -247,10 +248,12 @@ class _InwardScreenState extends State<InwardScreen> {
 
                   // Product Selection Mode
                   Card(
-                    color: const Color(0xFF1E293B),
+                    color: Theme.of(context).colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFF334155)),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -279,47 +282,33 @@ class _InwardScreenState extends State<InwardScreen> {
                           const SizedBox(height: 16),
 
                           if (!_isNewProduct) ...[
-                            DropdownButtonFormField<ProductVariant>(
+                            SearchPicker<ProductVariant>(
                               initialValue: _selectedVariant,
-                              dropdownColor: const Color(0xFF1E293B),
-                              style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
-                                labelText: 'Mahsulot va Hajmni tanlang *',
-                                filled: true,
-                                fillColor: Color(0xFF0F172A),
-                                border: OutlineInputBorder(),
-                              ),
+                              label: 'Mahsulot va hajmni qidiring',
                               items: _products
-                                  .expand(
-                                    (p) => p.variants.map((v) {
-                                      return DropdownMenuItem(
-                                        value: v,
-                                        child: Text(
-                                          '${p.name} — ${v.displayVolume} (qoldiq: ${v.stockQty})',
-                                          style: const TextStyle(fontSize: 13),
-                                        ),
-                                      );
-                                    }),
-                                  )
+                                  .expand((p) => p.variants)
                                   .toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedVariant = val;
-                                  if (val?.costPrice != null) {
-                                    _costPriceController.text = val!.costPrice
-                                        .toString();
-                                  }
-                                });
-                              },
+                              labelFor: (v) =>
+                                  '${_products.firstWhere((p) => p.id == v.productId).name} — ${v.displayVolume} · ${v.stockQty} dona',
+                              onChanged: (val) => setState(() {
+                                _selectedVariant = val;
+                                if (val?.costPrice != null)
+                                  _costPriceController.text =
+                                      '${val!.costPrice}';
+                              }),
                             ),
                           ] else ...[
                             TextField(
                               controller: _newProductNameController,
-                              style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                              decoration: InputDecoration(
                                 labelText: 'Yangi mahsulot nomi *',
                                 filled: true,
-                                fillColor: Color(0xFF0F172A),
+                                fillColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -330,12 +319,16 @@ class _InwardScreenState extends State<InwardScreen> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
-                              style: const TextStyle(color: Colors.white),
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                              decoration: InputDecoration(
                                 labelText:
                                     'Hajmi (litr, masalan: 0.5 yoki 1.5) *',
                                 filled: true,
-                                fillColor: Color(0xFF0F172A),
+                                fillColor: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
                                 border: OutlineInputBorder(),
                               ),
                             ),
@@ -348,10 +341,12 @@ class _InwardScreenState extends State<InwardScreen> {
 
                   // Supplier Card
                   Card(
-                    color: const Color(0xFF1E293B),
+                    color: Theme.of(context).colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFF334155)),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -361,17 +356,19 @@ class _InwardScreenState extends State<InwardScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 'Ta\'minotchi (Zavod / Diler)',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               IconButton(
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.add_business,
-                                  color: Colors.cyanAccent,
+                                  color: Theme.of(context).colorScheme.primary,
                                 ),
                                 tooltip: 'Yangi ta\'minotchi qo\'shish',
                                 onPressed: _showAddSupplierDialog,
@@ -379,25 +376,12 @@ class _InwardScreenState extends State<InwardScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          DropdownButtonFormField<SupplierModel>(
+                          SearchPicker<SupplierModel>(
                             initialValue: _selectedSupplier,
-                            dropdownColor: const Color(0xFF1E293B),
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Ta\'minotchini tanlang (ixtiyoriy)',
-                              filled: true,
-                              fillColor: Color(0xFF0F172A),
-                              border: OutlineInputBorder(),
-                            ),
-                            items: _suppliers.map((s) {
-                              return DropdownMenuItem(
-                                value: s,
-                                child: Text(
-                                  s.name,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              );
-                            }).toList(),
+                            label: 'Ta’minotchini qidiring',
+                            items: _suppliers,
+                            labelFor: (s) =>
+                                '${s.name} · ${s.companyName ?? ""} · ${s.phone ?? ""}',
                             onChanged: (val) =>
                                 setState(() => _selectedSupplier = val),
                           ),
@@ -410,10 +394,12 @@ class _InwardScreenState extends State<InwardScreen> {
 
                   // Quantity & Cost Card
                   Card(
-                    color: const Color(0xFF1E293B),
+                    color: Theme.of(context).colorScheme.surface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFF334155)),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
@@ -423,9 +409,13 @@ class _InwardScreenState extends State<InwardScreen> {
                           // Package selector
                           Row(
                             children: [
-                              const Text(
+                              Text(
                                 'Qadoq turi: ',
-                                style: TextStyle(color: Colors.blueGrey),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                               ),
                               const SizedBox(width: 8),
                               ChoiceChip(
@@ -457,11 +447,15 @@ class _InwardScreenState extends State<InwardScreen> {
                           TextField(
                             controller: _quantityController,
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Kirim miqdori *',
                               filled: true,
-                              fillColor: Color(0xFF0F172A),
+                              fillColor: Theme.of(
+                                context,
+                              ).scaffoldBackgroundColor,
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -469,11 +463,15 @@ class _InwardScreenState extends State<InwardScreen> {
                           TextField(
                             controller: _costPriceController,
                             keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Birlik tannarxi (so\'m) *',
                               filled: true,
-                              fillColor: Color(0xFF0F172A),
+                              fillColor: Theme.of(
+                                context,
+                              ).scaffoldBackgroundColor,
                               border: OutlineInputBorder(),
                             ),
                           ),
@@ -488,19 +486,19 @@ class _InwardScreenState extends State<InwardScreen> {
                     onPressed: _isLoading ? null : _submitInward,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white,
+                      foregroundColor: Theme.of(context).colorScheme.onSurface,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.white,
+                              color: Theme.of(context).colorScheme.onSurface,
                             ),
                           )
                         : const Text(

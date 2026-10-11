@@ -12,16 +12,13 @@ import 'pos_screen.dart';
 import 'reports_screen.dart';
 import 'sales_history_screen.dart';
 import '../services/offline_sync_service.dart';
+import '../services/theme_service.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   final UserModel user;
   final ApiService? apiService;
 
-  const MainNavigationScreen({
-    super.key,
-    required this.user,
-    this.apiService,
-  });
+  const MainNavigationScreen({super.key, required this.user, this.apiService});
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
@@ -52,17 +49,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         DebtScreen(apiService: _api),
         SalesHistoryScreen(apiService: _api),
       ];
-      _titles = ['Dashboard', 'POS / Savdo', 'Katalog & Qoldiq', 'Qarzlar', 'Savdo Tarixi'];
+      _titles = [
+        'Dashboard',
+        'Sotuv qilish',
+        'Katalog & Qoldiq',
+        'Qarzlar',
+        'Savdo Tarixi',
+      ];
       _navItems = const [
         BottomNavigationBarItem(
           icon: Icon(Icons.dashboard_outlined),
           activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          label: 'Bosh sahifa',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.point_of_sale_outlined),
           activeIcon: Icon(Icons.point_of_sale),
-          label: 'POS',
+          label: 'Sotuv',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.inventory_2_outlined),
@@ -112,12 +115,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         DebtScreen(apiService: _api),
         SalesHistoryScreen(apiService: _api),
       ];
-      _titles = ['POS / Savdo', 'Katalog & Qoldiq', 'Qarzlar', 'Savdo Tarixi'];
+      _titles = ['Sotuv qilish', 'Katalog & Qoldiq', 'Qarzlar', 'Savdo Tarixi'];
       _navItems = const [
         BottomNavigationBarItem(
           icon: Icon(Icons.point_of_sale_outlined),
           activeIcon: Icon(Icons.point_of_sale),
-          label: 'POS',
+          label: 'Sotuv',
         ),
         BottomNavigationBarItem(
           icon: Icon(Icons.inventory_2_outlined),
@@ -142,11 +145,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Chiqish', style: TextStyle(color: Colors.white)),
-        content: const Text(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(
+          'Chiqish',
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+        ),
+        content: Text(
           'Haqiqatan ham tizimdan chiqmoqchimisiz?',
-          style: TextStyle(color: Colors.blueGrey),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
         actions: [
           TextButton(
@@ -174,7 +182,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void _showSyncModal() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -194,21 +202,30 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
+                        Row(
                           children: [
-                            Icon(Icons.sync, color: Colors.cyanAccent),
+                            Icon(
+                              Icons.sync,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'Offline & Sinxronlash',
                               style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16),
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: Colors.blueGrey),
+                          icon: Icon(
+                            Icons.close,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
@@ -217,17 +234,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildStatusBadge('Kutilmoqda', summary.pendingCount, Colors.blueAccent),
-                        _buildStatusBadge('Yuborildi', summary.acknowledgedCount, Colors.greenAccent),
-                        _buildStatusBadge('Tekshiruv', summary.needsReviewCount, Colors.amberAccent),
-                        _buildStatusBadge('Mojaro', summary.conflictCount, Colors.redAccent),
+                        _buildStatusBadge(
+                          'Kutilmoqda',
+                          summary.pendingCount,
+                          Colors.blueAccent,
+                        ),
+                        _buildStatusBadge(
+                          'Yuborildi',
+                          summary.acknowledgedCount,
+                          Colors.greenAccent,
+                        ),
+                        _buildStatusBadge(
+                          'Tekshiruv',
+                          summary.needsReviewCount,
+                          Colors.amberAccent,
+                        ),
+                        _buildStatusBadge(
+                          'Mojaro',
+                          summary.conflictCount,
+                          Colors.redAccent,
+                        ),
                       ],
                     ),
                     if (summary.lastError != null) ...[
                       const SizedBox(height: 12),
                       Text(
                         'Xatolik: ${summary.lastError}',
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 20),
@@ -243,8 +279,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                     if (ctx.mounted) setModalState(() {});
                                   },
                             icon: const Icon(Icons.cloud_upload),
-                            label: Text(summary.isSyncing ? 'Sinxronlanmoqda...' : 'Hozir Sinxronlash'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+                            label: Text(
+                              summary.isSyncing
+                                  ? 'Sinxronlanmoqda...'
+                                  : 'Hozir Sinxronlash',
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -256,21 +298,32 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                                     await syncService.bootstrap();
                                     if (ctx.mounted) {
                                       ScaffoldMessenger.of(ctx).showSnackBar(
-                                        const SnackBar(content: Text('Bootstrap muvaffaqiyatli yuklandi!')),
+                                        const SnackBar(
+                                          content: Text(
+                                            'Bootstrap muvaffaqiyatli yuklandi!',
+                                          ),
+                                        ),
                                       );
                                       setModalState(() {});
                                     }
                                   } catch (e) {
                                     if (ctx.mounted) {
                                       ScaffoldMessenger.of(ctx).showSnackBar(
-                                        SnackBar(content: Text('Bootstrap xatosi: $e'), backgroundColor: Colors.redAccent),
+                                        SnackBar(
+                                          content: Text('Bootstrap xatosi: $e'),
+                                          backgroundColor: Colors.redAccent,
+                                        ),
                                       );
                                     }
                                   }
                                 },
                           icon: const Icon(Icons.download),
                           label: const Text('Bootstrap'),
-                          style: OutlinedButton.styleFrom(foregroundColor: Colors.cyanAccent),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -289,12 +342,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       children: [
         Text(
           count.toString(),
-          style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: color,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 2),
         Text(
           title,
-          style: const TextStyle(color: Colors.blueGrey, fontSize: 11),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+          ),
         ),
       ],
     );
@@ -305,15 +365,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final user = widget.user;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(_titles[_currentIndex]),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: Icon(
+              Theme.of(context).brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            tooltip: 'Kunduzgi / tungi rejim',
+            onPressed: () =>
+                ThemeService.instance.toggle(Theme.of(context).brightness),
+          ),
           // Sync & Offline Status Button
           IconButton(
-            icon: const Icon(Icons.sync, color: Colors.cyanAccent),
+            icon: Icon(
+              Icons.sync,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             tooltip: 'Sinxronlash holati',
             onPressed: _showSyncModal,
           ),
@@ -325,12 +398,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               decoration: BoxDecoration(
                 color: Colors.blueAccent.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.4)),
+                border: Border.all(
+                  color: Colors.blueAccent.withValues(alpha: 0.4),
+                ),
               ),
               child: Text(
                 user.role,
-                style: const TextStyle(
-                  color: Colors.cyanAccent,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
                 ),
@@ -341,40 +416,61 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
           // Logout Button
           IconButton(
-            icon: const Icon(Icons.logout, color: Colors.blueGrey),
+            icon: Icon(
+              Icons.logout,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             tooltip: 'Chiqish',
             onPressed: _handleLogout,
           ),
         ],
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
             UserAccountsDrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF0F172A)),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+              ),
               accountName: Text(
                 user.name,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               accountEmail: Text(
                 user.email,
-                style: const TextStyle(color: Colors.blueGrey),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: Colors.blueAccent,
                 child: Text(
                   user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
-                  style: const TextStyle(fontSize: 22, color: Colors.white),
+                  style: TextStyle(
+                    fontSize: 22,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                 ),
               ),
             ),
 
             if (user.isAdmin || user.isOwner) ...[
               ListTile(
-                leading: const Icon(Icons.dashboard, color: Colors.cyanAccent),
-                title: const Text('Dashboard', style: TextStyle(color: Colors.white)),
+                leading: Icon(
+                  Icons.dashboard,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: Text(
+                  'Dashboard',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() => _currentIndex = 0);
@@ -382,40 +478,75 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.bar_chart, color: Colors.blueAccent),
-                title: const Text('Hisobotlar', style: TextStyle(color: Colors.white)),
+                title: Text(
+                  'Hisobotlar',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => ReportsScreen(apiService: _api)),
+                    MaterialPageRoute(
+                      builder: (_) => ReportsScreen(apiService: _api),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.calculate, color: Colors.purpleAccent),
-                title: const Text('Ombor Kalkulyatori', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.calculate,
+                  color: Colors.purpleAccent,
+                ),
+                title: Text(
+                  'Ombor Kalkulyatori',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => CalculatorScreen(apiService: _api)),
+                    MaterialPageRoute(
+                      builder: (_) => CalculatorScreen(apiService: _api),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.add_shopping_cart, color: Colors.tealAccent),
-                title: const Text('Kirim Qilish', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.add_shopping_cart,
+                  color: Colors.tealAccent,
+                ),
+                title: Text(
+                  'Kirim Qilish',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => InwardScreen(apiService: _api)),
+                    MaterialPageRoute(
+                      builder: (_) => InwardScreen(apiService: _api),
+                    ),
                   );
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.shield_outlined, color: Colors.amberAccent),
-                title: const Text('Admin Web Linklar', style: TextStyle(color: Colors.white)),
+                leading: const Icon(
+                  Icons.shield_outlined,
+                  color: Colors.amberAccent,
+                ),
+                title: Text(
+                  'Admin Web Linklar',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
@@ -426,10 +557,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
               ),
             ],
 
-            const Divider(color: Color(0xFF334155)),
+            Divider(color: Theme.of(context).colorScheme.outlineVariant),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: const Text('Tizimdan chiqish', style: TextStyle(color: Colors.redAccent)),
+              title: const Text(
+                'Tizimdan chiqish',
+                style: TextStyle(color: Colors.redAccent),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _handleLogout();
@@ -442,9 +576,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (idx) => setState(() => _currentIndex = idx),
-        backgroundColor: const Color(0xFF1E293B),
-        selectedItemColor: Colors.cyanAccent,
-        unselectedItemColor: Colors.blueGrey,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Theme.of(context).colorScheme.onSurfaceVariant,
         type: BottomNavigationBarType.fixed,
         items: _navItems,
       ),

@@ -156,6 +156,7 @@
         <!-- Main Workspace -->
         <main id="workspace" tabindex="-1" class="app-main flex-1 w-full">
             <x-validation-errors />
+            <x-android-app-download />
             {{ $slot }}
         </main>
     </div>

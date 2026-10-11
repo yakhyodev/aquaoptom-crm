@@ -18,6 +18,7 @@ use App\Services\Payments\SupplierPaymentService;
 use App\Services\Purchase\ReceivePurchaseService;
 use App\Services\Reports\ReportQueryService;
 use App\Services\Sales\CreateSaleService;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,7 +42,11 @@ class ApiController extends Controller
      */
     public function getProducts(): JsonResponse
     {
-        $products = Product::with(['variants.volume', 'variants.packages', 'variants.balance'])->get();
+        $products = Product::whereRaw('LOWER(status) = ?', ['active'])
+            ->with(['variants' => fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active'])
+                ->whereHas('volume', fn ($volumes) => $volumes->whereRaw('LOWER(status) = ?', ['active']))
+                ->with(['volume', 'packages', 'balance'])->orderBy('volume_id')])
+            ->orderByRaw('LOWER(name)')->get();
 
         $canViewCost = auth()->user()?->can('view_cost_price') ?? false;
 
@@ -53,7 +58,7 @@ class ApiController extends Controller
                 'variants' => $p->variants->map(function ($v) use ($canViewCost) {
                     $stock = $v->balance ? (float) $v->balance->quantity : 0.0;
                     $wac = $v->balance ? (int) $v->balance->average_cost : 0;
-                    $litres = $v->volume ? round($v->volume->value_ml / 1000, 2) : 0.5;
+                    $litres = $v->volume ? $v->volume->value_ml / 1000 : 0;
 
                     return [
                         'id' => $v->id,
@@ -361,7 +366,7 @@ class ApiController extends Controller
     public function getCustomers(Request $request): JsonResponse
     {
         $search = $request->input('search');
-        $query = Customer::query();
+        $query = Customer::whereRaw('LOWER(status) = ?', ['active']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -371,7 +376,7 @@ class ApiController extends Controller
             });
         }
 
-        $customers = $query->orderBy('name')->limit(100)->get();
+        $customers = $query->orderByRaw('LOWER(name)')->get();
 
         return response()->json([
             'status' => 'success',
@@ -436,7 +441,7 @@ class ApiController extends Controller
     public function getSuppliers(Request $request): JsonResponse
     {
         $search = $request->input('search');
-        $query = Supplier::query();
+        $query = Supplier::whereRaw('LOWER(status) = ?', ['active']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -446,7 +451,7 @@ class ApiController extends Controller
             });
         }
 
-        $suppliers = $query->orderBy('name')->limit(100)->get();
+        $suppliers = $query->orderByRaw('LOWER(name)')->get();
 
         return response()->json([
             'status' => 'success',
@@ -592,16 +597,25 @@ class ApiController extends Controller
      */
     public function getSalesHistory(Request $request): JsonResponse
     {
+        $filters = $request->validate([
+            'page' => 'nullable|integer|min:1', 'per_page' => 'nullable|integer|min:1|max:100',
+            'search' => 'nullable|string|max:120',
+            'from_date' => 'nullable|date_format:Y-m-d',
+            'to_date' => 'nullable|date_format:Y-m-d|after_or_equal:from_date',
+        ]);
         $canViewCost = auth()->check() && auth()->user()->can('view_cost_price');
 
         $sales = Sale::with(['customer', 'items.variant.product', 'items.variant.volume'])
+            ->when($filters['search'] ?? null, fn ($query, $search) => $query->where(fn ($q) => $q->where('invoice_number', 'ilike', '%'.$search.'%')->orWhereHas('customer', fn ($c) => $c->where('name', 'ilike', '%'.$search.'%')->orWhere('store_name', 'ilike', '%'.$search.'%')->orWhere('phone', 'like', '%'.$search.'%'))))
+            ->when($filters['from_date'] ?? null, fn ($query, $date) => $query->where('created_at', '>=', Carbon::parse($date, 'Asia/Tashkent')->startOfDay()->utc()))
+            ->when($filters['to_date'] ?? null, fn ($query, $date) => $query->where('created_at', '<=', Carbon::parse($date, 'Asia/Tashkent')->endOfDay()->utc()))
             ->orderBy('id', 'desc')
-            ->limit(50)
-            ->get();
+            ->paginate($filters['per_page'] ?? 50);
 
         return response()->json([
             'status' => 'success',
-            'data' => $sales->map(fn ($sale) => [
+            'meta' => ['current_page' => $sales->currentPage(), 'last_page' => $sales->lastPage(), 'total' => $sales->total()],
+            'data' => $sales->getCollection()->map(fn ($sale) => [
                 'id' => $sale->id,
                 'operation_id' => $sale->operation_id,
                 'invoice_number' => $sale->invoice_number,
@@ -633,18 +647,19 @@ class ApiController extends Controller
     {
         $filters = [
             'period' => $request->input('period', 'today'),
-            'start_date' => $request->input('start_date'),
-            'end_date' => $request->input('end_date'),
+            'from_date' => $request->input('from_date', $request->input('start_date')),
+            'to_date' => $request->input('to_date', $request->input('end_date')),
         ];
 
         $salesSummary = $this->reportService->getSalesSummary($filters);
-        $cashSummary = $this->reportService->getCashSummary($filters);
+        $cashSummary = $request->user()->can('view_cash') ? $this->reportService->getCashSummary($filters) : null;
 
         return response()->json([
             'status' => 'success',
             'data' => [
                 'sales' => $salesSummary,
                 'cash' => $cashSummary,
+                'can_view_cash' => $request->user()->can('view_cash'),
             ],
         ]);
     }

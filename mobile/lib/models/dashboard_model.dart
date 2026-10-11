@@ -28,20 +28,27 @@ class DashboardFlow {
   factory DashboardFlow.fromJson(Map<String, dynamic> json, bool canViewCost) {
     return DashboardFlow(
       totalSales: (json['total_sales'] as num?)?.toInt() ?? 0,
-      paidAtPos: (json['paid_at_pos'] as num?)?.toInt() ?? 0,
+      paidAtPos:
+          ((json['paid_at_pos'] ?? json['cash_collected']) as num?)?.toInt() ??
+          0,
       newDebt: (json['new_debt'] as num?)?.toInt() ?? 0,
-      totalInflow: (json['total_inflow'] as num?)?.toInt() ?? 0,
+      totalInflow:
+          ((json['cash_in'] ?? json['total_inflow']) as num?)?.toInt() ?? 0,
       debtCollected: (json['debt_collected'] as num?)?.toInt() ?? 0,
-      totalOutflow: (json['total_outflow'] as num?)?.toInt() ?? 0,
+      totalOutflow:
+          ((json['cash_out'] ?? json['total_outflow']) as num?)?.toInt() ?? 0,
       supplierPaid: (json['supplier_paid'] as num?)?.toInt() ?? 0,
-      expenses: (json['expenses'] as num?)?.toInt() ?? 0,
+      expenses:
+          ((json['operating_expenses'] ?? json['expenses']) as num?)?.toInt() ??
+          0,
       grossProfit: canViewCost && json['gross_profit'] != null
           ? (json['gross_profit'] as num).toInt()
           : null,
       netOperating: canViewCost && json['net_operating'] != null
           ? (json['net_operating'] as num).toInt()
           : null,
-      ordersCount: (json['orders_count'] as num?)?.toInt() ?? 0,
+      ordersCount:
+          ((json['sales_count'] ?? json['orders_count']) as num?)?.toInt() ?? 0,
     );
   }
 }
@@ -69,26 +76,50 @@ class DashboardBalances {
     this.stockPotentialRevenue = 0,
   });
 
-  factory DashboardBalances.fromJson(Map<String, dynamic> json, bool canViewCost) {
-    final cashAccounts = json['cash_accounts'] as Map<String, dynamic>? ?? {};
+  factory DashboardBalances.fromJson(
+    Map<String, dynamic> json,
+    bool canViewCost,
+  ) {
+    final cashAccounts = json['cash_accounts'] is Map<String, dynamic>
+        ? json['cash_accounts'] as Map<String, dynamic>
+        : <String, dynamic>{};
     final byType = cashAccounts['by_type'] as Map<String, dynamic>? ?? {};
     final cust = json['customer_receivables'] as Map<String, dynamic>? ?? {};
-    final supp = json['supplier_payables'] as Map<String, dynamic>? ?? {};
+    final supp = json['supplier_payables'] is Map<String, dynamic>
+        ? json['supplier_payables'] as Map<String, dynamic>
+        : <String, dynamic>{};
     final stock = json['stock_valuation'] as Map<String, dynamic>? ?? {};
 
     return DashboardBalances(
-      cashTotal: (cashAccounts['total'] as num?)?.toInt() ?? 0,
+      cashTotal:
+          ((json['total_cash'] ?? cashAccounts['total']) as num?)?.toInt() ?? 0,
       cashInHand: (byType['CASH'] as num?)?.toInt() ?? 0,
       cardTotal: (byType['CARD'] as num?)?.toInt() ?? 0,
       bankTotal: (byType['BANK'] as num?)?.toInt() ?? 0,
-      customerDebts: (cust['total_debt'] as num?)?.toInt() ?? 0,
-      supplierPayables: (supp['total_payable'] as num?)?.toInt() ?? 0,
-      stockTotalUnits: (stock['total_units'] as num?)?.toInt() ?? 0,
-      stockCostValue: canViewCost && stock['total_cost_value'] != null
-          ? (stock['total_cost_value'] as num).toInt()
+      customerDebts:
+          ((json['customer_debts'] ?? cust['total_debt']) as num?)?.toInt() ??
+          0,
+      supplierPayables:
+          ((json['supplier_payables'] is num
+                      ? json['supplier_payables']
+                      : supp['total_payable'])
+                  as num?)
+              ?.toInt() ??
+          0,
+      stockTotalUnits:
+          ((json['stock_units'] ?? stock['total_units']) as num?)?.toInt() ?? 0,
+      stockCostValue:
+          canViewCost &&
+              (json['stock_cost_valuation'] ?? stock['total_cost_value']) !=
+                  null
+          ? ((json['stock_cost_valuation'] ?? stock['total_cost_value']) as num)
+                .toInt()
           : null,
       stockPotentialRevenue:
-          (stock['total_potential_revenue'] as num?)?.toInt() ?? 0,
+          ((json['potential_retail_value'] ?? stock['total_potential_revenue'])
+                  as num?)
+              ?.toInt() ??
+          0,
     );
   }
 }
@@ -110,10 +141,16 @@ class DashboardWarnings {
     return DashboardWarnings(
       lowStockCount: (json['low_stock_count'] as num?)?.toInt() ?? 0,
       offlineDevicesCount:
-          (json['offline_devices_count'] as num?)?.toInt() ?? 0,
+          ((json['stale_devices_count'] ?? json['offline_devices_count'])
+                  as num?)
+              ?.toInt() ??
+          0,
       pendingConflictsCount:
-          (json['pending_conflicts_count'] as num?)?.toInt() ?? 0,
-      isFullySynced: json['is_fully_synced'] as bool? ?? true,
+          ((json['needs_review_count'] ?? json['pending_conflicts_count'])
+                  as num?)
+              ?.toInt() ??
+          0,
+      isFullySynced: json['is_fully_synced'] as bool? ?? false,
     );
   }
 }
@@ -122,6 +159,7 @@ class DashboardData {
   final String periodKey;
   final String periodLabel;
   final bool canViewCost;
+  final bool canViewCash;
   final DashboardFlow flow;
   final DashboardBalances balances;
   final DashboardWarnings warnings;
@@ -131,6 +169,7 @@ class DashboardData {
     required this.periodKey,
     required this.periodLabel,
     required this.canViewCost,
+    this.canViewCash = false,
     required this.flow,
     required this.balances,
     required this.warnings,
@@ -145,6 +184,7 @@ class DashboardData {
       periodKey: period['key'] as String? ?? 'today',
       periodLabel: period['label'] as String? ?? 'Bugun',
       canViewCost: canViewCost,
+      canViewCash: json['can_view_cash'] as bool? ?? false,
       flow: DashboardFlow.fromJson(
         json['flow'] as Map<String, dynamic>? ?? {},
         canViewCost,

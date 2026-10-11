@@ -9,6 +9,7 @@ use App\Models\OperationResult;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sale;
+use App\Models\SyncChangeLog;
 use App\Models\SyncConflict;
 use App\Models\User;
 use App\Models\Volume;
@@ -793,6 +794,7 @@ class SyncProtocolAndConflictTest extends TestCase
      */
     public function test_postgresql_commit_order_cursor_monotonicity(): void
     {
+        $cursor = (int) SyncChangeLog::max('id');
         // 5 ta ketma-ket change log yaratish
         for ($i = 1; $i <= 5; $i++) {
             $this->changeLogService->logChange(
@@ -805,7 +807,7 @@ class SyncProtocolAndConflictTest extends TestCase
 
         // 1-sahifa: limit 3
         $resp1 = $this->actingAs($this->cashier, 'sanctum')
-            ->getJson('/api/sync/pull?cursor=0&limit=3');
+            ->getJson("/api/sync/pull?cursor={$cursor}&limit=3");
 
         $resp1->assertStatus(200);
         $data1 = $resp1->json('data');

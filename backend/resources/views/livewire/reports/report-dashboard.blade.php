@@ -81,9 +81,11 @@
             <button wire:click="setTab('statements')" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all {{ $activeTab === 'statements' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-slate-600 hover:bg-slate-50' }}">
                 Mijoz va yetkazuvchi hisobi
             </button>
+            @can('view_cash')
             <button wire:click="setTab('cash')" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all {{ $activeTab === 'cash' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-slate-600 hover:bg-slate-50' }}">
                 Kassa
             </button>
+            @endcan
             <button wire:click="setTab('staff')" class="px-3.5 py-2 rounded-lg text-xs font-semibold transition-all {{ $activeTab === 'staff' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'text-slate-600 hover:bg-slate-50' }}">
                 Xodimlar
             </button>
@@ -116,7 +118,7 @@
                     <span class="text-lg font-bold text-slate-900 font-mono mt-1 block">
                         {{ number_format($salesReport['kpi']['total_gross_sales']) }}
                     </span>
-                    <span class="text-xs text-slate-600">so'm (brutto)</span>
+                    <span class="text-xs text-slate-600">so'm (qaytarishlar ayrilmagan)</span>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -168,7 +170,7 @@
                             <tr>
                                 <th class="p-3">Mahsulot</th>
                                 <th class="p-3">Hajm</th>
-                                <th class="p-3">SKU</th>
+                                <th class="p-3">Mahsulot kodi</th>
                                 <th class="p-3 text-right">Sotilgan Dona</th>
                                 <th class="p-3 text-right">Cheklar Soni</th>
                                 <th class="p-3 text-right">Jami Tushum</th>
@@ -210,7 +212,7 @@
                         <span class="text-2xl font-bold text-slate-900 font-mono mt-1 block">
                             {{ number_format($pnlReport['net_sales']) }}
                         </span>
-                        <span class="text-xs text-slate-600">Brutto: {{ number_format($pnlReport['gross_sales']) }} - Qaytarish: {{ number_format($pnlReport['returns']) }}</span>
+                        <span class="text-xs text-slate-600">Jami savdo: {{ number_format($pnlReport['gross_sales']) }} - Qaytarish: {{ number_format($pnlReport['returns']) }}</span>
                     </div>
 
                     <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
@@ -258,7 +260,7 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100 font-mono">
                                 <tr>
-                                    <td class="p-3 font-sans font-medium text-slate-800">1. Jami Savdo (Brutto)</td>
+                                    <td class="p-3 font-sans font-medium text-slate-800">1. Jami savdo</td>
                                     <td class="p-3 text-right font-bold text-slate-900">+{{ number_format($pnlReport['gross_sales']) }}</td>
                                     <td class="p-3 font-sans text-slate-600">Davrdagi barcha cheklar summasi</td>
                                 </tr>

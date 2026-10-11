@@ -40,7 +40,7 @@ ApiService _createMockApiService() {
               'open_cash_sessions_count': 1,
             },
             'recent_activity': [],
-          }
+          },
         }),
         200,
         headers: {'content-type': 'application/json'},
@@ -65,7 +65,7 @@ ApiService _createMockApiService() {
           'data': {
             'sales': {'total_sales': 0, 'count': 0},
             'cash': {'total_inflow': 0, 'total_outflow': 0, 'net': 0},
-          }
+          },
         }),
         200,
         headers: {'content-type': 'application/json'},
@@ -83,6 +83,7 @@ ApiService _createMockApiService() {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
     SessionService().clearSession();
   });
@@ -92,38 +93,44 @@ void main() {
   });
 
   group('AquaOptomApp UI Smoke Tests', () {
-    testWidgets('Unauthenticated user sees LoginScreen and can open Server Settings',
-        (WidgetTester tester) async {
-      final api = _createMockApiService();
-      await tester.pumpWidget(AquaOptomApp(apiService: api));
-      await tester.pumpAndSettle();
+    testWidgets(
+      'Unauthenticated user sees LoginScreen and can open Server Settings',
+      (WidgetTester tester) async {
+        final api = _createMockApiService();
+        await tester.pumpWidget(AquaOptomApp(apiService: api));
+        await tester.pumpAndSettle();
 
-      // Verify LoginScreen UI elements
-      expect(find.text('AquaOptom'), findsOneWidget);
-      expect(find.text('Tizimga kirish'), findsOneWidget);
-      expect(find.byType(TextField), findsNWidgets(2)); // Email/phone and password fields
+        // Verify LoginScreen UI elements
+        expect(find.text('AquaOptom'), findsOneWidget);
+        expect(find.text('Tizimga kirish'), findsOneWidget);
+        expect(
+          find.byType(TextField),
+          findsNWidgets(2),
+        ); // Email/phone and password fields
 
-      // Find and tap Server Settings button
-      final serverButton = find.textContaining('Server:');
-      expect(serverButton, findsOneWidget);
+        // Find and tap Server Settings button
+        final serverButton = find.textContaining('Server:');
+        expect(serverButton, findsOneWidget);
 
-      await tester.ensureVisible(serverButton);
-      await tester.tap(serverButton);
-      await tester.pumpAndSettle();
+        await tester.ensureVisible(serverButton);
+        await tester.tap(serverButton);
+        await tester.pumpAndSettle();
 
-      // Check modal dialog
-      expect(find.text('API Server Manzili'), findsOneWidget);
-      expect(find.text('Standartga qaytarish'), findsOneWidget);
-      expect(find.text('Saqlash'), findsOneWidget);
+        // Check modal dialog
+        expect(find.text('API Server Manzili'), findsOneWidget);
+        expect(find.text('Standartga qaytarish'), findsOneWidget);
+        expect(find.text('Saqlash'), findsOneWidget);
 
-      // Tap save to close modal
-      await tester.tap(find.text('Saqlash'));
-      await tester.pumpAndSettle();
-      expect(find.text('API Server Manzili'), findsNothing);
-    });
+        // Tap save to close modal
+        await tester.tap(find.text('Saqlash'));
+        await tester.pumpAndSettle();
+        expect(find.text('API Server Manzili'), findsNothing);
+      },
+    );
 
-    testWidgets('Owner role renders MainNavigationScreen with all tabs',
-        (WidgetTester tester) async {
+    testWidgets('Owner role renders MainNavigationScreen with all tabs', (
+      WidgetTester tester,
+    ) async {
       final ownerUser = UserModel(
         id: 1,
         name: 'Aziz Rahimov',
@@ -141,7 +148,10 @@ void main() {
       );
 
       // Simulate logged in session
-      SessionService().setSession(user: ownerUser, token: 'fake-jwt-token-for-test');
+      SessionService().setSession(
+        user: ownerUser,
+        token: 'fake-jwt-token-for-test',
+      );
 
       final api = _createMockApiService();
       await tester.pumpWidget(AquaOptomApp(apiService: api));
@@ -178,17 +188,15 @@ void main() {
       expect(find.byIcon(Icons.receipt_long), findsWidgets);
     });
 
-    testWidgets('Cashier role renders restricted tabs without dashboard',
-        (WidgetTester tester) async {
+    testWidgets('Cashier role renders restricted tabs without dashboard', (
+      WidgetTester tester,
+    ) async {
       final cashierUser = UserModel(
         id: 2,
         name: 'Olim Kassir',
         email: 'kassir@aquaoptom.uz',
         role: 'CASHIER',
-        permissions: [
-          'manage_sales',
-          'view_debt',
-        ],
+        permissions: ['manage_sales', 'view_debt'],
       );
 
       SessionService().setSession(user: cashierUser, token: 'cashier-token');

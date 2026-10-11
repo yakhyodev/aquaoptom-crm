@@ -1,7 +1,7 @@
 <div class="dashboard-workspace space-y-4" wire:poll.30s="refreshDashboard">
         <div class="dashboard-welcome"><div><span class="trade-eyebrow">DO‘KONNING UMUMIY HOLATI</span><h1>Xush kelibsiz, {{ auth()->user()->name }}!</h1><p>Hozirgi qoldiqlarni ko‘ring yoki yangi ish boshlang.</p></div><a href="{{ route('guide') }}" class="trade-button trade-button-secondary">🧭 Do‘kon xaritasi</a></div>
     <div class="dashboard-overview">
-        <section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>
+        @can('view_cash')<section class="dashboard-cash" aria-label="Kassaning hozirgi holati"><div class="dashboard-cash-total"><span>Hozir do‘konda bor jami pul</span><strong data-testid="dashboard-cash">{{ number_format($dashboard['balances']['total_cash'], 0, '.', ' ') }} <small>so‘m</small></strong><p>Do‘kon kassasidagi jami mablag‘. Sana filtri hozirgi qoldiqni o‘zgartirmaydi.</p>@can('view_cash')<a href="{{ route('cash.index') }}">Kassa va xarajatlarni ochish →</a>@endcan</div><div class="dashboard-cash-accounts"><div class="workspace-caption">Oxirgi yangilanish: {{ $dashboard['as_of_time'] }}<button wire:click="refreshDashboard" aria-label="Qoldiqlarni yangilash">↻ Yangilash</button></div></div></section>@endcan
         <div class="dashboard-actions"><a href="{{ route('sales.pos') }}"><span>⚡</span><strong>Tezkor sotuv</strong><small>Mijozsiz sotish</small></a><a href="{{ route('sales.pos', ['mode' => 'customer']) }}"><span>👤</span><strong>Mijozga sotuv</strong><small>To‘lov yoki nasiya</small></a><a href="{{ route('inventory.inward') }}"><span>📥</span><strong>Mahsulot keldi</strong><small>Omborga kirim qilish</small></a><a href="{{ route('debts.index') }}"><span>🤝</span><strong>Qarz bilan ishlash</strong><small>To‘lov olish yoki berish</small></a></div>
     </div>
         <div class="dashboard-period flex flex-wrap items-center justify-between gap-3">
@@ -60,7 +60,7 @@
             </div>
             <div>
                 <div class="font-bold text-slate-900 flex items-center gap-2">
-                    <span>Ma'lumotlar to'liqligi: {{ $dashboard['warnings']['completeness_percent'] }}%</span>
+                    <span>Qurilmalar aloqasi: {{ $dashboard['warnings']['completeness_percent'] }}%</span>
                     @if($dashboard['warnings']['stale_devices_count'] > 0)
                         <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50/80 text-amber-700">
                             {{ $dashboard['warnings']['stale_devices_count'] }} ta offline qurilma
@@ -80,7 +80,7 @@
         </div>
     </div>
 
-    <div class="money-flow-cards"><div><span>Tanlangan davrda pul kirdi</span><strong>{{ number_format($dashboard['flow']['cash_in'], 0, '.', ' ') }} so‘m</strong></div><div><span>Tanlangan davrda pul chiqdi</span><strong>{{ number_format($dashboard['flow']['cash_out'], 0, '.', ' ') }} so‘m</strong></div><div><span>Shundan do‘kon xarajatlari</span><strong data-testid="dashboard-expenses">{{ number_format($dashboard['flow']['operating_expenses'], 0, '.', ' ') }} so‘m</strong></div></div>
+    @can('view_cash')<div class="money-flow-cards"><div><span>Tanlangan davrda pul kirdi</span><strong>{{ number_format($dashboard['flow']['cash_in'], 0, '.', ' ') }} so‘m</strong></div><div><span>Tanlangan davrda pul chiqdi</span><strong>{{ number_format($dashboard['flow']['cash_out'], 0, '.', ' ') }} so‘m</strong></div><div><span>Shundan do‘kon xarajatlari</span><strong data-testid="dashboard-expenses">{{ number_format($dashboard['flow']['operating_expenses'], 0, '.', ' ') }} so‘m</strong></div></div>@endcan
     <p class="workspace-caption">Boshlang‘ich qoldiq tanlangan davrdagi pul kirimiga qo‘shilmaydi. Mijozdan tushgan to‘lovlar quyida alohida.</p>
     <!-- 3. DAVRIY OQIM (Flow Metrics) -->
     <div>
@@ -105,6 +105,7 @@
                 <div class="absolute -right-2 -bottom-2 text-slate-800/40 text-5xl font-black select-none pointer-events-none">🛒</div>
             </div>
 
+@can('view_cash')
             <!-- Tushgan Pul (Cash Collections) -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative overflow-hidden">
                 <div class="text-xs font-semibold text-emerald-700 ">Tushgan Pul (Kassa)</div>
@@ -116,6 +117,7 @@
                 <div class="absolute -right-2 -bottom-2 text-slate-800/40 text-5xl font-black select-none pointer-events-none">💵</div>
             </div>
 
+@endcan
             <!-- Yangi Nasiya (New Debt) -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl relative overflow-hidden">
                 <div class="text-xs font-semibold text-amber-700 ">Yangi Nasiya</div>
@@ -173,6 +175,7 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+@can('view_cash')
             <!-- 4.1. Kassadagi jami pul -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">
@@ -186,6 +189,7 @@
                 </div>
             </div>
 
+@endcan
             <!-- 4.2. Mijozlarning hisobi: Alohida Qarzlar va Alohida Avanslar -->
             <div class="bg-slate-50 border border-slate-200 p-5 rounded-2xl">
                 <div class="flex items-center justify-between mb-2">

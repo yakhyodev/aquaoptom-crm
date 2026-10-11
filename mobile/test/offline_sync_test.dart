@@ -1050,40 +1050,214 @@ void main() {
       }
     },
   );
-  test('Lease renewal preserves pending sales and retries safely after rejection', () async {
-    final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(version: 2, onCreate: AppDatabase.createSchema));
-    AppDatabase.setTestDatabase(db);
-    SessionService().setSession(user: testUserA, token: 'renew-test-token');
-    var fail = false;
-    var requests = 0;
-    final service = OfflineSyncService(client: MockClient((request) async {
-      requests++;
-      expect(request.url.path.endsWith('/sync/renew-lease'), isTrue);
-      if (fail) return http.Response('{}', 403);
-      return http.Response(json.encode({'data': {
-        'lease_token': 'new-token', 'valid_from': DateTime.now().toUtc().toIso8601String(),
-        'expires_at': DateTime.now().add(const Duration(hours: 24)).toUtc().toIso8601String(),
-        'permissions': ['offline_sales'], 'epoch': 2, 'signature': 'signed',
-      }}), 200);
-    }));
-    service.setDeviceUuid('renew-device');
-    try {
-      await db.insert('offline_leases', {'device_uuid': 'renew-device', 'user_id': 1, 'lease_token': 'old-token',
-        'valid_from': DateTime.now().toIso8601String(), 'expires_at': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
-        'permissions': '[]', 'epoch': 1, 'signature': '', 'is_active': 1});
-      await db.insert('sync_queue', {'operation_id': 'renew-pending', 'user_id': 1, 'device_uuid': 'renew-device',
-        'type': 'CREATE_SALE', 'payload': '{}', 'payload_fingerprint': 'fingerprint', 'status': 'PENDING',
-        'device_created_at': DateTime.now().toIso8601String(), 'lease_token': 'old-token'});
-      expect(await service.renewDeviceLease(), isTrue);
-      expect((await db.query('offline_leases')).first['lease_token'], 'new-token');
-      expect((await db.query('sync_queue')).first['lease_token'], 'old-token');
-      expect((await db.query('sync_queue')).first['status'], 'PENDING');
-      expect(await service.renewDeviceLease(), isFalse);
-      expect(requests, 1);
-      fail = true;
-      await expectLater(service.renewDeviceLease(force: true), throwsA(isA<ServerException>()));
-      expect((await db.query('offline_leases')).first['lease_token'], 'new-token');
-    } finally { await db.close(); }
-  });
+  test(
+    'Lease renewal preserves pending sales and retries safely after rejection',
+    () async {
+      final db = await databaseFactoryFfi.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: AppDatabase.createSchema,
+        ),
+      );
+      AppDatabase.setTestDatabase(db);
+      SessionService().setSession(user: testUserA, token: 'renew-test-token');
+      var fail = false;
+      var requests = 0;
+      final service = OfflineSyncService(
+        client: MockClient((request) async {
+          requests++;
+          expect(request.url.path.endsWith('/sync/renew-lease'), isTrue);
+          if (fail) return http.Response('{}', 403);
+          return http.Response(
+            json.encode({
+              'data': {
+                'lease_token': 'new-token',
+                'valid_from': DateTime.now().toUtc().toIso8601String(),
+                'expires_at': DateTime.now()
+                    .add(const Duration(hours: 24))
+                    .toUtc()
+                    .toIso8601String(),
+                'permissions': ['offline_sales'],
+                'epoch': 2,
+                'signature': 'signed',
+              },
+            }),
+            200,
+          );
+        }),
+      );
+      service.setDeviceUuid('renew-device');
+      try {
+        await db.insert('offline_leases', {
+          'device_uuid': 'renew-device',
+          'user_id': 1,
+          'lease_token': 'old-token',
+          'valid_from': DateTime.now().toIso8601String(),
+          'expires_at': DateTime.now()
+              .add(const Duration(hours: 1))
+              .toIso8601String(),
+          'permissions': '[]',
+          'epoch': 1,
+          'signature': '',
+          'is_active': 1,
+        });
+        await db.insert('sync_queue', {
+          'operation_id': 'renew-pending',
+          'user_id': 1,
+          'device_uuid': 'renew-device',
+          'type': 'CREATE_SALE',
+          'payload': '{}',
+          'payload_fingerprint': 'fingerprint',
+          'status': 'PENDING',
+          'device_created_at': DateTime.now().toIso8601String(),
+          'lease_token': 'old-token',
+        });
+        expect(await service.renewDeviceLease(), isTrue);
+        expect(
+          (await db.query('offline_leases')).first['lease_token'],
+          'new-token',
+        );
+        expect(
+          (await db.query('sync_queue')).first['lease_token'],
+          'old-token',
+        );
+        expect((await db.query('sync_queue')).first['status'], 'PENDING');
+        expect(await service.renewDeviceLease(), isFalse);
+        expect(requests, 1);
+        fail = true;
+        await expectLater(
+          service.renewDeviceLease(force: true),
+          throwsA(isA<ServerException>()),
+        );
+        expect(
+          (await db.query('offline_leases')).first['lease_token'],
+          'new-token',
+        );
+      } finally {
+        await db.close();
+      }
+    },
+  );
 
+  test(
+    'Delta failures retain cursor; exact custom volumes and local catalog survive restart',
+    () async {
+      final db = await databaseFactoryFfi.openDatabase(
+        ':memory:',
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: AppDatabase.createSchema,
+        ),
+      );
+      AppDatabase.setTestDatabase(db);
+      await SessionService().setSession(user: testUserA, token: 'delta-token');
+      var failPull = true;
+      final service = OfflineSyncService(
+        appDb: AppDatabase(),
+        client: MockClient((request) async {
+          if (failPull) return http.Response('{}', 503);
+          return http.Response(
+            json.encode({
+              'data': {
+                'next_cursor': 3,
+                'has_more': false,
+                'items': [
+                  {
+                    'entity_type': 'PRODUCT',
+                    'entity_id': '1',
+                    'payload': {
+                      'name': 'Fanta',
+                      'code': 'F',
+                      'status': 'active',
+                    },
+                  },
+                  {
+                    'entity_type': 'PRODUCT_VARIANT',
+                    'entity_id': '12',
+                    'payload': {
+                      'product_id': 1,
+                      'volume_ml': 2500,
+                      'volume_name': '2.5 L',
+                      'default_sale_price': 8000,
+                      'status': 'active',
+                    },
+                  },
+                  {
+                    'entity_type': 'CUSTOMER',
+                    'entity_id': '4',
+                    'payload': {
+                      'name': 'Abror',
+                      'status': 'active',
+                      'current_debt': 20000,
+                    },
+                  },
+                ],
+              },
+            }),
+            200,
+          );
+        }),
+      );
+      service.setDeviceUuid('delta-device');
+      try {
+        final previousSync = service.lastSyncedAt;
+        await expectLater(
+          service.pullDeltaChanges(),
+          throwsA(isA<ServerException>()),
+        );
+        expect(await db.query('sync_cursor'), isEmpty);
+        expect(service.lastSyncedAt, previousSync);
+        failPull = false;
+        expect(await service.pullDeltaChanges(), 3);
+        final variant = (await db.query('product_variants')).single;
+        expect(variant['volume_ml'], 2500);
+        expect(variant['litres'], 2.5);
+        expect(variant['display_volume'], '2.5 L');
+        await db.insert('offline_leases', {
+          'device_uuid': 'delta-device',
+          'user_id': 1,
+          'lease_token': 'valid-token',
+          'valid_from': DateTime.now().toIso8601String(),
+          'expires_at': DateTime.now()
+              .add(const Duration(hours: 1))
+              .toIso8601String(),
+          'permissions': '["offline_sales"]',
+          'epoch': 1,
+          'is_active': 1,
+        });
+        await db.insert('stock_allocations', {
+          'id': 1,
+          'variant_id': 12,
+          'allocated_quantity': 200,
+          'consumed_quantity': 0,
+          'returned_quantity': 0,
+          'available_quantity': 200,
+        });
+        final local = OfflineSalesService(appDb: AppDatabase());
+        final products = await local.getLocalCatalog();
+        expect(products.single.variants.single.volumeMl, 2500);
+        expect(products.single.variants.single.stockQty, 200);
+        expect((await local.getLocalCustomers()).single.name, 'Abror');
+        await expectLater(
+          local.confirmSaleOffline(
+            items: [
+              {'variant_id': 12, 'quantity': -1, 'sale_price': 8000},
+            ],
+            paymentType: 'CASH',
+            paymentMethod: 'CASH',
+          ),
+          throwsA(isA<ValidationException>()),
+        );
+        expect(
+          (await db.query('stock_allocations')).single['available_quantity'],
+          200,
+        );
+        expect(await db.query('sync_queue'), isEmpty);
+      } finally {
+        AppDatabase.setTestDatabase(null);
+        await db.close();
+      }
+    },
+  );
 }

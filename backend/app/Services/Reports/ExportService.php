@@ -64,11 +64,15 @@ class ExportService
         $totalSales = 0;
         $totalPaid = 0;
         $totalDebt = 0;
+        $completedCount = 0;
 
         foreach ($sales as $sale) {
-            $totalSales += (int) $sale->total_amount;
-            $totalPaid += (int) $sale->paid_amount;
-            $totalDebt += (int) $sale->debt_amount;
+            if ($sale->status !== 'CANCELLED') {
+                $totalSales += (int) $sale->total_amount;
+                $totalPaid += (int) $sale->paid_amount;
+                $totalDebt += (int) $sale->debt_amount;
+                $completedCount++;
+            }
 
             $rows[] = [
                 self::escapeFormula($sale->invoice_number),
@@ -87,7 +91,7 @@ class ExportService
 
         $totals = [
             'JAMI',
-            count($sales).' ta savdo',
+            $completedCount.' ta savdo (bekor qilinganlar jamiga kirmaydi)',
             '',
             '',
             '',
@@ -103,7 +107,7 @@ class ExportService
             'Jami Savdo' => $totalSales,
             'Dastlabki To\'langan' => $totalPaid,
             'Dastlabki Nasiya' => $totalDebt,
-            'Cheklar Soni' => count($sales),
+            'Cheklar Soni' => $completedCount,
         ];
 
         return $this->generateExport(
@@ -364,6 +368,7 @@ class ExportService
     public function exportCashReport(User $user, array $filters, string $format = 'csv'): ReportExport
     {
         $this->authorize($user);
+        abort_unless($user->can('view_cash'), 403);
 
         $cash = $this->reportQueryService->getCashSummary($filters);
         $period = $cash['period'];

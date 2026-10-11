@@ -55,6 +55,8 @@ class ReportDashboard extends Component
 
     public function setTab(string $tab): void
     {
+        abort_unless(in_array($tab, ['sales', 'profit_loss', 'purchases', 'inventory', 'statements', 'cash', 'staff', 'sync'], true), 422);
+        abort_if($tab === 'cash' && ! Auth::user()?->can('view_cash'), 403);
         $this->activeTab = $tab;
         $this->errorMessage = null;
         $this->successMessage = null;
@@ -129,7 +131,7 @@ class ReportDashboard extends Component
             $inventoryReport = $this->reportQueryService->getInventoryValuationReport($filters, $canViewCost);
         } elseif ($this->activeTab === 'statements') {
             $statementsReport = $this->reportQueryService->getPartyStatements($this->statementPartyType, $this->statementPartyId, $filters);
-        } elseif ($this->activeTab === 'cash') {
+        } elseif ($this->activeTab === 'cash' && Auth::user()?->can('view_cash')) {
             $cashReport = $this->reportQueryService->getCashSummary($filters);
         } elseif ($this->activeTab === 'staff') {
             $staffReport = $this->reportQueryService->getStaffSummary($filters);

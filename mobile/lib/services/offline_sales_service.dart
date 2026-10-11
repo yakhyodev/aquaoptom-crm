@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import '../database/app_database.dart';
 import '../models/customer_model.dart';
+import '../models/product_model.dart';
 import '../models/offline_lease_model.dart';
 import '../models/user_model.dart';
 import '../utils/operation_id.dart';
@@ -31,6 +32,52 @@ class OfflineSalesService {
   final AppDatabase _appDb;
 
   OfflineSalesService({AppDatabase? appDb}) : _appDb = appDb ?? AppDatabase();
+
+  Future<List<Product>> getLocalCatalog() async {
+    await getActiveLease();
+    final db = await _appDb.database;
+    final products = await db.query(
+      'products',
+      where: 'is_active = 1',
+      orderBy: 'LOWER(name)',
+    );
+    final result = <Product>[];
+    for (final product in products) {
+      final variants = await db.query(
+        'product_variants',
+        where: 'product_id = ?',
+        whereArgs: [product['id']],
+        orderBy: 'volume_ml',
+      );
+      final mapped = <Map<String, dynamic>>[];
+      for (final variant in variants) {
+        final allocations = await db.query(
+          'stock_allocations',
+          where: 'variant_id = ?',
+          whereArgs: [variant['id']],
+        );
+        mapped.add({
+          ...variant,
+          'stock_qty': allocations.isEmpty
+              ? 0
+              : allocations.first['available_quantity'],
+        });
+      }
+      if (mapped.isNotEmpty)
+        result.add(Product.fromJson({...product, 'variants': mapped}));
+    }
+    return result;
+  }
+
+  Future<List<CustomerModel>> getLocalCustomers() async {
+    await getActiveLease();
+    final db = await _appDb.database;
+    return (await db.query(
+      'customers',
+      where: 'is_active = 1',
+      orderBy: 'LOWER(name)',
+    )).map(CustomerModel.fromJson).toList();
+  }
 
   /// Qurilmaning faol lease ruxsatnomasini tekshirish
   Future<OfflineLeaseModel> getActiveLease({int? userId}) async {
@@ -125,6 +172,20 @@ class OfflineSalesService {
 
       // 1. Har bir tovar ajratmasini (Stock Allocation) tekshirish va band qilish
       for (final item in items) {
+        final rawQty = item['quantity'];
+        final rawPrice = item['sale_price'] ?? item['unit_price'];
+        if (rawQty is! num ||
+            !rawQty.isFinite ||
+            rawQty <= 0 ||
+            rawQty != rawQty.toInt() ||
+            rawPrice is! num ||
+            !rawPrice.isFinite ||
+            rawPrice < 0 ||
+            rawPrice != rawPrice.toInt()) {
+          throw ValidationException(
+            'Miqdor musbat butun dona, narx esa butun so‘m bo‘lishi kerak.',
+          );
+        }
         final variantId = (item['variant_id'] as num).toInt();
         final qty = (item['quantity'] as num).toInt();
         final unitPrice = ((item['sale_price'] ?? item['unit_price']) as num)

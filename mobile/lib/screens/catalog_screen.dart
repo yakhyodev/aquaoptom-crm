@@ -73,7 +73,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final canReceiveStock = user?.canReceiveStock ?? false;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: _fetchProducts,
         child: Column(
@@ -83,11 +83,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
               padding: const EdgeInsets.all(16.0),
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Mahsulot nomi yoki kodini qidiring...',
-                  hintStyle: const TextStyle(color: Colors.blueGrey),
-                  prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Colors.blueAccent,
+                  ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, color: Colors.grey),
@@ -98,14 +105,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
                         )
                       : null,
                   filled: true,
-                  fillColor: const Color(0xFF1E293B),
+                  fillColor: Theme.of(context).colorScheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                   ),
                 ),
                 onChanged: (val) {
@@ -126,7 +137,10 @@ class _CatalogScreenState extends State<CatalogScreen> {
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -136,171 +150,199 @@ class _CatalogScreenState extends State<CatalogScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _filteredProducts.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'Mahsulotlar topilmadi',
-                            style: TextStyle(color: Colors.blueGrey),
+                  ? Center(
+                      child: Text(
+                        'Mahsulotlar topilmadi',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      itemCount: _filteredProducts.length,
+                      itemBuilder: (ctx, idx) {
+                        final prod = _filteredProducts[idx];
+                        return Card(
+                          color: Theme.of(context).colorScheme.surface,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outlineVariant,
+                            ),
                           ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          itemCount: _filteredProducts.length,
-                          itemBuilder: (ctx, idx) {
-                            final prod = _filteredProducts[idx];
-                            return Card(
-                              color: const Color(0xFF1E293B),
-                              margin: const EdgeInsets.only(bottom: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Color(0xFF334155)),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(14.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Padding(
+                            padding: const EdgeInsets.all(14.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Product Name & Code
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // Product Name & Code
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          prod.name,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        if (prod.code.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 8, vertical: 3),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF0F172A),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              prod.code,
-                                              style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 11),
-                                            ),
-                                          ),
-                                      ],
+                                    Text(
+                                      prod.name,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
+                                      ),
                                     ),
-                                    const SizedBox(height: 10),
-
-                                    // Variants List
-                                    ...prod.variants.map((v) {
-                                      final isLowStock = v.stockQty <= 10;
-                                      return Container(
-                                        margin: const EdgeInsets.only(top: 8),
-                                        padding: const EdgeInsets.all(10),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF0F172A),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
+                                    if (prod.code.isNotEmpty)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
                                         ),
-                                        child: Row(
-                                          children: [
-                                            // Volume Badge
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                      horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: Colors.blueAccent
-                                                    .withValues(alpha: 0.2),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                v.displayVolume,
-                                                style: const TextStyle(
-                                                  color: Colors.cyanAccent,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 12),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).scaffoldBackgroundColor,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          prod.code,
+                                          style: TextStyle(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
 
-                                            // Stock Qty
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
+                                // Variants List
+                                ...prod.variants.map((v) {
+                                  final isLowStock = v.stockQty <= 10;
+                                  return Container(
+                                    margin: const EdgeInsets.only(top: 8),
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(
+                                        context,
+                                      ).scaffoldBackgroundColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        // Volume Badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blueAccent.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            v.displayVolume,
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+
+                                        // Stock Qty
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
                                                 children: [
-                                                  Row(
-                                                    children: [
-                                                      Text(
-                                                        'Qoldiq: ${v.stockQty} dona',
-                                                        style: TextStyle(
-                                                          color: isLowStock
-                                                              ? Colors.amberAccent
-                                                              : Colors.white,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          fontSize: 13,
-                                                        ),
-                                                      ),
-                                                      if (isLowStock) ...[
-                                                        const SizedBox(width: 4),
-                                                        const Icon(
-                                                          Icons.warning_amber_rounded,
-                                                          color: Colors.amberAccent,
-                                                          size: 14,
-                                                        ),
-                                                      ],
-                                                    ],
-                                                  ),
-                                                  if (v.costPrice != null)
-                                                    Text(
-                                                      'Tannarx: ${Formatters.formatMoney(v.costPrice!)}',
-                                                      style: const TextStyle(
-                                                        color: Colors.blueGrey,
-                                                        fontSize: 11,
-                                                      ),
+                                                  Text(
+                                                    'Qoldiq: ${v.stockQty} dona',
+                                                    style: TextStyle(
+                                                      color: isLowStock
+                                                          ? Colors.amberAccent
+                                                          : Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurface,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      fontSize: 13,
                                                     ),
+                                                  ),
+                                                  if (isLowStock) ...[
+                                                    const SizedBox(width: 4),
+                                                    const Icon(
+                                                      Icons
+                                                          .warning_amber_rounded,
+                                                      color: Colors.amberAccent,
+                                                      size: 14,
+                                                    ),
+                                                  ],
                                                 ],
                                               ),
-                                            ),
-
-                                            // Sale Price
-                                            Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.end,
-                                              children: [
+                                              if (v.costPrice != null)
                                                 Text(
-                                                  Formatters.formatMoney(
-                                                      v.defaultSalePrice),
-                                                  style: const TextStyle(
-                                                    color: Colors.greenAccent,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                                const Text(
-                                                  'sotuv narxi',
+                                                  'Tannarx: ${Formatters.formatMoney(v.costPrice!)}',
                                                   style: TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 10,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .onSurfaceVariant,
+                                                    fontSize: 11,
                                                   ),
                                                 ),
-                                              ],
+                                            ],
+                                          ),
+                                        ),
+
+                                        // Sale Price
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              Formatters.formatMoney(
+                                                v.defaultSalePrice,
+                                              ),
+                                              style: const TextStyle(
+                                                color: Colors.greenAccent,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                            const Text(
+                                              'sotuv narxi',
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 10,
+                                              ),
                                             ),
                                           ],
                                         ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -319,10 +361,15 @@ class _CatalogScreenState extends State<CatalogScreen> {
                 }
               },
               backgroundColor: Colors.blueAccent,
-              icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
-              label: const Text(
+              icon: Icon(
+                Icons.add_shopping_cart,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              label: Text(
                 'Kirim qilish',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             )
           : null,

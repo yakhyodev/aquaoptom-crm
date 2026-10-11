@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter/services.dart';
 import '../config/app_config.dart';
 import '../models/cash_account_model.dart';
 import '../models/customer_model.dart';
@@ -13,6 +14,7 @@ import '../models/supplier_model.dart';
 import '../models/user_model.dart';
 import 'api_exceptions.dart';
 import 'session_service.dart';
+import 'offline_sales_service.dart';
 
 class ApiService {
   final http.Client _client;
@@ -49,7 +51,7 @@ class ApiService {
 
     switch (response.statusCode) {
       case 401:
-        SessionService().clearSession();
+        unawaited(SessionService().clearSession().catchError((Object _) {}));
         throw UnauthorizedException(message, body);
       case 403:
         throw ForbiddenException(message, body);
@@ -124,7 +126,7 @@ class ApiService {
     final userJson = data['user'] as Map<String, dynamic>? ?? {};
 
     final user = UserModel.fromJson(userJson);
-    SessionService().setSession(user: user, token: token);
+    await SessionService().setSession(user: user, token: token);
     return user;
   }
 
@@ -136,7 +138,7 @@ class ApiService {
 
     final data = json.decode(response.body) as Map<String, dynamic>;
     final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
-    SessionService().updateCurrentUser(user);
+    await SessionService().updateCurrentUser(user);
     return user;
   }
 
@@ -149,7 +151,7 @@ class ApiService {
         ),
       );
     } finally {
-      SessionService().clearSession();
+      await SessionService().clearSession();
     }
   }
 
@@ -181,15 +183,21 @@ class ApiService {
   // ==========================================
 
   Future<List<Product>> getProducts() async {
-    final response = await _sendRequest(
-      () =>
-          _client.get(Uri.parse('$baseUrl/products'), headers: _buildHeaders()),
-    );
+    try {
+      final response = await _sendRequest(
+        () => _client.get(
+          Uri.parse('$baseUrl/products'),
+          headers: _buildHeaders(),
+        ),
+      );
 
-    final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data
-        .map((json) => Product.fromJson(json as Map<String, dynamic>))
-        .toList();
+      final data = json.decode(response.body)['data'] as List<dynamic>;
+      return data
+          .map((json) => Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on NetworkException {
+      return OfflineSalesService().getLocalCatalog();
+    }
   }
 
   // ==========================================
@@ -286,19 +294,23 @@ class ApiService {
   // ==========================================
 
   Future<List<CustomerModel>> getCustomers({String? search}) async {
-    final queryParams = <String, String>{};
-    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    try {
+      final queryParams = <String, String>{};
+      if (search != null && search.isNotEmpty) queryParams['search'] = search;
 
-    final uri = Uri.parse(
-      '$baseUrl/customers',
-    ).replace(queryParameters: queryParams);
-    final response = await _sendRequest(
-      () => _client.get(uri, headers: _buildHeaders()),
-    );
-    final data = json.decode(response.body)['data'] as List<dynamic>;
-    return data
-        .map((c) => CustomerModel.fromJson(c as Map<String, dynamic>))
-        .toList();
+      final uri = Uri.parse(
+        '$baseUrl/customers',
+      ).replace(queryParameters: queryParams);
+      final response = await _sendRequest(
+        () => _client.get(uri, headers: _buildHeaders()),
+      );
+      final data = json.decode(response.body)['data'] as List<dynamic>;
+      return data
+          .map((c) => CustomerModel.fromJson(c as Map<String, dynamic>))
+          .toList();
+    } on NetworkException {
+      return OfflineSalesService().getLocalCustomers();
+    }
   }
 
   Future<CustomerModel> createCustomer({
@@ -425,10 +437,23 @@ class ApiService {
   // SALES HISTORY
   // ==========================================
 
-  Future<List<SaleRecord>> getSalesHistory() async {
+  Future<List<SaleRecord>> getSalesHistory({
+    int page = 1,
+    String search = '',
+    String? fromDate,
+    String? toDate,
+  }) async {
     final response = await _sendRequest(
       () => _client.get(
-        Uri.parse('$baseUrl/sales/history'),
+        Uri.parse('$baseUrl/sales/history').replace(
+          queryParameters: {
+            'page': '$page',
+            'per_page': '50',
+            if (search.isNotEmpty) 'search': search,
+            if (fromDate != null) 'from_date': fromDate,
+            if (toDate != null) 'to_date': toDate,
+          },
+        ),
         headers: _buildHeaders(),
       ),
     );
@@ -460,6 +485,30 @@ class ApiService {
     );
     final data = json.decode(response.body)['data'] as Map<String, dynamic>;
     return ReportsData.fromJson(data);
+  }
+
+  Future<void> downloadReport({
+    required String type,
+    String period = 'today',
+  }) async {
+    final response = await _sendRequest(
+      () => _client.post(
+        Uri.parse('$baseUrl/reports/export'),
+        headers: _buildHeaders(),
+        body: json.encode({'type': type, 'period': period}),
+      ),
+    );
+    final data = json.decode(response.body)['data'] as Map<String, dynamic>;
+    try {
+      await SessionService.channel.invokeMethod('downloadReport', {
+        'url': '$baseUrl/reports/download/${data['uuid']}',
+        'file_name': data['file_name'],
+        'token': SessionService().token,
+        'api_origin': Uri.parse(baseUrl).origin,
+      });
+    } on MissingPluginException {
+      throw const ServerException('Excel faylini web panel orqali yuklang.');
+    }
   }
 
   // ==========================================

@@ -315,19 +315,6 @@ class SyncPushService
                 'created_by' => $user->id,
             ]);
 
-            // Change feedga yozish
-            $this->changeLogService->logChange('CUSTOMER', $customer->id, 'CREATED', [
-                'id' => $customer->id,
-                'uuid' => $customer->uuid,
-                'name' => $customer->name,
-                'phone' => $customer->phone,
-                'store_name' => $customer->store_name,
-                'address' => $customer->address,
-                'debt_limit' => $customer->debt_limit,
-                'is_strict_credit_limit' => $customer->is_strict_credit_limit,
-                'current_debt' => 0,
-                'status' => $customer->status,
-            ]);
         }
 
         OperationResult::create([

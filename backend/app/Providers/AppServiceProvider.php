@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Livewire\Inventory\StockManager;
+use App\Services\Sync\SyncChangeLogService;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        app(SyncChangeLogService::class)->registerModelChanges();
         // Rate Limiters
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());

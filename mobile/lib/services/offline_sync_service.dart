@@ -610,7 +610,6 @@ class OfflineSyncService extends ChangeNotifier {
           }
         });
 
-        _lastSyncedAt = DateTime.now();
         notifyListeners();
         return results.length;
       } else {
@@ -653,9 +652,14 @@ class OfflineSyncService extends ChangeNotifier {
       '${AppConfig.apiBaseUrl}/sync/pull',
     ).replace(queryParameters: {'cursor': curPos.toString(), 'limit': '50'});
 
-    final response = await _client.get(uri, headers: _buildHeaders());
+    final response = await _client
+        .get(uri, headers: _buildHeaders())
+        .timeout(const Duration(seconds: 20));
     if (response.statusCode != 200) {
-      return 0;
+      throw ServerException(
+        'Yuborish bosqichi tugadi, ammo yangi ma’lumotlar olinmadi. Qayta sinxronlang.',
+        response.statusCode,
+      );
     }
 
     final data =
@@ -685,11 +689,15 @@ class OfflineSyncService extends ChangeNotifier {
                 'id': id,
                 'name': payload['name'],
                 'code': payload['code'],
-                'is_active': payload['status'] == 'ARCHIVED' ? 0 : 1,
+                'is_active':
+                    '${payload['status'] ?? 'ACTIVE'}'.toUpperCase() == 'ACTIVE'
+                    ? 1
+                    : 0,
               }, conflictAlgorithm: ConflictAlgorithm.replace);
             }
-          } else if (entity == 'PRODUCT_VARIANT') {
-            if (ch['is_tombstone'] == true) {
+          } else if (entity == 'PRODUCT_VARIANT' || entity == 'VARIANT') {
+            if (ch['is_tombstone'] == true ||
+                '${payload['status'] ?? 'ACTIVE'}'.toUpperCase() != 'ACTIVE') {
               await txn.delete(
                 'product_variants',
                 where: 'id = ?',
@@ -700,6 +708,13 @@ class OfflineSyncService extends ChangeNotifier {
             final update = <String, Object?>{
               'updated_at': DateTime.now().toIso8601String(),
             };
+            if (payload['volume_ml'] != null) {
+              final ml = (payload['volume_ml'] as num).toInt();
+              update['volume_ml'] = ml;
+              update['litres'] = ml / 1000;
+              update['display_volume'] =
+                  payload['volume_name'] ?? '${ml / 1000} L';
+            }
             for (final field in [
               'stock_qty',
               'retail_price',
@@ -725,8 +740,21 @@ class OfflineSyncService extends ChangeNotifier {
               );
             }
           } else if (entity == 'CUSTOMER') {
+            if (ch['is_tombstone'] == true) {
+              await txn.update(
+                'customers',
+                {'is_active': 0},
+                where: 'id = ?',
+                whereArgs: [id],
+              );
+              continue;
+            }
             final update = <String, Object?>{
               'updated_at': DateTime.now().toIso8601String(),
+              if (payload['status'] != null)
+                'is_active': '${payload['status']}'.toUpperCase() == 'ACTIVE'
+                    ? 1
+                    : 0,
             };
             for (final field in [
               'name',
@@ -797,11 +825,11 @@ class OfflineSyncService extends ChangeNotifier {
       });
     }
 
-    _lastSyncedAt = DateTime.now();
-    notifyListeners();
     if (data['has_more'] == true && newCursor > curPos) {
       return changes.length + await pullDeltaChanges();
     }
+    _lastSyncedAt = DateTime.now();
+    notifyListeners();
     return changes.length;
   }
 
@@ -810,19 +838,52 @@ class OfflineSyncService extends ChangeNotifier {
     final user = SessionService().currentUser;
     if (user == null || deviceUuid.isEmpty) return false;
     final db = await _appDb.database;
-    final rows = await db.query('offline_leases', where: 'user_id = ? AND device_uuid = ? AND is_active = 1', whereArgs: [user.id, deviceUuid], limit: 1);
+    final rows = await db.query(
+      'offline_leases',
+      where: 'user_id = ? AND device_uuid = ? AND is_active = 1',
+      whereArgs: [user.id, deviceUuid],
+      limit: 1,
+    );
     if (rows.isEmpty) return false;
     final expiry = DateTime.tryParse(rows.first['expires_at'] as String);
-    if (!force && expiry != null && expiry.isAfter(DateTime.now().add(const Duration(hours: 4)))) return false;
-    final response = await _client.post(Uri.parse('${AppConfig.apiBaseUrl}/sync/renew-lease'), headers: _buildHeaders(), body: json.encode({'device_uuid': deviceUuid})).timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200) throw const ServerException('Qurilma ruxsatini yangilab bo‘lmadi. Internetga ulanib qayta urinib ko‘ring.');
-    final lease = (json.decode(response.body) as Map<String, dynamic>)['data'] as Map<String, dynamic>;
+    if (!force &&
+        expiry != null &&
+        expiry.isAfter(DateTime.now().add(const Duration(hours: 4))))
+      return false;
+    final response = await _client
+        .post(
+          Uri.parse('${AppConfig.apiBaseUrl}/sync/renew-lease'),
+          headers: _buildHeaders(),
+          body: json.encode({'device_uuid': deviceUuid}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200)
+      throw const ServerException(
+        'Qurilma ruxsatini yangilab bo‘lmadi. Internetga ulanib qayta urinib ko‘ring.',
+      );
+    final lease =
+        (json.decode(response.body) as Map<String, dynamic>)['data']
+            as Map<String, dynamic>;
     final expires = DateTime.tryParse(lease['expires_at'] as String? ?? '');
-    if (expires == null || !expires.isAfter(DateTime.now()) || (lease['lease_token'] as String? ?? '').isEmpty) throw const ServerException('Server yaroqli qurilma ruxsatini qaytarmadi.');
-    await db.update('offline_leases', {
-      'lease_token': lease['lease_token'], 'valid_from': lease['valid_from'], 'expires_at': lease['expires_at'],
-      'permissions': json.encode(lease['permissions'] ?? []), 'epoch': lease['epoch'], 'signature': lease['signature'],
-    }, where: 'user_id = ? AND device_uuid = ? AND is_active = 1', whereArgs: [user.id, deviceUuid]);
+    if (expires == null ||
+        !expires.isAfter(DateTime.now()) ||
+        (lease['lease_token'] as String? ?? '').isEmpty)
+      throw const ServerException(
+        'Server yaroqli qurilma ruxsatini qaytarmadi.',
+      );
+    await db.update(
+      'offline_leases',
+      {
+        'lease_token': lease['lease_token'],
+        'valid_from': lease['valid_from'],
+        'expires_at': lease['expires_at'],
+        'permissions': json.encode(lease['permissions'] ?? []),
+        'epoch': lease['epoch'],
+        'signature': lease['signature'],
+      },
+      where: 'user_id = ? AND device_uuid = ? AND is_active = 1',
+      whereArgs: [user.id, deviceUuid],
+    );
     return true;
   }
 

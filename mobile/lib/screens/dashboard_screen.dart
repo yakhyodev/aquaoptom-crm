@@ -62,9 +62,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       },
       selectedColor: Colors.blueAccent,
-      backgroundColor: const Color(0xFF1E293B),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.blueGrey,
+        color: isSelected
+            ? Theme.of(context).colorScheme.onSurface
+            : Theme.of(context).colorScheme.onSurfaceVariant,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
         fontSize: 12,
       ),
@@ -81,9 +83,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF334155)),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +95,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontSize: 12, color: Colors.blueGrey),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
               Icon(icon, color: iconColor, size: 20),
             ],
@@ -101,10 +106,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           if (subtitle != null) ...[
@@ -122,7 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: RefreshIndicator(
         onRefresh: _fetchDashboard,
         child: _isLoading && _dashboardData == null
@@ -159,7 +164,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       child: Text(
                         _errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 13,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -177,12 +185,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning_amber_rounded, color: Colors.amber),
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.amber,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 "Kam qoldiq: ${_dashboardData!.warnings.lowStockCount} ta mahsulot minimal chegaradan kam!",
-                                style: const TextStyle(color: Colors.amber, fontSize: 13),
+                                style: const TextStyle(
+                                  color: Colors.amber,
+                                  fontSize: 13,
+                                ),
                               ),
                             ),
                           ],
@@ -192,12 +206,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
 
                     // Sales Flow Metrics
-                    const Text(
+                    Text(
                       'Davriy Oqim (Savdo & Kassa)',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -211,43 +225,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         _buildMetricCard(
                           title: 'Jami Savdo',
-                          value: Formatters.formatMoney(_dashboardData!.flow.totalSales),
+                          value: Formatters.formatMoney(
+                            _dashboardData!.flow.totalSales,
+                          ),
                           icon: Icons.point_of_sale,
                           iconColor: Colors.blueAccent,
-                          subtitle: '${_dashboardData!.flow.ordersCount} ta chek',
+                          subtitle:
+                              '${_dashboardData!.flow.ordersCount} ta chek',
                         ),
-                        _buildMetricCard(
-                          title: 'Kassaga To\'langan',
-                          value: Formatters.formatMoney(_dashboardData!.flow.paidAtPos),
-                          icon: Icons.payments_outlined,
-                          iconColor: Colors.greenAccent,
-                        ),
+                        if (_dashboardData!.canViewCash)
+                          _buildMetricCard(
+                            title: 'Kassaga To\'langan',
+                            value: Formatters.formatMoney(
+                              _dashboardData!.flow.paidAtPos,
+                            ),
+                            icon: Icons.payments_outlined,
+                            iconColor: Colors.greenAccent,
+                          ),
                         _buildMetricCard(
                           title: 'Yangi Nasiya',
-                          value: Formatters.formatMoney(_dashboardData!.flow.newDebt),
+                          value: Formatters.formatMoney(
+                            _dashboardData!.flow.newDebt,
+                          ),
                           icon: Icons.credit_card_off,
                           iconColor: Colors.orangeAccent,
                         ),
-                        _buildMetricCard(
-                          title: 'Undirilgan Qarz',
-                          value: Formatters.formatMoney(_dashboardData!.flow.debtCollected),
-                          icon: Icons.assignment_turned_in,
-                          iconColor: Colors.tealAccent,
-                        ),
+                        if (_dashboardData!.canViewCash)
+                          _buildMetricCard(
+                            title: 'Undirilgan Qarz',
+                            value: Formatters.formatMoney(
+                              _dashboardData!.flow.debtCollected,
+                            ),
+                            icon: Icons.assignment_turned_in,
+                            iconColor: Colors.tealAccent,
+                          ),
                         if (_dashboardData!.canViewCost &&
                             _dashboardData!.flow.grossProfit != null) ...[
                           _buildMetricCard(
                             title: 'Yalpi Foyda',
-                            value: Formatters.formatMoney(_dashboardData!.flow.grossProfit!),
+                            value: Formatters.formatMoney(
+                              _dashboardData!.flow.grossProfit!,
+                            ),
                             icon: Icons.trending_up,
-                            iconColor: Colors.cyanAccent,
+                            iconColor: Theme.of(context).colorScheme.primary,
                           ),
                           _buildMetricCard(
                             title: 'Sof Operatsion',
-                            value: Formatters.formatMoney(_dashboardData!.flow.netOperating ?? 0),
+                            value: Formatters.formatMoney(
+                              _dashboardData!.flow.netOperating ?? 0,
+                            ),
                             icon: Icons.account_balance_wallet,
                             iconColor: Colors.purpleAccent,
-                            subtitle: 'Xarajatlar: ${Formatters.formatMoney(_dashboardData!.flow.expenses)}',
+                            subtitle:
+                                'Xarajatlar: ${Formatters.formatMoney(_dashboardData!.flow.expenses)}',
                           ),
                         ],
                       ],
@@ -255,12 +285,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 20),
 
                     // Current As-of Balances
-                    const Text(
+                    Text(
                       'Hozirgi Qoldiqlar (As-of Balans)',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -272,32 +302,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       physics: const NeverScrollableScrollPhysics(),
                       childAspectRatio: 1.5,
                       children: [
-                        _buildMetricCard(
-                          title: 'Kassadagi Pul',
-                          value: Formatters.formatMoney(_dashboardData!.balances.cashTotal),
-                          icon: Icons.account_balance,
-                          iconColor: Colors.greenAccent,
-                          subtitle: 'Barcha pul bitta kassada',
-                        ),
+                        if (_dashboardData!.canViewCash)
+                          _buildMetricCard(
+                            title: 'Kassadagi Pul',
+                            value: Formatters.formatMoney(
+                              _dashboardData!.balances.cashTotal,
+                            ),
+                            icon: Icons.account_balance,
+                            iconColor: Colors.greenAccent,
+                            subtitle: 'Barcha pul bitta kassada',
+                          ),
                         _buildMetricCard(
                           title: 'Mijozlar Qarzi',
-                          value: Formatters.formatMoney(_dashboardData!.balances.customerDebts),
+                          value: Formatters.formatMoney(
+                            _dashboardData!.balances.customerDebts,
+                          ),
                           icon: Icons.people_alt_outlined,
                           iconColor: Colors.amberAccent,
                         ),
                         _buildMetricCard(
                           title: 'Ta\'minotchilarga Qarz',
-                          value: Formatters.formatMoney(_dashboardData!.balances.supplierPayables),
+                          value: Formatters.formatMoney(
+                            _dashboardData!.balances.supplierPayables,
+                          ),
                           icon: Icons.local_shipping_outlined,
                           iconColor: Colors.redAccent,
                         ),
                         _buildMetricCard(
                           title: 'Ombor Mahsulotlari',
-                          value: '${_dashboardData!.balances.stockTotalUnits} dona',
+                          value:
+                              '${_dashboardData!.balances.stockTotalUnits} dona',
                           icon: Icons.inventory_2_outlined,
                           iconColor: Colors.blueAccent,
-                          subtitle: _dashboardData!.canViewCost &&
-                                  _dashboardData!.balances.stockCostValue != null
+                          subtitle:
+                              _dashboardData!.canViewCost &&
+                                  _dashboardData!.balances.stockCostValue !=
+                                      null
                               ? 'Tannarx: ${Formatters.formatMoney(_dashboardData!.balances.stockCostValue!)}'
                               : null,
                         ),

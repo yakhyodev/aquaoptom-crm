@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 // Authentication (Public)
 Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [WebAuthController::class, 'login']);
+Route::post('/login', [WebAuthController::class, 'login'])->middleware('throttle:login');
 Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout')->middleware('auth');
 
 // Protected CRM Workspace (Session Auth + Active User Status)

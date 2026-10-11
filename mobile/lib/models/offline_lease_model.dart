@@ -28,13 +28,17 @@ class OfflineLeaseModel {
   }
 
   bool get canSell =>
+      hasPermission('offline_sales') ||
       hasPermission('manage_sales') ||
       hasPermission('create_sale') ||
       hasPermission('sales') ||
       hasPermission('sell_products');
 
-  factory OfflineLeaseModel.fromJson(Map<String, dynamic> json,
-      {String? fallbackDeviceUuid, int? fallbackUserId}) {
+  factory OfflineLeaseModel.fromJson(
+    Map<String, dynamic> json, {
+    String? fallbackDeviceUuid,
+    int? fallbackUserId,
+  }) {
     return OfflineLeaseModel(
       deviceUuid: (json['device_uuid'] as String?) ?? fallbackDeviceUuid ?? '',
       userId: (json['user_id'] as num?)?.toInt() ?? fallbackUserId ?? 0,
@@ -45,7 +49,8 @@ class OfflineLeaseModel {
       expiresAt: json['expires_at'] != null
           ? DateTime.parse(json['expires_at'].toString()).toUtc()
           : DateTime.now().toUtc().add(const Duration(hours: 24)),
-      permissions: (json['permissions'] as List<dynamic>?)
+      permissions:
+          (json['permissions'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],

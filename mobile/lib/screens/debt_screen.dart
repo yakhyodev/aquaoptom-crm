@@ -81,10 +81,12 @@ class _DebtScreenState extends State<DebtScreen>
       text: currentBalance > 0 ? currentBalance.toString() : '',
     );
     final notesCtrl = TextEditingController();
-    final cashAccount = _cashAccounts.isEmpty ? null : _cashAccounts.firstWhere(
-      (account) => account.isDefault,
-      orElse: () => _cashAccounts.first,
-    );
+    final cashAccount = _cashAccounts.isEmpty
+        ? null
+        : _cashAccounts.firstWhere(
+            (account) => account.isDefault,
+            orElse: () => _cashAccounts.first,
+          );
     final selectedAccountId = cashAccount?.id;
     String? paymentError;
     final opId = OperationId.generate();
@@ -96,12 +98,15 @@ class _DebtScreenState extends State<DebtScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDlgState) {
           return AlertDialog(
-            backgroundColor: const Color(0xFF1E293B),
+            backgroundColor: Theme.of(context).colorScheme.surface,
             title: Text(
               isCustomer
                   ? 'Mijozdan To\'lov Qabul Qilish'
                   : 'Ta\'minotchiga Qarz To\'lash',
-              style: const TextStyle(color: Colors.white, fontSize: 16),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontSize: 16,
+              ),
             ),
             content: SingleChildScrollView(
               child: Column(
@@ -110,8 +115,8 @@ class _DebtScreenState extends State<DebtScreen>
                 children: [
                   Text(
                     'Taraf: $partyName',
-                    style: const TextStyle(
-                      color: Colors.cyanAccent,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -125,28 +130,43 @@ class _DebtScreenState extends State<DebtScreen>
                       fontSize: 13,
                     ),
                   ),
-                  const Divider(color: Color(0xFF334155), height: 20),
+                  Divider(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    height: 20,
+                  ),
 
                   // Amount
                   TextField(
                     controller: amountCtrl,
                     onChanged: (_) => setDlgState(() {}),
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
                       labelText: 'To\'lov summasi (so\'m) *',
-                      labelStyle: TextStyle(color: Colors.blueGrey),
+                      labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       filled: true,
-                      fillColor: Color(0xFF0F172A),
+                      fillColor: Theme.of(context).scaffoldBackgroundColor,
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  Text('Kassada hozir: ${Formatters.formatMoney(cashAccount?.balance ?? 0)}', style: const TextStyle(color: Colors.white)),
+                  Text(
+                    'Kassada hozir: ${Formatters.formatMoney(cashAccount?.balance ?? 0)}',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   if (paymentError != null) ...[
-                    Text(paymentError!, style: const TextStyle(color: Colors.redAccent)),
+                    Text(
+                      paymentError!,
+                      style: const TextStyle(color: Colors.redAccent),
+                    ),
                     const SizedBox(height: 12),
                   ],
                   if ((int.tryParse(amountCtrl.text) ?? 0) >
@@ -166,12 +186,16 @@ class _DebtScreenState extends State<DebtScreen>
                   // Notes
                   TextField(
                     controller: notesCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
                       labelText: 'Izoh (ixtiyoriy)',
-                      labelStyle: TextStyle(color: Colors.blueGrey),
+                      labelStyle: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       filled: true,
-                      fillColor: Color(0xFF0F172A),
+                      fillColor: Theme.of(context).scaffoldBackgroundColor,
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -192,11 +216,18 @@ class _DebtScreenState extends State<DebtScreen>
                         final amount =
                             int.tryParse(amountCtrl.text.trim()) ?? 0;
                         if (amount <= 0) {
-                          setDlgState(() => paymentError = 'Summani butun so‘mda, 0 dan katta qilib yozing.');
+                          setDlgState(
+                            () => paymentError =
+                                'Summani butun so‘mda, 0 dan katta qilib yozing.',
+                          );
                           return;
                         }
-                        if (!isCustomer && amount > (cashAccount?.balance ?? 0)) {
-                          setDlgState(() => paymentError = 'Kassada pul yetmaydi. Summani kamaytiring yoki kassaga pul qo‘shing.');
+                        if (!isCustomer &&
+                            amount > (cashAccount?.balance ?? 0)) {
+                          setDlgState(
+                            () => paymentError =
+                                'Kassada pul yetmaydi. Summani kamaytiring yoki kassaga pul qo‘shing.',
+                          );
                           return;
                         }
                         setDlgState(() => paymentError = null);
@@ -233,7 +264,10 @@ class _DebtScreenState extends State<DebtScreen>
                           }
                         } catch (e) {
                           if (ctx.mounted) {
-                            setDlgState(() { submitting = false; paymentError = 'To‘lov saqlanmadi: $e'; });
+                            setDlgState(() {
+                              submitting = false;
+                              paymentError = 'To‘lov saqlanmadi: $e';
+                            });
                           }
                         }
                       },
@@ -268,13 +302,13 @@ class _DebtScreenState extends State<DebtScreen>
     }).toList();
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Qarzlar va To\'lovlar'),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.cyanAccent,
+          indicatorColor: Theme.of(context).colorScheme.primary,
           tabs: const [
             Tab(text: 'Mijozlar Qarzi'),
             Tab(text: 'Ta\'minotchilarga Qarz'),
@@ -288,19 +322,25 @@ class _DebtScreenState extends State<DebtScreen>
             Padding(
               padding: const EdgeInsets.all(12),
               child: TextField(
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Qidirish (ism, do\'kon, telefon)...',
-                  hintStyle: const TextStyle(color: Colors.blueGrey),
+                  hintStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   prefixIcon: const Icon(
                     Icons.search,
                     color: Colors.blueAccent,
                   ),
                   filled: true,
-                  fillColor: const Color(0xFF1E293B),
+                  fillColor: Theme.of(context).colorScheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: Color(0xFF334155)),
+                    borderSide: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                   ),
                 ),
                 onChanged: (val) => setState(() => _searchQuery = val),
@@ -322,10 +362,14 @@ class _DebtScreenState extends State<DebtScreen>
                       children: [
                         // Customer Debts Tab
                         filteredCustomers.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
                                   'Mijozlar topilmadi',
-                                  style: TextStyle(color: Colors.blueGrey),
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               )
                             : ListView.builder(
@@ -335,19 +379,25 @@ class _DebtScreenState extends State<DebtScreen>
                                   final c = filteredCustomers[idx];
                                   final hasDebt = c.currentDebt > 0;
                                   return Card(
-                                    color: const Color(0xFF1E293B),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
                                     margin: const EdgeInsets.only(bottom: 8),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
-                                      side: const BorderSide(
-                                        color: Color(0xFF334155),
+                                      side: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outlineVariant,
                                       ),
                                     ),
                                     child: ListTile(
                                       title: Text(
                                         c.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -359,16 +409,20 @@ class _DebtScreenState extends State<DebtScreen>
                                               c.storeName!.isNotEmpty)
                                             Text(
                                               c.storeName!,
-                                              style: const TextStyle(
-                                                color: Colors.blueGrey,
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                                 fontSize: 12,
                                               ),
                                             ),
                                           if (c.phone != null)
                                             Text(
                                               c.phone!,
-                                              style: const TextStyle(
-                                                color: Colors.blueGrey,
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                                 fontSize: 12,
                                               ),
                                             ),
@@ -434,10 +488,14 @@ class _DebtScreenState extends State<DebtScreen>
 
                         // Supplier Payables Tab
                         filteredSuppliers.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Text(
                                   'Ta\'minotchilar topilmadi',
-                                  style: TextStyle(color: Colors.blueGrey),
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               )
                             : ListView.builder(
@@ -447,19 +505,25 @@ class _DebtScreenState extends State<DebtScreen>
                                   final s = filteredSuppliers[idx];
                                   final hasDebt = s.balance > 0;
                                   return Card(
-                                    color: const Color(0xFF1E293B),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surface,
                                     margin: const EdgeInsets.only(bottom: 8),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10),
-                                      side: const BorderSide(
-                                        color: Color(0xFF334155),
+                                      side: BorderSide(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.outlineVariant,
                                       ),
                                     ),
                                     child: ListTile(
                                       title: Text(
                                         s.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurface,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -471,16 +535,20 @@ class _DebtScreenState extends State<DebtScreen>
                                               s.companyName!.isNotEmpty)
                                             Text(
                                               s.companyName!,
-                                              style: const TextStyle(
-                                                color: Colors.blueGrey,
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                                 fontSize: 12,
                                               ),
                                             ),
                                           if (s.phone != null)
                                             Text(
                                               s.phone!,
-                                              style: const TextStyle(
-                                                color: Colors.blueGrey,
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant,
                                                 fontSize: 12,
                                               ),
                                             ),

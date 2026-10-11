@@ -265,6 +265,20 @@ async function runTests() {
         assert.strictEqual((await bootstrapDb.get('catalog', 101)).sku, 'FANTA-05');
         assert.strictEqual((await bootstrapDb.get('meta', 'last_cursor')).value, 2);
     } finally { global.fetch = savedFetch; }
+    // Execute the real worker: POST Livewire updates and exports must bypass caching.
+    const vm = require('node:vm');
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const handlers = {};
+    let writes = 0;
+    let interceptions = 0;
+    const context = { URL, Response, self: { location: {origin: 'https://example.test'}, addEventListener: (name, fn) => handlers[name] = fn }, caches: { match: async () => null, open: async () => ({put: async () => writes++, delete: async () => true}) }, fetch: async () => new Response('OK') };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8'), context);
+    for (const request of [{url: 'https://example.test/livewire/update', method: 'POST'}, {url: 'https://example.test/exports/private', method: 'GET', mode: 'cors', destination: ''}]) {
+        handlers.fetch({request, respondWith: () => interceptions++, waitUntil: () => {}});
+    }
+    assert.strictEqual(interceptions, 0);
+    assert.strictEqual(writes, 0);
     console.log("\n🎉 ALL AQUADB TESTS PASSED (7 scenarios + bootstrap/duplicate-line/pending regressions)!\n");
 }
 

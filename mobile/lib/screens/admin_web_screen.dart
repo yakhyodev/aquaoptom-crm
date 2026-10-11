@@ -59,10 +59,10 @@ class AdminWebScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Admin Boshqaruvi (Web Linklar)'),
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
@@ -70,14 +70,16 @@ class AdminWebScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF334155)),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
                     Icon(Icons.shield_outlined, color: Colors.blueAccent),
                     SizedBox(width: 8),
@@ -86,21 +88,27 @@ class AdminWebScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
+                Text(
                   'Murakkab ma\'muriy amallar, foydalanuvchilar audit va ziddiyatlar yechimi xavfsizlik nuqtai nazaridan himoyalangan Web boshqaruv panelida amalga oshiriladi.',
-                  style: TextStyle(fontSize: 13, color: Colors.blueGrey),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
+                    color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -112,9 +120,9 @@ class AdminWebScreen extends StatelessWidget {
                       ),
                       Text(
                         maskedToken,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.cyanAccent,
+                          color: Theme.of(context).colorScheme.primary,
                           fontFamily: 'monospace',
                         ),
                       ),
@@ -127,11 +135,13 @@ class AdminWebScreen extends StatelessWidget {
           const SizedBox(height: 16),
           ...adminLinks.map(
             (link) => Card(
-              color: const Color(0xFF1E293B),
+              color: Theme.of(context).colorScheme.surface,
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: const BorderSide(color: Color(0xFF334155)),
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: ListTile(
                 leading: Container(
@@ -140,21 +150,30 @@ class AdminWebScreen extends StatelessWidget {
                     color: Colors.blueAccent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(link['icon'] as IconData, color: Colors.blueAccent),
+                  child: Icon(
+                    link['icon'] as IconData,
+                    color: Colors.blueAccent,
+                  ),
                 ),
                 title: Text(
                   link['title'] as String,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 subtitle: Text(
                   link['desc'] as String,
-                  style: const TextStyle(color: Colors.blueGrey, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.copy_rounded, color: Colors.cyanAccent),
+                  icon: Icon(
+                    Icons.copy_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
                   tooltip: 'Havolani nusxalash',
                   onPressed: () => _copyLink(context, link['path'] as String),
                 ),

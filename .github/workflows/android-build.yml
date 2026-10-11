@@ -16,7 +16,7 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -97,6 +97,17 @@ jobs:
           path: mobile/dist/
           if-no-files-found: error
           retention-days: 14
+      - name: Publish permanent staging APK download
+        if: github.ref == 'refs/heads/master' && inputs.build_type == 'debug' && inputs.api_base_url == 'https://aquaoptom-web-staging.up.railway.app/api'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp build/app/outputs/flutter-apk/app-debug.apk dist/aquaoptom-android-test.apk
+          (cd dist && sha256sum aquaoptom-android-test.apk > aquaoptom-android-test.apk.sha256)
+          if ! gh release view android-test --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create android-test --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title 'Android sinov ilovasi' --notes 'Railway sinov paneliga ulangan Android APK. Production relizi emas.'
+          fi
+          gh release upload android-test dist/aquaoptom-android-test.apk dist/aquaoptom-android-test.apk.sha256 dist/BUILD_INFO.txt --clobber --repo "$GITHUB_REPOSITORY"
       - name: Remove private signing file
         if: always()
         run: rm -f "$RUNNER_TEMP/aquaoptom-release.jks"

@@ -121,7 +121,9 @@ class SyncBootstrapService
 
         // 7. Faol Katalog (Sezgir tannarxlar chiqarib tashlangan holda)
         $catalog = ProductVariant::with(['product', 'volume'])
-            ->where('status', 'ACTIVE')
+            ->whereRaw('LOWER(status) = ?', ['active'])
+            ->whereHas('product', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
+            ->whereHas('volume', fn ($query) => $query->whereRaw('LOWER(status) = ?', ['active']))
             ->get()
             ->map(function ($variant) {
                 return [
@@ -130,17 +132,19 @@ class SyncBootstrapService
                     'product_name' => $variant->product?->name,
                     'volume_name' => $variant->volume?->name,
                     'volume_ml' => $variant->volume?->value_ml,
-                    'volume_litres' => $variant->volume ? (string) ($variant->volume->litres) : '1.000',
+                    'volume_litres' => (string) (($variant->volume?->value_ml ?? 0) / 1000),
                     'sku' => $variant->sku,
                     'barcode' => $variant->barcode,
                     'default_sale_price' => (int) $variant->default_sale_price,
                     'version' => (int) $variant->version,
-                    'status' => $variant->status,
+                    'status' => strtoupper($variant->status),
                 ];
             })->values()->all();
 
         // 8. Mijozlar ro'yxati
         $customers = Customer::select(['id', 'uuid', 'name', 'phone', 'store_name', 'current_debt', 'debt_limit', 'is_strict_credit_limit'])
+            ->whereRaw('LOWER(status) = ?', ['active'])
+            ->orderByRaw('LOWER(name)')
             ->get()
             ->map(function ($c) {
                 return [

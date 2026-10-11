@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\EventInvalidationApiController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\OperationApiController;
 use App\Http\Controllers\Api\SyncApiController;
+use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\TelegramController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,6 +42,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     // Dashboard & Reports
     Route::get('/dashboard', [ApiController::class, 'dashboard']);
     Route::get('/reports', [ApiController::class, 'getReports'])->middleware('permission:view_reports');
+    Route::post('/reports/export', [ReportExportController::class, 'create'])->middleware('permission:export_reports');
+    Route::get('/reports/download/{uuid}', [ReportExportController::class, 'download'])->middleware('permission:export_reports');
 
     // Customers & Suppliers
     Route::get('/customers', [ApiController::class, 'getCustomers']);
