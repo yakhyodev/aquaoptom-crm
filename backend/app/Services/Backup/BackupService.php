@@ -37,7 +37,7 @@ class BackupService
      */
     public function getEncryptionKey(?string $customKey = null): string
     {
-        $key = $customKey ?: env('BACKUP_ENCRYPTION_KEY', config('app.key'));
+        $key = $customKey ?: (config('backup.encryption_key') ?: config('app.key'));
         if (str_starts_with($key, 'base64:')) {
             $key = base64_decode(substr($key, 7));
         }
@@ -81,6 +81,14 @@ class BackupService
                 'database_name' => config('database.connections.pgsql.database'),
                 'tables_count' => $tablesCount,
                 'files_count' => $filesCount,
+                'files_checksums' => collect(['private', 'public'])->flatMap(function ($directory) {
+                    $path = storage_path('app/'.$directory);
+                    if (! File::exists($path)) {
+                        return [];
+                    }
+
+                    return collect(File::allFiles($path))->mapWithKeys(fn ($file) => [$directory.'/'.str_replace('\\', '/', $file->getRelativePathname()) => hash_file('sha256', $file->getRealPath())]);
+                })->all(),
             ];
             File::put($tmpDir.'/manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
@@ -284,6 +292,14 @@ class BackupService
 
             // 5. Maqsadli bazani aniqlash va tiklash
             $targetDb = $options['target_db'] ?? config('database.connections.pgsql.database');
+            $filesTarget = $options['files_target'] ?? storage_path('app');
+            if (($options['restore_files'] ?? false) && $targetDb !== config('database.connections.pgsql.database')) {
+                $allowedRoot = str_replace('\\', '/', $this->getBackupStoragePath()).'/drill_files_';
+                if (! str_starts_with(str_replace('\\', '/', $filesTarget), $allowedRoot)
+                    || str_contains($filesTarget, '..') || File::exists($filesTarget)) {
+                    throw new \RuntimeException('Isolated restore requires a new drill_files_* directory.');
+                }
+            }
             $this->ensureTargetDatabaseExists($targetDb);
 
             $dumpFile = $tmpDir.'/db_dump.sql';
@@ -309,8 +325,20 @@ class BackupService
             if ($restoreFiles && File::exists($tmpDir.'/files.zip')) {
                 $filesZip = new ZipArchive;
                 if ($filesZip->open($tmpDir.'/files.zip') === true) {
-                    $filesZip->extractTo(storage_path('app'));
-                    $filesZip->close();
+                    File::ensureDirectoryExists($filesTarget);
+                    try {
+                        if (! $filesZip->extractTo($filesTarget)) {
+                            throw new \RuntimeException('Backup files could not be restored.');
+                        }
+                    } finally {
+                        $filesZip->close();
+                    }
+                    foreach ($manifest['files_checksums'] ?? [] as $relativePath => $checksum) {
+                        $restoredPath = $filesTarget.'/'.$relativePath;
+                        if (! File::exists($restoredPath) || ! hash_equals($checksum, hash_file('sha256', $restoredPath))) {
+                            throw new \RuntimeException('Restored file checksum mismatch.');
+                        }
+                    }
                 }
             }
 

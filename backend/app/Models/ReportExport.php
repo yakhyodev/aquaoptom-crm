@@ -48,6 +48,16 @@ class ReportExport extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function canBeDownloadedBy(User $user): bool
+    {
+        if (! $user->isOwner() && (! $user->hasPermission('export_reports') || (int) $this->user_id !== (int) $user->id)) {
+            return false;
+        }
+        $containsCost = $this->metadata['contains_cost'] ?? in_array($this->report_type, ['inventory', 'profit_loss', 'purchases'], true);
+
+        return ! $containsCost || $user->isOwner() || $user->hasPermission('view_cost_price');
+    }
+
     public function isCompleted(): bool
     {
         return $this->status === 'COMPLETED';

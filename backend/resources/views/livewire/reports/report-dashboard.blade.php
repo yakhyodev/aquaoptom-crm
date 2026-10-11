@@ -128,11 +128,11 @@
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                    <span class="text-xs font-semibold text-blue-600  block">Sof Savdo (Net)</span>
+                    <span class="text-xs font-semibold text-blue-600  block">Sotilgan mahsulotlar summasi</span>
                     <span class="text-lg font-bold text-blue-700 font-mono mt-1 block">
                         {{ number_format($salesReport['kpi']['net_sales']) }}
                     </span>
-                    <span class="text-xs text-slate-600">haqiqiy tushum</span>
+                    <span class="text-xs text-slate-600">Qaytarishlar ayrilgan sotuv summasi; nasiya ham kiradi</span>
                 </div>
 
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -309,6 +309,8 @@
         </div>
 
     <!-- TAB 3: KIRIM VA TA'MINOTCHILAR -->
+    @elseif($activeTab === 'purchases' && !$canViewCost)
+        <div class="rounded-xl border border-slate-200 bg-white p-5 text-slate-600">Kirim narxlarini ko‘rish uchun do‘kon egasi ruxsat berishi kerak.</div>
     @elseif($activeTab === 'purchases' && $purchasesReport)
         <div class="space-y-6">
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -350,7 +352,7 @@
     @elseif($activeTab === 'inventory' && $inventoryReport)
         <div class="space-y-6">
             <div class="bg-purple-50/70 border border-purple-200 rounded-xl p-4 text-purple-900 text-xs">
-                <strong>Qat'iy buxgalteriya qoidasi:</strong> Ushbu hisobotdagi davr boshi va davr yakuni qoldiqlari hozirgi jonli snapshotdan emas, balki tanlangan davr sanalaridagi rasmiy ombor harakatlari daftari (inventory_movements) asosida retrospektiv hisoblangan.
+                <strong>Qat'iy buxgalteriya qoidasi:</strong> Tanlangan davr: boshidagi qoldiq + kirim − chiqim + sanashdagi farq = oxiridagi qoldiq. Sanashdagi farq oddiy kirimga qo‘shilmaydi.
             </div>
 
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -381,7 +383,7 @@
                 <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
                     <span class="text-xs font-semibold text-purple-600  block">Davr Yakuni Qiymati</span>
                     <span class="text-lg font-bold text-purple-700 font-mono mt-1 block">
-                        {{ number_format($inventoryReport['summary']['total_closing_valuation']) }}
+                        {{ $canViewCost ? number_format($inventoryReport['summary']['total_closing_valuation']) : 'Yashirilgan' }}
                     </span>
                     <span class="text-xs text-slate-600">{{ number_format($inventoryReport['summary']['total_closing_units']) }} dona (O‘rtacha kirim narxi qiymati)</span>
                 </div>
@@ -418,8 +420,8 @@
                                     <td class="p-3 text-right text-rose-600">-{{ number_format($ir['outward_units']) }}</td>
                                     <td class="p-3 text-right text-purple-600">{{ $ir['adjustment_units'] > 0 ? '+'.$ir['adjustment_units'] : $ir['adjustment_units'] }}</td>
                                     <td class="p-3 text-right font-bold text-slate-900">{{ number_format($ir['closing_units']) }}</td>
-                                    <td class="p-3 text-right text-slate-600">{{ number_format($ir['wac_cost']) }}</td>
-                                    <td class="p-3 text-right font-bold text-purple-700">{{ number_format($ir['closing_valuation']) }} so'm</td>
+                                    <td class="p-3 text-right text-slate-600">{{ $canViewCost ? number_format($ir['wac_cost']) : '—' }}</td>
+                                    <td class="p-3 text-right font-bold text-purple-700">{{ $canViewCost ? number_format($ir['closing_valuation']).' so‘m' : '—' }}</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -466,8 +468,8 @@
                                 <th class="p-3">Taraf Nomi</th>
                                 <th class="p-3">Telefon</th>
                                 <th class="p-3 text-right">Davr Boshi Balansi</th>
-                                <th class="p-3 text-right">Davr Debet (+)</th>
-                                <th class="p-3 text-right">Davr Kredit (-)</th>
+                                <th class="p-3 text-right">Qarz oshdi (+)</th>
+                                <th class="p-3 text-right">Qarz kamaydi (−)</th>
                                 <th class="p-3 text-right font-bold">Davr Yakuni Balansi</th>
                             </tr>
                         </thead>
@@ -479,8 +481,8 @@
                                     <td class="p-3 text-right {{ $st['opening_balance'] > 0 ? 'text-amber-700' : ($st['opening_balance'] < 0 ? 'text-blue-700' : 'text-slate-600') }}">
                                         {{ number_format($st['opening_balance']) }}
                                     </td>
-                                    <td class="p-3 text-right text-emerald-600">+{{ number_format($st['period_debits']) }}</td>
-                                    <td class="p-3 text-right text-rose-600">-{{ number_format($st['period_credits']) }}</td>
+                                    <td class="p-3 text-right text-emerald-600">+{{ number_format($statementPartyType === 'supplier' ? $st['period_credits'] : $st['period_debits']) }}</td>
+                                    <td class="p-3 text-right text-rose-600">-{{ number_format($statementPartyType === 'supplier' ? $st['period_debits'] : $st['period_credits']) }}</td>
                                     <td class="p-3 text-right font-bold {{ $st['closing_balance'] > 0 ? 'text-amber-700' : ($st['closing_balance'] < 0 ? 'text-blue-700' : 'text-slate-600') }}">
                                         {{ number_format($st['closing_balance']) }} so'm
                                     </td>

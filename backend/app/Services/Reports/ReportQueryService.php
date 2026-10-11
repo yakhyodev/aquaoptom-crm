@@ -293,107 +293,63 @@ class ReportQueryService
      * Tarixiy Ombor Qoldig'i va Baholash Hisoboti (Stock & Value Report)
      * Qoida: Davr bosh/yakun balans ledgerdan (inventory_movements), hozirgi snapshot tarixiy balans emas.
      */
-    public function getInventoryValuationReport(array $filters): array
+    public function getInventoryValuationReport(array $filters, bool $canViewCost = true): array
     {
         $period = $this->resolvePeriod($filters);
-
-        $variantsQuery = ProductVariant::with(['product', 'volume']);
-        if (! empty($filters['product_id'])) {
-            $variantsQuery->where('product_id', $filters['product_id']);
-        }
-        if (! empty($filters['product_variant_id'])) {
-            $variantsQuery->where('id', $filters['product_variant_id']);
-        }
-        if (! empty($filters['volume_id'])) {
-            $variantsQuery->where('volume_id', $filters['volume_id']);
-        }
-
-        $variants = $variantsQuery->get();
-
+        $variants = ProductVariant::with(['product', 'volume'])
+            ->when($filters['product_id'] ?? null, fn ($query, $id) => $query->where('product_id', $id))
+            ->when($filters['product_variant_id'] ?? null, fn ($query, $id) => $query->where('id', $id))
+            ->when($filters['volume_id'] ?? null, fn ($query, $id) => $query->where('volume_id', $id))
+            ->get();
+        $ids = $variants->modelKeys();
+        $start = $period['start_utc'];
+        $end = $period['end_utc'];
+        $adjustments = "'ADJUSTMENT', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT'";
+        $aggregates = InventoryMovement::whereIn('product_variant_id', $ids)
+            ->where('created_at', '<=', $end)
+            ->select('product_variant_id')
+            ->selectRaw('SUM(CASE WHEN created_at < ? THEN quantity ELSE 0 END) AS opening_units', [$start])
+            ->selectRaw("SUM(CASE WHEN created_at >= ? AND quantity > 0 AND movement_type NOT IN ($adjustments) THEN quantity ELSE 0 END) AS inward_units", [$start])
+            ->selectRaw("SUM(CASE WHEN created_at >= ? AND quantity < 0 AND movement_type NOT IN ($adjustments) THEN -quantity ELSE 0 END) AS outward_units", [$start])
+            ->selectRaw("SUM(CASE WHEN created_at >= ? AND movement_type IN ($adjustments) THEN quantity ELSE 0 END) AS adjustment_units", [$start])
+            ->selectRaw('SUM(quantity) AS closing_units')
+            ->groupBy('product_variant_id')->get()->keyBy('product_variant_id');
+        $ranked = InventoryMovement::whereIn('product_variant_id', $ids)->where('created_at', '<=', $end)
+            ->select(['product_variant_id', 'unit_cost', 'balance_after_value'])
+            ->selectRaw('ROW_NUMBER() OVER (PARTITION BY product_variant_id ORDER BY created_at DESC, id DESC) AS movement_rank');
+        $latest = DB::query()->fromSub($ranked, 'ranked_movements')->where('movement_rank', 1)
+            ->get()->keyBy('product_variant_id');
         $rows = [];
-        $totalOpeningUnits = 0;
-        $totalInwardUnits = 0;
-        $totalOutwardUnits = 0;
-        $totalAdjustmentUnits = 0;
-        $totalClosingUnits = 0;
-        $totalClosingValuation = 0;
-
+        $summary = ['total_opening_units' => 0, 'total_inward_units' => 0, 'total_outward_units' => 0,
+            'total_adjustment_units' => 0, 'total_closing_units' => 0, 'total_closing_valuation' => $canViewCost ? 0 : null];
         foreach ($variants as $variant) {
-            // Davr boshidagi qoldiq: created_at < start_utc
-            $openingUnits = (int) InventoryMovement::where('product_variant_id', $variant->id)
-                ->where('created_at', '<', $period['start_utc'])
-                ->sum('quantity');
-
-            // Davr ichidagi kirimlar (quantity > 0)
-            $inwardUnits = (int) InventoryMovement::where('product_variant_id', $variant->id)
-                ->whereBetween('created_at', [$period['start_utc'], $period['end_utc']])
-                ->where('quantity', '>', 0)
-                ->sum('quantity');
-
-            // Davr ichidagi chiqimlar (quantity < 0)
-            $outwardUnits = (int) abs(InventoryMovement::where('product_variant_id', $variant->id)
-                ->whereBetween('created_at', [$period['start_utc'], $period['end_utc']])
-                ->where('quantity', '<', 0)
-                ->whereNotIn('movement_type', ['ADJUSTMENT', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
-                ->sum('quantity'));
-
-            // Davr ichidagi tuzatishlar (ADJUSTMENT_IN, ADJUSTMENT_OUT)
-            $adjustmentUnits = (int) InventoryMovement::where('product_variant_id', $variant->id)
-                ->whereBetween('created_at', [$period['start_utc'], $period['end_utc']])
-                ->whereIn('movement_type', ['ADJUSTMENT', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
-                ->sum('quantity');
-
-            // Davr yakunidagi qoldiq: created_at <= end_utc
-            $closingUnits = (int) InventoryMovement::where('product_variant_id', $variant->id)
-                ->where('created_at', '<=', $period['end_utc'])
-                ->sum('quantity');
-
-            // WAC tannarx: oxirgi harakatdagi unit_cost yoki balance_after_value / balance_after_quantity
-            $latestMovement = InventoryMovement::where('product_variant_id', $variant->id)
-                ->where('created_at', '<=', $period['end_utc'])
-                ->orderByDesc('created_at')
-                ->orderByDesc('id')
-                ->first();
-
-            $wacUnitCost = ($latestMovement && $closingUnits > 0 && $latestMovement->balance_after_value > 0)
-                ? (int) round($latestMovement->balance_after_value / $closingUnits)
-                : ($latestMovement ? (int) $latestMovement->unit_cost : 0);
-            $closingValuation = $closingUnits > 0 ? (int) round($closingUnits * $wacUnitCost) : 0;
-
-            $totalOpeningUnits += $openingUnits;
-            $totalInwardUnits += $inwardUnits;
-            $totalOutwardUnits += $outwardUnits;
-            $totalAdjustmentUnits += $adjustmentUnits;
-            $totalClosingUnits += $closingUnits;
-            $totalClosingValuation += $closingValuation;
-
-            $rows[] = [
+            $aggregate = $aggregates->get($variant->id);
+            $movement = $latest->get($variant->id);
+            $closingUnits = (int) ($aggregate?->closing_units ?? 0);
+            $valuation = $closingUnits > 0 ? (int) ($movement?->balance_after_value ?? 0) : 0;
+            $row = [
                 'variant_id' => $variant->id,
-                'product_name' => $variant->product->name ?? 'Noma\'lum',
+                'product_name' => $variant->product->name ?? '',
                 'volume_name' => $variant->volume->name ?? '',
                 'sku' => $variant->sku,
-                'opening_units' => $openingUnits,
-                'inward_units' => $inwardUnits,
-                'outward_units' => $outwardUnits,
-                'adjustment_units' => $adjustmentUnits,
+                'opening_units' => (int) ($aggregate?->opening_units ?? 0),
+                'inward_units' => (int) ($aggregate?->inward_units ?? 0),
+                'outward_units' => (int) ($aggregate?->outward_units ?? 0),
+                'adjustment_units' => (int) ($aggregate?->adjustment_units ?? 0),
                 'closing_units' => $closingUnits,
-                'wac_cost' => $wacUnitCost,
-                'closing_valuation' => $closingValuation,
+                'wac_cost' => $canViewCost ? ($closingUnits > 0 ? (int) round($valuation / $closingUnits) : (int) ($movement?->unit_cost ?? 0)) : null,
+                'closing_valuation' => $canViewCost ? $valuation : null,
             ];
+            foreach (['opening_units', 'inward_units', 'outward_units', 'adjustment_units', 'closing_units'] as $field) {
+                $summary['total_'.$field] += $row[$field];
+            }
+            if ($canViewCost) {
+                $summary['total_closing_valuation'] += $valuation;
+            }
+            $rows[] = $row;
         }
 
-        return [
-            'period' => $period,
-            'summary' => [
-                'total_opening_units' => $totalOpeningUnits,
-                'total_inward_units' => $totalInwardUnits,
-                'total_outward_units' => $totalOutwardUnits,
-                'total_adjustment_units' => $totalAdjustmentUnits,
-                'total_closing_units' => $totalClosingUnits,
-                'total_closing_valuation' => $totalClosingValuation,
-            ],
-            'rows' => $rows,
-        ];
+        return ['period' => $period, 'summary' => $summary, 'rows' => $rows, 'can_view_cost' => $canViewCost];
     }
 
     /**
@@ -436,7 +392,7 @@ class ReportQueryService
                 if ($partyId) {
                     $movements = CustomerLedger::where('customer_id', $customer->id)
                         ->whereBetween('created_at', [$period['start_utc'], $period['end_utc']])
-                        ->orderBy('created_at')
+                        ->orderBy('created_at')->orderBy('id')
                         ->get()
                         ->map(fn ($m) => [
                             'occurred_at' => Carbon::parse($m->created_at)->setTimezone(ReportPeriod::TIMEZONE)->format('Y-m-d H:i:s'),
@@ -444,6 +400,8 @@ class ReportQueryService
                             'signed_amount' => (int) ($m->debit - $m->credit),
                             'notes' => $m->notes,
                             'source_document_type' => $m->reference_type,
+                            'source_document_id' => $m->reference_id,
+                            'balance_after' => (int) $m->balance_after,
                         ])
                         ->toArray();
                 }
@@ -497,7 +455,7 @@ class ReportQueryService
             if ($partyId) {
                 $movements = SupplierLedger::where('supplier_id', $supplier->id)
                     ->whereBetween('created_at', [$period['start_utc'], $period['end_utc']])
-                    ->orderBy('created_at')
+                    ->orderBy('created_at')->orderBy('id')
                     ->get()
                     ->map(fn ($m) => [
                         'occurred_at' => Carbon::parse($m->created_at)->setTimezone(ReportPeriod::TIMEZONE)->format('Y-m-d H:i:s'),
@@ -505,6 +463,8 @@ class ReportQueryService
                         'signed_amount' => (int) ($m->credit - $m->debit),
                         'notes' => $m->notes,
                         'source_document_type' => $m->reference_type,
+                        'source_document_id' => $m->reference_id,
+                        'balance_after' => (int) $m->balance_after,
                     ])
                     ->toArray();
             }
@@ -803,4 +763,3 @@ class ReportQueryService
         );
     }
 }
-

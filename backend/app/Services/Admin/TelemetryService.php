@@ -107,7 +107,7 @@ class TelemetryService
                 'last_offsite_at' => $lastOffsite?->created_at?->timezone('Asia/Tashkent')->format('d.m.Y H:i:s') ?? 'Hali ko‘chirilmagan',
                 'last_drill_at' => $lastDrill?->created_at?->timezone('Asia/Tashkent')->format('d.m.Y H:i:s') ?? 'Hali tekshirilmagan',
                 'offsite_configured' => (bool) config('backup.offsite_disk'),
-                'needs_attention' => $backupIssue || ! config('backup.offsite_disk') || ! $lastDrill || ! $lastBackup || $lastBackup->created_at->lt(now()->subMinutes(30))
+                'needs_attention' => $backupIssue || ! config('backup.offsite_disk') || ! $lastDrill || $lastDrill->created_at->lt(now()->subDays(config('backup.drill_max_age_days', 30))) || ! $lastBackup || $lastBackup->created_at->lt(now()->subMinutes(30))
                     || (config('backup.offsite_disk') && (! $lastOffsite || $lastOffsite->created_at->lt(now()->subMinutes(30)))),
             ],
             'devices' => [

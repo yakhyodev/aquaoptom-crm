@@ -123,10 +123,10 @@ class ReportDashboard extends Component
             $salesReport = $this->reportQueryService->getSalesSummary($filters);
         } elseif ($this->activeTab === 'profit_loss') {
             $pnlReport = $this->reportQueryService->getProfitAndLoss($filters, $canViewCost);
-        } elseif ($this->activeTab === 'purchases') {
+        } elseif ($this->activeTab === 'purchases' && $canViewCost) {
             $purchasesReport = $this->reportQueryService->getPurchasesSummary($filters);
         } elseif ($this->activeTab === 'inventory') {
-            $inventoryReport = $this->reportQueryService->getInventoryValuationReport($filters);
+            $inventoryReport = $this->reportQueryService->getInventoryValuationReport($filters, $canViewCost);
         } elseif ($this->activeTab === 'statements') {
             $statementsReport = $this->reportQueryService->getPartyStatements($this->statementPartyType, $this->statementPartyId, $filters);
         } elseif ($this->activeTab === 'cash') {

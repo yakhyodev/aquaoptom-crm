@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\CashAccount;
 use App\Models\CashMovement;
 use App\Models\CashSession;
@@ -26,6 +27,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PDO;
 use Tests\TestCase;
@@ -46,6 +48,27 @@ class BackupRestoreAndRecoveryDrillTest extends TestCase
     protected Supplier $supplier;
 
     protected CashAccount $cashAccount;
+
+    public function test_drill_downloads_offsite_archive_and_verifies_files_in_an_isolated_directory(): void
+    {
+        config(['backup.offsite_disk' => 'drill-offsite']);
+        Storage::fake('drill-offsite');
+        $relative = 'private/drill-proof-'.Str::uuid().'.txt';
+        $path = storage_path('app/'.$relative);
+        File::ensureDirectoryExists(dirname($path));
+        File::put($path, 'Preserve this store file exactly');
+        $target = 'aquaoptom_restore_files_'.substr((string) Str::uuid(), 0, 8);
+        try {
+            $this->artisan('app:backup-drill', ['--target-db' => $target])->assertExitCode(0);
+            $log = AuditLog::where('action', 'RESTORE_DRILL_PASSED')->latest('id')->firstOrFail();
+            $this->assertTrue($log->new_values['files_restored']);
+            $this->assertTrue($log->new_values['offsite_verified']);
+            $this->assertSame('Preserve this store file exactly', File::get($path));
+            $this->assertNull(DB::selectOne('SELECT 1 AS present FROM pg_database WHERE datname = ?', [$target]));
+        } finally {
+            File::delete($path);
+        }
+    }
 
     public function test_audit_restore_rejects_path_traversal_before_database_restore(): void
     {

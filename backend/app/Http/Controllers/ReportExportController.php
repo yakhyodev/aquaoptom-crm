@@ -20,6 +20,9 @@ class ReportExportController extends Controller
         }
 
         $export = ReportExport::where('uuid', $uuid)->firstOrFail();
+        abort_unless($export->canBeDownloadedBy($user), 403, 'Bu hisobotni ko‘rish uchun ruxsat yo‘q.');
+        abort_if($export->expires_at?->isPast(), 410, 'Hisobot muddati tugagan. Yangisini tayyorlang.');
+        abort_unless($export->isCompleted(), 404);
 
         if (! Storage::disk('local')->exists($export->file_path)) {
             abort(404, 'Eksport fayli topilmadi yoki muddati o\'tgan.');

@@ -95,6 +95,30 @@ async function runTests() {
     let passed = 0;
     const aquaDb = new AquaDB(DB_NAME, DB_VERSION);
     await aquaDb.open();
+    const fs = require('node:fs');
+    const vm = require('node:vm');
+    const path = require('node:path');
+    const source = fs.readFileSync(path.join(__dirname, '../resources/js/offline/aqua-sync.js'), 'utf8')
+        .replace(/^import .*;\r?\n/gm, '').replace('export class AquaSync', 'class AquaSync');
+    const sandbox = vm.createContext({console, Date, Math});
+    vm.runInContext(source + '\nthis.AquaSync = AquaSync;', sandbox);
+    const writes = [];
+    let released = false;
+    const engine = new sandbox.AquaSync({
+        acquireSyncLock: async () => true, releaseSyncLock: async () => {released = true;},
+        get: async () => null, put: async (store, row) => writes.push(row),
+    });
+    engine.checkHealth = async () => ({isOnline: true});
+    engine.pushPendingQueue = async () => ({pushedCount: 1});
+    engine.pullServerChanges = async () => ({skipped: true, status: 503});
+    const failedPull = await engine.syncNow();
+    assert.strictEqual(failedPull.status, 'PARTIAL');
+    assert.strictEqual(writes.length, 0, 'A failed pull must not advance successful sync time');
+    assert.strictEqual(released, true);
+    engine.pullServerChanges = async () => ({pulledCount: 2});
+    assert.strictEqual((await engine.syncNow()).status, 'SUCCESS');
+    assert.strictEqual(writes[0].key, 'last_successful_sync');
+
 
     // -------------------------------------------------------------
     // Test 1: Multi-tab Mutex Lock & Stale Lock Recovery

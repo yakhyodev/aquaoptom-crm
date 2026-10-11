@@ -99,6 +99,13 @@ export class AquaSync {
 
             // D. 2-bosqich: Kursor bo'yicha yangi o'zgarishlarni Pull qilish
             const pullResult = await this.pullServerChanges();
+            if (pullResult.skipped) {
+                return {
+                    status: 'PARTIAL', pushResult, pullResult,
+                    message: 'Savdolar yuborildi, lekin serverdagi yangiliklar olinmadi. Sinxronlashni qayta bosing.'
+                };
+            }
+
 
             // E. Oxirgi sinxronlash vaqtini qayd etish
             this.lastSyncTime = new Date().toISOString();

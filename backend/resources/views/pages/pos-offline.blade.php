@@ -184,42 +184,12 @@
                             :class="selectedVolume === 'all' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
                         Barchasi
                     </button>
-                    <button type="button"
-                            @click="selectedVolume = '0.5'"
+                    <template x-for="volume in availableVolumes" :key="volume.key">
+                        <button type="button" @click="selectedVolume = volume.key"
                             class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '0.5' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        0.5 L
-                    </button>
-                    <button type="button"
-                            @click="selectedVolume = '1.0'"
-                            class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '1.0' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        1.0 L
-                    </button>
-                    <button type="button"
-                            @click="selectedVolume = '1.5'"
-                            class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '1.5' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        1.5 L
-                    </button>
-                    <button type="button"
-                            @click="selectedVolume = '5'"
-                            class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '5' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        5 L
-                    </button>
-                    <button type="button"
-                            @click="selectedVolume = '10'"
-                            class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '10' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        10 L
-                    </button>
-                    <button type="button"
-                            @click="selectedVolume = '18.9'"
-                            class="px-2.5 py-1 rounded-lg font-semibold transition-colors shrink-0"
-                            :class="selectedVolume === '18.9' ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'">
-                        18.9 L / 19 L
-                    </button>
+                            :class="selectedVolume === volume.key ? 'bg-cyan-600 text-slate-900 shadow-sm' : 'bg-slate-100 text-slate-600 hover:text-slate-900'"
+                            x-text="volume.label"></button>
+                    </template>
                 </div>
             </div>
 

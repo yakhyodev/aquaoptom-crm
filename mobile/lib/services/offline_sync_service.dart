@@ -806,6 +806,26 @@ class OfflineSyncService extends ChangeNotifier {
   }
 
   /// Qo'lda yoki avtomatik to'liq sinxronlash (Sync Now)
+  Future<bool> renewDeviceLease({bool force = false}) async {
+    final user = SessionService().user;
+    if (user == null || deviceUuid.isEmpty) return false;
+    final db = await _appDb.database;
+    final rows = await db.query('offline_leases', where: 'user_id = ? AND device_uuid = ? AND is_active = 1', whereArgs: [user.id, deviceUuid], limit: 1);
+    if (rows.isEmpty) return false;
+    final expiry = DateTime.tryParse(rows.first['expires_at'] as String);
+    if (!force && expiry != null && expiry.isAfter(DateTime.now().add(const Duration(hours: 4)))) return false;
+    final response = await _client.post(Uri.parse('${AppConfig.apiBaseUrl}/sync/renew-lease'), headers: _buildHeaders(), body: json.encode({'device_uuid': deviceUuid})).timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) throw const ServerException('Qurilma ruxsatini yangilab bo‘lmadi. Internetga ulanib qayta urinib ko‘ring.');
+    final lease = (json.decode(response.body) as Map<String, dynamic>)['data'] as Map<String, dynamic>;
+    final expires = DateTime.tryParse(lease['expires_at'] as String? ?? '');
+    if (expires == null || !expires.isAfter(DateTime.now()) || (lease['lease_token'] as String? ?? '').isEmpty) throw const ServerException('Server yaroqli qurilma ruxsatini qaytarmadi.');
+    await db.update('offline_leases', {
+      'lease_token': lease['lease_token'], 'valid_from': lease['valid_from'], 'expires_at': lease['expires_at'],
+      'permissions': json.encode(lease['permissions'] ?? []), 'epoch': lease['epoch'], 'signature': lease['signature'],
+    }, where: 'user_id = ? AND device_uuid = ? AND is_active = 1', whereArgs: [user.id, deviceUuid]);
+    return true;
+  }
+
   Future<void> syncNow() async {
     if (_isSyncing) return;
     _isSyncing = true;
@@ -828,6 +848,7 @@ class OfflineSyncService extends ChangeNotifier {
         whereArgs: ['recovery_hold'],
       );
       if (hold.isNotEmpty && hold.first['value'] == 'true') return;
+      await renewDeviceLease();
       await pullDeltaChanges();
     } catch (e) {
       _lastError = e.toString();

@@ -14,6 +14,26 @@ class BackupOffsiteTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_restore_errors_are_audited(): void
+    {
+        $this->partialMock(BackupService::class, function ($mock): void {
+            $mock->shouldReceive('createBackup')->once()->andThrow(new \RuntimeException('Simulated backup failure'));
+        });
+        $target = 'aquaoptom_restore_failure_'.substr((string) Str::uuid(), 0, 8);
+        $this->artisan('app:backup-drill', ['--target-db' => $target])->assertExitCode(1);
+        $this->assertTrue(AuditLog::where('action', 'RESTORE_DRILL_FAILED')->exists());
+    }
+
+    public function test_old_restore_drill_requires_attention_even_with_fresh_backups(): void
+    {
+        config(['backup.offsite_disk' => 'offsite-test', 'backup.drill_max_age_days' => 30]);
+        foreach (['BACKUP_CREATED', 'BACKUP_OFFSITE_COPIED'] as $action) {
+            AuditLog::create(['action' => $action, 'created_at' => now()]);
+        }
+        AuditLog::create(['action' => 'RESTORE_DRILL_PASSED', 'created_at' => now()->subDays(31)]);
+        $this->assertTrue(app(TelemetryService::class)->getTelemetry()['backup']['needs_attention']);
+    }
+
     public function test_restore_drill_refuses_the_current_database_before_creating_a_backup(): void
     {
         $this->artisan('app:backup-drill', ['--target-db' => config('database.connections.pgsql.database')])

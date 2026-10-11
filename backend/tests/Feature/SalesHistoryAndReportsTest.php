@@ -29,7 +29,9 @@ use App\Services\Reports\ReportPeriod;
 use App\Services\Reports\ReportQueryService;
 use Carbon\Carbon;
 use Database\Seeders\RoleAndPermissionSeeder;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -56,6 +58,95 @@ class SalesHistoryAndReportsTest extends TestCase
     protected ReportQueryService $reportQueryService;
 
     protected ExportService $exportService;
+
+    public function test_adjustments_reconcile_once_and_valuation_keeps_exact_ledger_amount(): void
+    {
+        $common = ['product_variant_id' => $this->variantFanta->id, 'warehouse_id' => 1, 'unit_cost' => 100];
+        foreach ([['INWARD', 100, 10000, now()->subDay()], ['ADJUSTMENT_IN', 10, 11000, now()], ['ADJUSTMENT_OUT', -2, 10800, now()]] as [$type, $qty, $value, $at]) {
+            InventoryMovement::create($common + ['operation_id' => (string) Str::uuid(), 'movement_type' => $type,
+                'quantity' => $qty, 'total_cost' => abs($qty) * 100, 'balance_after_quantity' => $value / 100, 'balance_after_value' => $value, 'created_at' => $at]);
+        }
+        $row = $this->reportQueryService->getInventoryValuationReport(['period' => 'today'])['rows'][0];
+        $this->assertSame(100, $row['opening_units']);
+        $this->assertSame(0, $row['inward_units']);
+        $this->assertSame(8, $row['adjustment_units']);
+        $this->assertSame($row['closing_units'], $row['opening_units'] + $row['inward_units'] - $row['outward_units'] + $row['adjustment_units']);
+        InventoryMovement::where('product_variant_id', $this->variantFanta->id)->delete();
+        InventoryMovement::create($common + ['operation_id' => (string) Str::uuid(), 'movement_type' => 'INWARD',
+            'quantity' => 3, 'total_cost' => 10000, 'balance_after_quantity' => 3, 'balance_after_value' => 10000, 'created_at' => now()]);
+        $this->assertSame(10000, $this->reportQueryService->getInventoryValuationReport(['period' => 'today'])['rows'][0]['closing_valuation']);
+    }
+
+    public function test_stock_report_query_count_does_not_grow_with_product_count(): void
+    {
+        for ($i = 0; $i < 20; $i++) {
+            $product = Product::create(['name' => 'Scale '.$i, 'normalized_name' => 'scale '.$i, 'code' => 'SCALE-'.$i, 'status' => 'active']);
+            ProductVariant::create(['product_id' => $product->id, 'volume_id' => $this->variantFanta->volume_id, 'sku' => 'SCALE-'.$i, 'status' => 'active']);
+        }
+        DB::enableQueryLog();
+        try {
+            $report = $this->reportQueryService->getInventoryValuationReport(['period' => 'today']);
+            $this->assertCount(21, $report['rows']);
+            $this->assertLessThanOrEqual(6, count(DB::getQueryLog()));
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+    }
+
+    public function test_cost_is_masked_in_stock_ui_and_export_and_foreign_files_are_denied(): void
+    {
+        $this->cashier->givePermission('view_reports', true);
+        $this->cashier->givePermission('export_reports', true);
+        $this->cashier->givePermission('view_cost_price', false);
+        Livewire::actingAs($this->cashier)->test(ReportDashboard::class)->call('setTab', 'inventory')
+            ->assertViewHas('inventoryReport', fn ($report) => $report['summary']['total_closing_valuation'] === null && $report['rows'][0]['wac_cost'] === null)
+            ->assertSee('Yashirilgan');
+        $export = $this->exportService->exportInventoryReport($this->cashier, ['period' => 'today'], 'csv');
+        $content = Storage::disk('local')->get($export->file_path);
+        $this->assertStringNotContainsString('WAC Tannarx', $content);
+        $this->actingAs($this->cashier)->get(route('exports.download', $export->uuid))->assertOk();
+        $ownerExport = $this->exportService->exportInventoryReport($this->owner, ['period' => 'today'], 'csv');
+        $this->actingAs($this->cashier)->get(route('exports.download', $ownerExport->uuid))->assertForbidden();
+        $this->cashier->givePermission('view_cost_price', true);
+        $sensitive = $this->exportService->exportInventoryReport($this->cashier->fresh(), ['period' => 'today']);
+        $this->cashier->givePermission('view_cost_price', false);
+        $this->actingAs($this->cashier->fresh())->get(route('exports.download', $sensitive->uuid))->assertForbidden();
+    }
+
+    public function test_expired_reports_cannot_be_downloaded_and_scheduled_cleanup_removes_only_exports(): void
+    {
+        $export = $this->exportService->exportSalesReport($this->owner, ['period' => 'today']);
+        $export->update(['expires_at' => now()->subMinute()]);
+        Storage::disk('local')->put('private/keep.txt', 'store data');
+        $this->actingAs($this->owner)->get(route('exports.download', $export->uuid))->assertStatus(410);
+        $schedule = app(Schedule::class);
+        $event = collect($schedule->events())->first(fn ($event) => $event->description === 'reports:prune-expired');
+        $this->assertNotNull($event);
+        $event->run(app());
+        Storage::disk('local')->assertMissing($export->file_path);
+        Storage::disk('local')->assertExists('private/keep.txt');
+        $this->assertSame('EXPIRED', $export->fresh()->status);
+        Storage::disk('local')->delete('private/keep.txt');
+    }
+
+    public function test_individual_excel_statement_includes_ordered_payments_and_running_debt(): void
+    {
+        foreach ([['SALE', 70000, 0, 70000, now()->subMinutes(2)], ['PAYMENT', 0, 20000, 50000, now()->subMinute()]] as [$type, $debit, $credit, $balance, $at]) {
+            CustomerLedger::create(['customer_id' => $this->customer->id, 'operation_id' => (string) Str::uuid(),
+                'type' => $type, 'debit' => $debit, 'credit' => $credit, 'balance_after' => $balance,
+                'notes' => 'Statement regression', 'created_at' => $at]);
+        }
+        $export = $this->exportService->exportPartyStatementReport($this->owner, 'customer', $this->customer->id, ['period' => 'today'], 'xlsx');
+        $zip = new \ZipArchive;
+        $this->assertTrue($zip->open(Storage::disk('local')->path($export->file_path)));
+        $xml = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        $this->assertStringContainsString('Mijozdan pul olindi', $xml);
+        $this->assertStringContainsString('Statement regression', $xml);
+        $this->assertStringContainsString('<v>50000</v>', $xml);
+        $this->assertStringContainsString($at->timezone(ReportPeriod::TIMEZONE)->format('Y-m-d H:i:s'), $xml);
+    }
 
     public function test_every_report_tab_downloads_its_own_real_excel_workbook(): void
     {

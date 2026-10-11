@@ -295,20 +295,25 @@ export function aquaPos() {
         /**
          * 4. Filtr va Qidiruv natijalari
          */
+        volumeKey(item) {
+            const millilitres = Number(item.volume_ml ?? Number(item.volume_litres) * 1000);
+            return Number.isFinite(millilitres) && millilitres > 0 ? String(Math.round(millilitres)) : null;
+        },
+
+        get availableVolumes() {
+            const volumes = new Map();
+            for (const item of this.catalog) {
+                const key = this.volumeKey(item);
+                if (key) volumes.set(key, {key, label: `${Number(key) / 1000} L`});
+            }
+            return [...volumes.values()].sort((a, b) => Number(a.key) - Number(b.key));
+        },
+
         get filteredCatalog() {
             let list = this.catalog;
 
-            // Hajm filtri
             if (this.selectedVolume !== 'all') {
-                list = list.filter(item => {
-                    if (this.selectedVolume === '0.5') return item.volume_name?.includes('0.5') || item.volume_litres === '0.500';
-                    if (this.selectedVolume === '1.0') return item.volume_name?.includes('1.0') || item.volume_name?.includes('1 L') || item.volume_litres === '1.000';
-                    if (this.selectedVolume === '1.5') return item.volume_name?.includes('1.5') || item.volume_litres === '1.500';
-                    if (this.selectedVolume === '5') return item.volume_name?.includes('5') || item.volume_litres === '5.000';
-                    if (this.selectedVolume === '10') return item.volume_name?.includes('10') || item.volume_litres === '10.000';
-                    if (this.selectedVolume === '18.9') return item.volume_name?.includes('18.9') || item.volume_name?.includes('19') || item.volume_litres === '18.900';
-                    return true;
-                });
+                list = list.filter(item => this.volumeKey(item) === this.selectedVolume);
             }
 
             // Qidiruv filtri
@@ -769,6 +774,10 @@ export function aquaPos() {
                     const pushed = res.pushResult?.pushedCount || 0;
                     const pulled = res.pullResult?.pulledCount || 0;
                     this.showAlert('success', `Sinxronlash yakunlandi: ${pushed} ta yuborildi, ${pulled} ta o'zgarish yangilandi.`);
+                } else if (res.status === 'PARTIAL') {
+                    await this.loadLocalData(false);
+                    await this.updateOutboxCount();
+                    this.showAlert('warning', res.message);
                 } else if (res.status === 'OFFLINE') {
                     this.showAlert('warning', res.message);
                 } else if (res.status === 'LOCKED') {

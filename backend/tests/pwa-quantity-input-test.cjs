@@ -11,6 +11,20 @@ const context = vm.createContext({ AquaDB: class {}, navigator: { onLine: false 
 vm.runInContext(source + '\nthis.createPos = aquaPos;', context);
 (async () => {
     const pos = context.createPos();
+    pos.catalog = [
+        {id: 1, volume_ml: 500, volume_name: '0.5 L'},
+        {id: 2, volume_ml: 5000, volume_name: '5 L'},
+        {id: 3, volume_ml: 2500, volume_name: 'Custom 2.5 L'},
+        {id: 4, volume_litres: '18.900', volume_name: '18.9 L'},
+        {id: 5, volume_ml: 19000, volume_name: '19 L'},
+    ];
+    pos.selectedVolume = '5000';
+    assert.equal(JSON.stringify(pos.filteredCatalog.map(row => row.id)), '[2]');
+    pos.selectedVolume = '2500';
+    assert.equal(JSON.stringify(pos.filteredCatalog.map(row => row.id)), '[3]');
+    assert.equal(JSON.stringify(pos.availableVolumes.map(row => row.key)), '["500","2500","5000","18900","19000"]');
+    pos.selectedVolume = 'all';
+
     pos.cart = [{ variant_id: 1, product_name: 'Water', quantity: 1, sale_price: 5000 }];
     pos.stockAllocations.set(1, { allocated_quantity: 500, consumed_quantity: 0, returned_quantity: 0 });
     const alerts = [];

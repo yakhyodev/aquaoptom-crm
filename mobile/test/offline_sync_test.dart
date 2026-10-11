@@ -1050,4 +1050,40 @@ void main() {
       }
     },
   );
+  test('Lease renewal preserves pending sales and retries safely after rejection', () async {
+    final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath, options: OpenDatabaseOptions(version: 2, onCreate: AppDatabase.createSchema));
+    AppDatabase.setTestDatabase(db);
+    SessionService().setSession(user: testUserA, token: 'renew-test-token');
+    var fail = false;
+    var requests = 0;
+    final service = OfflineSyncService(client: MockClient((request) async {
+      requests++;
+      expect(request.url.path.endsWith('/sync/renew-lease'), isTrue);
+      if (fail) return http.Response('{}', 403);
+      return http.Response(json.encode({'data': {
+        'lease_token': 'new-token', 'valid_from': DateTime.now().toUtc().toIso8601String(),
+        'expires_at': DateTime.now().add(const Duration(hours: 24)).toUtc().toIso8601String(),
+        'permissions': ['offline_sales'], 'epoch': 2, 'signature': 'signed',
+      }}), 200);
+    }));
+    service.setDeviceUuid('renew-device');
+    try {
+      await db.insert('offline_leases', {'device_uuid': 'renew-device', 'user_id': 1, 'lease_token': 'old-token',
+        'valid_from': DateTime.now().toIso8601String(), 'expires_at': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+        'permissions': '[]', 'epoch': 1, 'signature': '', 'is_active': 1});
+      await db.insert('sync_queue', {'operation_id': 'renew-pending', 'user_id': 1, 'device_uuid': 'renew-device',
+        'type': 'CREATE_SALE', 'payload': '{}', 'payload_fingerprint': 'fingerprint', 'status': 'PENDING',
+        'device_created_at': DateTime.now().toIso8601String(), 'lease_token': 'old-token'});
+      expect(await service.renewDeviceLease(), isTrue);
+      expect((await db.query('offline_leases')).first['lease_token'], 'new-token');
+      expect((await db.query('sync_queue')).first['lease_token'], 'old-token');
+      expect((await db.query('sync_queue')).first['status'], 'PENDING');
+      expect(await service.renewDeviceLease(), isFalse);
+      expect(requests, 1);
+      fail = true;
+      await expectLater(service.renewDeviceLease(force: true), throwsA(isA<ServerException>()));
+      expect((await db.query('offline_leases')).first['lease_token'], 'new-token');
+    } finally { await db.close(); }
+  });
+
 }

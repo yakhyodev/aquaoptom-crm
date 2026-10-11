@@ -3,8 +3,10 @@
 namespace App\Services\Reports;
 
 use App\Models\Device;
+use App\Models\Payment;
 use App\Models\Purchase;
 use App\Models\ReportExport;
+use App\Models\Sale;
 use App\Models\User;
 use App\Services\Reports\Exceptions\UnauthorizedExportException;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -134,9 +136,9 @@ class ExportService
         $alignRightColumns = [1];
 
         $rows = [
-            ['Jami Savdo (Brutto)', $pnl['gross_sales'], 'Cheklar bo\'yicha tushum'],
+            ['Jami Savdo (Brutto)', $pnl['gross_sales'], 'Sotuv summasi, nasiya ham kiradi'],
             ['Qaytarilgan Tovarlar (Returns)', $pnl['returns'], 'Mijozlar qaytargan summalar'],
-            ['Sof Savdo Tushumi (Net Sales)', $pnl['net_sales'], 'Brutto savdo - Qaytarishlar'],
+            ['Sotilgan mahsulotlar summasi (qaytarishlar ayrilgan)', $pnl['net_sales'], 'Brutto savdo - Qaytarishlar'],
             ['Sotilgan Mahsulotlar Tannarxi (COGS)', $pnl['cogs'], 'WAC asosidagi xarid tannarxi'],
             ['Yalpi Foyda (Gross Profit)', $pnl['gross_profit'], 'Sof savdo - Tannarx'],
             ['Yalpi Marja (%)', $pnl['gross_margin_percent'].'%', 'Yalpi foyda / Sof savdo'],
@@ -175,7 +177,8 @@ class ExportService
     {
         $this->authorize($user);
 
-        $inv = $this->reportQueryService->getInventoryValuationReport($filters);
+        $canViewCost = $user->isOwner() || $user->hasPermission('view_cost_price');
+        $inv = $this->reportQueryService->getInventoryValuationReport($filters, $canViewCost);
         $period = $inv['period'];
 
         $headers = [
@@ -228,6 +231,13 @@ class ExportService
             'Chiqim Dona' => $inv['summary']['total_outward_units'],
             'Yakuniy Qiymat' => $inv['summary']['total_closing_valuation'],
         ];
+
+        if (! $canViewCost) {
+            $headers = array_slice($headers, 0, 8);
+            $rows = array_map(fn ($row) => array_slice($row, 0, 8), $rows);
+            $totals = array_slice($totals, 0, 8);
+            unset($kpis['Yakuniy Qiymat']);
+        }
 
         return $this->generateExport(
             user: $user,
@@ -289,19 +299,55 @@ class ExportService
         }
 
         $totals = ['JAMI', '', $totOpening, $totDebits, $totCredits, $totClosing];
-
-        $kpis = [
-            'Boshlang\'ich Balans' => $totOpening,
-            'Davr Aylanmasi (+)' => $totDebits,
-            'Davr To\'lovlari (-)' => $totCredits,
-            'Yakuniy Balans' => $totClosing,
-        ];
+        if ($partyType === 'supplier') {
+            foreach ($rows as &$row) {
+                [$row[3], $row[4]] = [$row[4], $row[3]];
+            }
+            unset($row);
+            [$totals[3], $totals[4]] = [$totals[4], $totals[3]];
+        }
+        $headers = [$partyLabel.' nomi', 'Telefon', 'Boshlang‘ich qarz / avans', 'Qarz oshdi', 'Qarz kamaydi', 'Yakuniy qarz / avans'];
+        if ($partyId) {
+            $documents = [];
+            $movements = collect($res['statements'])->flatMap(fn ($statement) => $statement['movements']);
+            foreach ([Sale::class => 'invoice_number', Purchase::class => 'invoice_number', Payment::class => 'payment_number'] as $model => $column) {
+                $ids = $movements->where('source_document_type', $model)->pluck('source_document_id')->filter()->unique();
+                if ($ids->isNotEmpty()) {
+                    $documents[$model] = $model::whereIn('id', $ids)->pluck($column, 'id')->all();
+                }
+            }
+            $headers = [$partyLabel.' nomi', 'Telefon', 'Sana va vaqt (Toshkent)', 'Amal', 'Hujjat', 'Qarz oshdi', 'Qarz kamaydi', 'Qarz / avans qoldig‘i', 'Izoh'];
+            $rows = [];
+            foreach ($res['statements'] as $statement) {
+                $rows[] = [$statement['party_name'], $statement['party_phone'] ?: '', '', 'Davr boshidagi qoldiq', '', 0, 0, $statement['opening_balance'], 'Manfiy qoldiq — oldindan to‘lov'];
+                $balance = $statement['opening_balance'];
+                foreach ($statement['movements'] as $movement) {
+                    $amount = $movement['signed_amount'];
+                    $balance += $amount;
+                    $label = match ($movement['movement_type']) {
+                        'SALE' => 'Mijozga sotuv', 'PURCHASE', 'INWARD' => 'Mahsulot kirimi',
+                        'PAYMENT' => $partyType === 'customer' ? 'Mijozdan pul olindi' : 'Yetkazuvchiga pul berildi',
+                        'SALE_RETURN', 'PURCHASE_RETURN', 'RETURN' => 'Mahsulot qaytarildi',
+                        'OPENING_BALANCE', 'INITIAL_BALANCE' => 'Boshlang‘ich qarz',
+                        default => $movement['movement_type'],
+                    };
+                    $reference = $documents[$movement['source_document_type']][$movement['source_document_id']]
+                        ?? ($movement['source_document_id'] ? '#'.$movement['source_document_id'] : '');
+                    $rows[] = [$statement['party_name'], $statement['party_phone'] ?: '', $movement['occurred_at'], $label, $reference,
+                        max(0, $amount), max(0, -$amount), $balance, $movement['notes'] ?: ''];
+                }
+            }
+            $totals = ['', '', '', 'Davr yakuni', '', $partyType === 'supplier' ? $totCredits : $totDebits,
+                $partyType === 'supplier' ? $totDebits : $totCredits, $totClosing, ''];
+            $alignRightColumns = [5, 6, 7];
+        }
+        $kpis = ['Boshlang‘ich qarz / avans' => $totOpening, 'Yakuniy qarz / avans' => $totClosing];
 
         return $this->generateExport(
             user: $user,
             reportType: 'statement',
             format: $format,
-            title: $partyLabel.'lar Hisob-Kitob Ko\'chirmasi (Signed Balance)',
+            title: $partyLabel.'lar qarz va to‘lovlar ko‘chirmasi',
             period: $period,
             headers: $headers,
             rows: $rows,
@@ -444,7 +490,7 @@ class ExportService
         $hasPendingDevices = Device::whereNotNull('freeze_requested_at')
             ->whereNull('freeze_acknowledged_at')
             ->exists();
-        $completenessStatus = $hasPendingDevices ? 'Ogohlantirish: Uzilgan qurilmalar sinxronlanmagan' : 'To\'liq server ma\'lumotlari';
+        $completenessStatus = $hasPendingDevices ? 'Ogohlantirish: Uzilgan qurilmalar sinxronlanmagan' : 'Serverga yetib kelgan yozuvlar; oflayn qurilmalardagi yuborilmagan savdolar kirmaydi';
 
         $metadata = [
             'title' => $title,
@@ -456,6 +502,8 @@ class ExportService
             'user_name' => $user->name.' ('.$user->role.')',
             'completeness_status' => $completenessStatus,
             'rows_count' => count($rows),
+            'contains_cost' => in_array($reportType, ['inventory', 'profit_loss', 'purchases'], true)
+                && ($user->isOwner() || $user->hasPermission('view_cost_price')),
         ];
 
         // Format bo'yicha kontent yaratish
