@@ -98,7 +98,7 @@ class DashboardQueryService
                 $label = 'Shu oy ('.$now->translatedFormat('F Y').')';
                 break;
             case 'last_month':
-                $lastM = $now->copy()->subMonth();
+                $lastM = $now->copy()->subMonthNoOverflow();
                 $start = $lastM->copy()->startOfMonth();
                 $end = $lastM->copy()->endOfMonth();
                 $label = "O'tgan oy (".$lastM->translatedFormat('F Y').')';

@@ -41,8 +41,8 @@ class ReportPeriod
                 break;
 
             case 'last_month':
-                $startLocal = $nowLocal->copy()->subMonth()->startOfMonth();
-                $endLocal = $nowLocal->copy()->subMonth()->endOfMonth();
+                $startLocal = $nowLocal->copy()->subMonthNoOverflow()->startOfMonth();
+                $endLocal = $nowLocal->copy()->subMonthNoOverflow()->endOfMonth();
                 $label = 'O\'tgan oy ('.$startLocal->format('d.m.Y').' - '.$endLocal->format('d.m.Y').')';
                 break;
 

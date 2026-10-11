@@ -3,6 +3,7 @@
 namespace App\Livewire\Dashboard;
 
 use App\Services\Dashboard\DashboardQueryService;
+use App\Services\Reports\ReportPeriod;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -21,17 +22,31 @@ class DashboardManager extends Component
 
     public function mount(): void
     {
-        $this->customStart = now()->startOfMonth()->format('Y-m-d');
-        $this->customEnd = now()->format('Y-m-d');
+        $this->setPeriod('today');
     }
 
     public function setPeriod(string $p): void
     {
+        abort_unless(in_array($p, ['today', 'yesterday', 'this_week', 'this_month', 'last_month', 'all_time'], true), 422);
+        $range = ReportPeriod::resolve($p);
         $this->period = $p;
+        $this->customStart = $p === 'all_time' ? '2020-01-01' : $range['from_date'];
+        $this->customEnd = $range['to_date'];
+        $this->resetValidation();
     }
 
     public function applyCustomDates(): void
     {
+        $this->validate([
+            'customStart' => ['required', 'date_format:Y-m-d'],
+            'customEnd' => ['required', 'date_format:Y-m-d', 'after_or_equal:customStart'],
+        ], [
+            'customStart.required' => 'Boshlanish sanasini tanlang.',
+            'customStart.date_format' => 'Boshlanish sanasini to‘g‘ri kiriting.',
+            'customEnd.required' => 'Tugash sanasini tanlang.',
+            'customEnd.date_format' => 'Tugash sanasini to‘g‘ri kiriting.',
+            'customEnd.after_or_equal' => 'Tugash sanasi boshlanish sanasidan oldin bo‘lmasin.',
+        ]);
         $this->period = 'custom';
     }
 

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Dashboard\DashboardManager;
 use App\Models\CashAccount;
 use App\Models\Customer;
 use App\Models\Device;
@@ -11,11 +12,14 @@ use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Catalog\CatalogService;
 use App\Services\Reports\ExportService;
+use App\Services\Reports\ReportPeriod;
 use App\Services\Sync\SyncBootstrapService;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AuditRegressionTest extends TestCase
@@ -30,6 +34,26 @@ class AuditRegressionTest extends TestCase
         $this->seed(RoleAndPermissionSeeder::class);
         $this->owner = User::factory()->create(['role' => 'OWNER', 'status' => 'ACTIVE', 'is_active' => true]);
         Warehouse::firstOrCreate(['id' => 1], ['name' => 'Asosiy ombor', 'is_default' => true]);
+    }
+
+    public function test_dashboard_dates_match_presets_and_respect_tashkent_and_month_end(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-31 12:00:00', 'UTC'));
+        $component = Livewire::actingAs($this->owner)->test(DashboardManager::class)
+            ->assertSet('customStart', '2026-03-31')->assertSet('customEnd', '2026-03-31')
+            ->call('setPeriod', 'last_month')
+            ->assertSet('customStart', '2026-02-01')->assertSet('customEnd', '2026-02-28');
+        $range = ReportPeriod::resolve('last_month');
+        $this->assertSame('2026-02-01', $range['from_date']);
+        $this->assertSame('2026-02-28', $range['to_date']);
+        $component->set('customStart', '2026-04-02')->set('customEnd', '2026-04-01')
+            ->call('applyCustomDates')->assertHasErrors(['customEnd' => 'after_or_equal'])
+            ->assertSet('period', 'last_month')
+            ->set('customStart', '2026-04-01')->set('customEnd', '2026-04-02')
+            ->call('applyCustomDates')->assertHasNoErrors()->assertSet('period', 'custom');
+        $this->travelTo(Carbon::parse('2026-03-31 22:00:00', 'UTC'));
+        Livewire::actingAs($this->owner)->test(DashboardManager::class)
+            ->assertSet('customStart', '2026-04-01')->assertSet('customEnd', '2026-04-01');
     }
 
     public function test_real_catalog_writes_reach_bootstrap_and_delta_with_exact_volume(): void

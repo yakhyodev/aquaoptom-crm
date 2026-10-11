@@ -52,6 +52,8 @@
                 </button>
             </div>
         </div>
+        @error('customStart') <p class="text-sm text-red-600" role="alert">{{ $message }}</p> @enderror
+        @error('customEnd') <p class="text-sm text-red-600" role="alert">{{ $message }}</p> @enderror
     <!-- 2. Data Completeness & Offline Indicator Banner -->
     <div class="dashboard-sync p-3 rounded-2xl border {{ $dashboard['warnings']['completeness_percent'] >= 100 ? 'bg-emerald-50/20 border-emerald-200/50 text-emerald-700' : 'bg-amber-50/20 border-amber-200/50 text-amber-700' }} flex flex-wrap items-center justify-between gap-3 text-xs">
         <div class="flex items-center gap-3">
