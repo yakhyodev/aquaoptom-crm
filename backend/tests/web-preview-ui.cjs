@@ -52,7 +52,24 @@ const fs = require('node:fs');
         assert(width >= 240, route + ': search field is too narrow to type a name or phone number (' + width + 'px)');
     }
     try {
+        const androidPage = await browser.newPage({
+            viewport: { width: 390, height: 844 },
+            userAgent: 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
+        });
+        androidPage.on('pageerror', error => failures.push(error.message));
+        await androidPage.goto(process.env.PREVIEW_URL + '/login');
+        const apkOffer = androidPage.getByRole('complementary', { name: 'Android ilovasi' });
+        await apkOffer.waitFor({ state: 'visible' });
+        assert.equal(await apkOffer.getByRole('link', { name: 'APK yuklash ↓' }).getAttribute('href'), 'https://github.com/yakhyodev/aquaoptom-crm/releases/download/android-test/aquaoptom-android-test.apk');
+        assert(await androidPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'APK offer overflows Android viewport');
+        await androidPage.screenshot({ path: 'ui-evidence/android-apk-offer.png', fullPage: true, animations: 'disabled' });
+        await apkOffer.getByRole('button', { name: 'Taklifni yopish' }).click();
+        await apkOffer.waitFor({ state: 'hidden' });
+        await androidPage.reload();
+        await androidPage.waitForFunction(() => document.querySelector('.apk-offer')?.getAttribute('style')?.includes('display: none'));
+        await androidPage.close();
         await page.goto(process.env.PREVIEW_URL + '/login');
+        assert.equal(await page.locator('.apk-offer').isVisible(), false, 'APK offer should only appear on Android');
         await page.locator('#email').fill('admin');
         await page.locator('#password').fill(process.env.PREVIEW_OWNER_PASSWORD);
         await screenshot('login');
