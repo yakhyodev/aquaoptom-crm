@@ -27,6 +27,7 @@ use App\Services\Reports\Exceptions\UnauthorizedExportException;
 use App\Services\Reports\ExportService;
 use App\Services\Reports\ReportPeriod;
 use App\Services\Reports\ReportQueryService;
+use App\Services\Sync\SyncChangeLogService;
 use Carbon\Carbon;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Console\Scheduling\Schedule;
@@ -58,6 +59,13 @@ class SalesHistoryAndReportsTest extends TestCase
     protected ReportQueryService $reportQueryService;
 
     protected ExportService $exportService;
+
+    public function test_delta_catalog_includes_exact_custom_volume_data(): void
+    {
+        $change = app(SyncChangeLogService::class)->logChange('PRODUCT_VARIANT', $this->variantFanta->id, 'CREATED', ['id' => $this->variantFanta->id]);
+        $this->assertSame(1500, $change->payload['volume_ml']);
+        $this->assertSame($this->variantFanta->volume_id, $change->payload['volume_id']);
+    }
 
     public function test_adjustments_reconcile_once_and_valuation_keeps_exact_ledger_amount(): void
     {

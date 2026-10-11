@@ -34,6 +34,14 @@ class SyncChangeLogService
             DB::statement('SELECT pg_advisory_xact_lock(?)', [self::ADVISORY_LOCK_ID]);
         }
 
+        if (in_array(strtoupper($entityType), ['PRODUCT_VARIANT', 'VARIANT'], true) && ! $isTombstone && ! isset($payload['volume_ml'])) {
+            $variant = ProductVariant::with('volume')->find($entityId);
+            if ($variant?->volume) {
+                $payload += ['volume_id' => $variant->volume_id, 'volume_ml' => $variant->volume->value_ml,
+                    'volume_litres' => (string) $variant->volume->litres];
+            }
+        }
+
         return SyncChangeLog::create([
             'entity_type' => strtoupper($entityType),
             'entity_id' => (string) $entityId,

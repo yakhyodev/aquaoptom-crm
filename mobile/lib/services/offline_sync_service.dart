@@ -807,7 +807,7 @@ class OfflineSyncService extends ChangeNotifier {
 
   /// Qo'lda yoki avtomatik to'liq sinxronlash (Sync Now)
   Future<bool> renewDeviceLease({bool force = false}) async {
-    final user = SessionService().user;
+    final user = SessionService().currentUser;
     if (user == null || deviceUuid.isEmpty) return false;
     final db = await _appDb.database;
     final rows = await db.query('offline_leases', where: 'user_id = ? AND device_uuid = ? AND is_active = 1', whereArgs: [user.id, deviceUuid], limit: 1);
