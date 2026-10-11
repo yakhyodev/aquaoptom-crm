@@ -50,7 +50,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         SalesHistoryScreen(apiService: _api),
       ];
       _titles = [
-        'Dashboard',
+        'Bosh sahifa',
         'Sotuv qilish',
         'Katalog & Qoldiq',
         'Qarzlar',
@@ -466,7 +466,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 title: Text(
-                  'Dashboard',
+                  'Bosh sahifa',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                   ),

@@ -85,7 +85,7 @@ self.addEventListener('fetch', (event) => {
                 if (networkResponse.status === 200 && !networkResponse.redirected && url.pathname === '/pos') {
                     const responseClone = networkResponse.clone();
                     caches.open(CACHE_NAME).then((cache) => {
-                        cache.put(event.request, responseClone);
+                        cache.put('/pos', responseClone);
                     });
                 }
                 return networkResponse;

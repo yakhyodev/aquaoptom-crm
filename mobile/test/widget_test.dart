@@ -158,14 +158,26 @@ void main() {
       await tester.pumpAndSettle();
 
       // Verify Main Navigation Screen tabs for Owner
-      expect(find.text('Dashboard'), findsNWidgets(2)); // AppBar + BottomNavBar
-      expect(find.text('POS'), findsOneWidget);
+      expect(
+        find.text('Bosh sahifa'),
+        findsNWidgets(2),
+      ); // AppBar + BottomNavBar
+      expect(find.text('Sotuv'), findsOneWidget);
       expect(find.text('Katalog'), findsOneWidget);
       expect(find.text('Qarzlar'), findsOneWidget);
       expect(find.text('Tarix'), findsOneWidget);
+      final originalBrightness = Theme.of(
+        tester.element(find.byType(Scaffold).first),
+      ).brightness;
+      await tester.tap(find.byTooltip('Kunduzgi / tungi rejim'));
+      await tester.pumpAndSettle();
+      expect(
+        Theme.of(tester.element(find.byType(Scaffold).first)).brightness,
+        isNot(originalBrightness),
+      );
 
       // Switch to POS tab
-      await tester.tap(find.text('POS'));
+      await tester.tap(find.text('Sotuv'));
       await tester.pumpAndSettle();
       expect(find.text('Savat hozircha bo\'sh'), findsOneWidget);
       expect(find.text('Tezkor Xaridor'), findsOneWidget);
@@ -206,8 +218,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Cashier should have POS, Katalog, Qarzlar, Tarix, but NOT Dashboard
-      expect(find.text('Dashboard'), findsNothing);
-      expect(find.text('POS'), findsOneWidget);
+      expect(find.text('Bosh sahifa'), findsNothing);
+      expect(find.text('Sotuv'), findsOneWidget);
       expect(find.text('Katalog'), findsOneWidget);
       expect(find.text('Qarzlar'), findsOneWidget);
       expect(find.text('Tarix'), findsOneWidget);

@@ -88,8 +88,12 @@ class ReportsData {
 
   factory ReportsData.fromJson(Map<String, dynamic> json) {
     return ReportsData(
-      sales: SalesReport.fromJson(json['sales'] as Map<String, dynamic>? ?? {}),
-      cash: CashReport.fromJson(json['cash'] as Map<String, dynamic>? ?? {}),
+      sales: SalesReport.fromJson(
+        Map<String, dynamic>.from(json['sales'] as Map? ?? {}),
+      ),
+      cash: CashReport.fromJson(
+        Map<String, dynamic>.from(json['cash'] as Map? ?? {}),
+      ),
       canViewCash: json['can_view_cash'] as bool? ?? json['cash'] != null,
     );
   }
