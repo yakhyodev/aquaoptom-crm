@@ -240,7 +240,7 @@ class AuthAndAccessControlTest extends TestCase
      */
     public function test_cost_price_hiding_in_api_for_unauthorized_users(): void
     {
-        Warehouse::create(['name' => 'Asosiy Ombor', 'is_default' => true]);
+        $warehouse = Warehouse::create(['name' => 'Asosiy Ombor', 'is_default' => true]);
         $vol = Volume::create(['name' => '1.0 L', 'value_ml' => 1000]);
         $product = Product::create([
             'name' => 'Coca-Cola',
@@ -257,7 +257,7 @@ class AuthAndAccessControlTest extends TestCase
         ]);
 
         $variant->balance()->create([
-            'warehouse_id' => 1,
+            'warehouse_id' => $warehouse->id,
             'quantity' => 100,
             'average_cost' => 8500, // Cost price
         ]);
