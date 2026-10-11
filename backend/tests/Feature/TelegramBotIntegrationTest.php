@@ -319,6 +319,7 @@ class TelegramBotIntegrationTest extends TestCase
         $salesDashboard = TelegramClient::getRecordedMessages()[0]['payload']['text'];
         $this->assertStringNotContainsString('Yalpi foyda', $salesDashboard);
         $this->assertStringNotContainsString('Tannarx (COGS)', $salesDashboard);
+        $this->assertStringNotContainsString('Kassalarda mavjud', $salesDashboard);
 
         // 3. Qoldiqlar ko'rish (/qoldiq)
         TelegramClient::resetFake();

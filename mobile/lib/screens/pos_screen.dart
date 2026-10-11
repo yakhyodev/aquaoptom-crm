@@ -338,8 +338,9 @@ class _PosScreenState extends State<PosScreen> {
       labelFor: (item) =>
           '${item.product.name} — ${item.variant.displayVolume} · ${item.variant.stockQty} dona',
     );
-    if (selected != null && mounted)
+    if (selected != null && mounted) {
       _addToCart(selected.product, selected.variant);
+    }
   }
 
   void _showReceiptDialog(SaleRecord sale) {

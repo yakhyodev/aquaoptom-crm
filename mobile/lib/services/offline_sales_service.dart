@@ -63,8 +63,9 @@ class OfflineSalesService {
               : allocations.first['available_quantity'],
         });
       }
-      if (mapped.isNotEmpty)
+      if (mapped.isNotEmpty) {
         result.add(Product.fromJson({...product, 'variants': mapped}));
+      }
     }
     return result;
   }

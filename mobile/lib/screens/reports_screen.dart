@@ -46,7 +46,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     setState(() => _isExporting = true);
     try {
       await _api.downloadReport(type: type, period: _selectedPeriod);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -54,11 +54,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
             ),
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('$e')));
+      }
     } finally {
       if (mounted) setState(() => _isExporting = false);
     }

@@ -29,7 +29,7 @@ class AuditRegressionTest extends TestCase
         parent::setUp();
         $this->seed(RoleAndPermissionSeeder::class);
         $this->owner = User::factory()->create(['role' => 'OWNER', 'status' => 'ACTIVE', 'is_active' => true]);
-        Warehouse::create(['name' => 'Asosiy ombor', 'is_default' => true]);
+        Warehouse::firstOrCreate(['id' => 1], ['name' => 'Asosiy ombor', 'is_default' => true]);
     }
 
     public function test_real_catalog_writes_reach_bootstrap_and_delta_with_exact_volume(): void
@@ -76,7 +76,7 @@ class AuditRegressionTest extends TestCase
     {
         Storage::fake('local');
         foreach (['COMPLETED', 'CANCELLED'] as $status) {
-            Sale::create(['operation_id' => (string) Str::uuid(), 'invoice_number' => 'INV-'.$status, 'warehouse_id' => Warehouse::first()->id, 'status' => $status, 'total_amount' => 10000, 'paid_amount' => 6000, 'debt_amount' => 4000, 'payment_type' => 'PARTIAL', 'payment_method' => 'CASH', 'created_by' => $this->owner->id, 'posted_at' => now(), 'completed_at' => now()]);
+            Sale::create(['operation_id' => (string) Str::uuid(), 'invoice_number' => 'INV-'.$status, 'warehouse_id' => Warehouse::first()->id, 'status' => $status, 'total_amount' => 10000, 'total_cost' => 7000, 'gross_profit' => 3000, 'paid_amount' => 6000, 'debt_amount' => 4000, 'payment_type' => 'PARTIAL', 'payment_method' => 'CASH', 'created_by' => $this->owner->id, 'posted_at' => now(), 'completed_at' => now()]);
         }
         $export = app(ExportService::class)->exportSalesReport($this->owner, ['period' => 'today']);
         $csv = Storage::disk('local')->get($export->file_path);
@@ -90,7 +90,7 @@ class AuditRegressionTest extends TestCase
     public function test_history_can_reach_older_sales_and_filter_before_pagination(): void
     {
         for ($i = 0; $i < 55; $i++) {
-            Sale::create(['operation_id' => (string) Str::uuid(), 'invoice_number' => 'CHEK-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), 'warehouse_id' => Warehouse::first()->id, 'status' => 'COMPLETED', 'total_amount' => 10000, 'paid_amount' => 10000, 'debt_amount' => 0, 'payment_type' => 'CASH', 'payment_method' => 'CASH', 'created_by' => $this->owner->id]);
+            Sale::create(['operation_id' => (string) Str::uuid(), 'invoice_number' => 'CHEK-'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), 'warehouse_id' => Warehouse::first()->id, 'status' => 'COMPLETED', 'total_amount' => 10000, 'total_cost' => 7000, 'gross_profit' => 3000, 'paid_amount' => 10000, 'debt_amount' => 0, 'payment_type' => 'CASH', 'payment_method' => 'CASH', 'created_by' => $this->owner->id]);
         }
         $this->actingAs($this->owner, 'sanctum')->getJson('/api/sales/history?page=2')->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('meta.total', 55);
         $this->getJson('/api/sales/history?search=CHEK-000')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.invoice_number', 'CHEK-000');

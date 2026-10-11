@@ -292,9 +292,10 @@ class _InwardScreenState extends State<InwardScreen> {
                                   '${_products.firstWhere((p) => p.id == v.productId).name} — ${v.displayVolume} · ${v.stockQty} dona',
                               onChanged: (val) => setState(() {
                                 _selectedVariant = val;
-                                if (val?.costPrice != null)
+                                if (val?.costPrice != null) {
                                   _costPriceController.text =
                                       '${val!.costPrice}';
+                                }
                               }),
                             ),
                           ] else ...[

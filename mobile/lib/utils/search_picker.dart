@@ -52,8 +52,9 @@ Future<T?> chooseFromList<T>(
                           ),
                         )
                         .toList();
-                    if (matches.isEmpty)
+                    if (matches.isEmpty) {
                       return const Center(child: Text('Mos yozuv topilmadi'));
+                    }
                     return ListView.builder(
                       itemCount: matches.length,
                       itemBuilder: (context, index) => ListTile(

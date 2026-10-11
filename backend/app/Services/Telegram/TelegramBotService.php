@@ -236,10 +236,10 @@ class TelegramBotService
         $canCost = $data['can_view_cost'];
 
         $fSales = number_format($flow['total_sales'], 0, '.', ' ');
-        $fPaid = number_format($flow['cash_collected'], 0, '.', ' ');
+        $fPaid = number_format($flow['cash_collected'] ?? 0, 0, '.', ' ');
         $fDebt = number_format($flow['new_debt'], 0, '.', ' ');
-        $fExp = number_format($flow['operating_expenses'], 0, '.', ' ');
-        $fCashAcc = number_format($balances['total_cash'], 0, '.', ' ');
+        $fExp = number_format($flow['operating_expenses'] ?? 0, 0, '.', ' ');
+        $fCashAcc = number_format($balances['total_cash'] ?? 0, 0, '.', ' ');
 
         // Mijozlar va ta'minotchilar balansi alohida (net qilinmaydi!)
         $fCustDebt = number_format($balances['customer_debts'], 0, '.', ' ');
@@ -250,12 +250,13 @@ class TelegramBotService
         $msg = "📊 <b>BUGUNGI JONLI DASHBOARD</b>\n";
         $msg .= "━━━━━━━━━━━━━━━━━━━━━\n";
         $msg .= "💰 <b>Savdo aylanmasi:</b> {$fSales} so'm ({$flow['sales_count']} ta chek)\n";
-        $msg .= "💵 <b>Kassa tushumi:</b> {$fPaid} so'm\n";
-        $msg .= '   • Naqd: '.number_format($flow['payments_by_method']['cash'], 0, '.', ' ')." so'm\n";
-        $msg .= '   • Karta: '.number_format($flow['payments_by_method']['card'], 0, '.', ' ')." so'm\n";
-        $msg .= '   • Bank: '.number_format($flow['payments_by_method']['bank'], 0, '.', ' ')." so'm\n";
+        if ($data['can_view_cash']) {
+            $msg .= "💵 <b>Kassa tushumi:</b> {$fPaid} so'm\n";
+        }
         $msg .= "📝 <b>Yangi nasiya:</b> {$fDebt} so'm\n";
-        $msg .= "📉 <b>Xarajatlar:</b> {$fExp} so'm\n";
+        if ($data['can_view_cash']) {
+            $msg .= "📉 <b>Xarajatlar:</b> {$fExp} so'm\n";
+        }
 
         if ($canCost && $flow['gross_profit'] !== null) {
             $fCost = number_format($flow['total_cost'], 0, '.', ' ');
@@ -266,7 +267,9 @@ class TelegramBotService
 
         $msg .= "\n🏛 <b>JONLI BALANSLAR (AS-OF):</b>\n";
         $msg .= "━━━━━━━━━━━━━━━━━━━━━\n";
-        $msg .= "💼 <b>Kassalarda mavjud:</b> {$fCashAcc} so'm\n";
+        if ($data['can_view_cash']) {
+            $msg .= "💼 <b>Kassalarda mavjud:</b> {$fCashAcc} so'm\n";
+        }
         $msg .= "👥 <b>Mijozlar qarzi:</b> {$fCustDebt} so'm ({$balances['debtors_count']} ta xaridor)\n";
         $msg .= "🎁 <b>Mijozlar avansi:</b> {$fCustAdv} so'm (Alohida!)\n";
         $msg .= "🏭 <b>Ta'minotchilarga qarz:</b> {$fSuppPay} so'm\n";
@@ -277,8 +280,8 @@ class TelegramBotService
             $msg .= '🏷 <b>Ombor tannarxi:</b> '.number_format($balances['stock_cost_valuation'], 0, '.', ' ')." so'm\n";
         }
 
-        $msg .= "\n📡 <b>To'liqlik ko'rsatkichi:</b> {$warnings['completeness_percent']}%\n";
-        if ($warnings['stale_devices_count'] > 0) {
+        $msg .= "\n📡 <b>Qurilmalar aloqasi:</b> {$warnings['completeness_percent']}%\n";
+        if (! empty($warnings['completeness_note'])) {
             $msg .= "⚠️ <i>{$warnings['completeness_note']}</i>\n";
         }
 
@@ -517,17 +520,21 @@ class TelegramBotService
         $canCost = $data['can_view_cost'];
 
         $fSales = number_format($flow['total_sales'], 0, '.', ' ');
-        $fPaid = number_format($flow['cash_collected'], 0, '.', ' ');
+        $fPaid = number_format($flow['cash_collected'] ?? 0, 0, '.', ' ');
         $fDebt = number_format($flow['new_debt'], 0, '.', ' ');
-        $fExp = number_format($flow['operating_expenses'], 0, '.', ' ');
+        $fExp = number_format($flow['operating_expenses'] ?? 0, 0, '.', ' ');
 
         $periodLabel = $data['period']['label'] ?? $period;
         $msg = "📈 <b>HISOBOT: {$periodLabel}</b>\n";
         $msg .= "━━━━━━━━━━━━━━━━━━━━━\n";
         $msg .= "💰 <b>Savdo summasi:</b> {$fSales} so'm ({$flow['sales_count']} ta chek)\n";
-        $msg .= "💵 <b>Tushum:</b> {$fPaid} so'm\n";
+        if ($data['can_view_cash']) {
+            $msg .= "💵 <b>Tushum:</b> {$fPaid} so'm\n";
+        }
         $msg .= "📝 <b>Yangi nasiya:</b> {$fDebt} so'm\n";
-        $msg .= "📉 <b>Xarajatlar:</b> {$fExp} so'm\n";
+        if ($data['can_view_cash']) {
+            $msg .= "📉 <b>Xarajatlar:</b> {$fExp} so'm\n";
+        }
 
         if ($canCost && $flow['gross_profit'] !== null) {
             $msg .= '📦 <b>WAC Tannarx:</b> '.number_format($flow['total_cost'], 0, '.', ' ')." so'm\n";

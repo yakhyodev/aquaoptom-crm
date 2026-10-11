@@ -848,8 +848,9 @@ class OfflineSyncService extends ChangeNotifier {
     final expiry = DateTime.tryParse(rows.first['expires_at'] as String);
     if (!force &&
         expiry != null &&
-        expiry.isAfter(DateTime.now().add(const Duration(hours: 4))))
+        expiry.isAfter(DateTime.now().add(const Duration(hours: 4)))) {
       return false;
+    }
     final response = await _client
         .post(
           Uri.parse('${AppConfig.apiBaseUrl}/sync/renew-lease'),
@@ -857,20 +858,22 @@ class OfflineSyncService extends ChangeNotifier {
           body: json.encode({'device_uuid': deviceUuid}),
         )
         .timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw const ServerException(
         'Qurilma ruxsatini yangilab bo‘lmadi. Internetga ulanib qayta urinib ko‘ring.',
       );
+    }
     final lease =
         (json.decode(response.body) as Map<String, dynamic>)['data']
             as Map<String, dynamic>;
     final expires = DateTime.tryParse(lease['expires_at'] as String? ?? '');
     if (expires == null ||
         !expires.isAfter(DateTime.now()) ||
-        (lease['lease_token'] as String? ?? '').isEmpty)
+        (lease['lease_token'] as String? ?? '').isEmpty) {
       throw const ServerException(
         'Server yaroqli qurilma ruxsatini qaytarmadi.',
       );
+    }
     await db.update(
       'offline_leases',
       {
